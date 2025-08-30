@@ -1,0 +1,916 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
+<meta name="theme-color" content="#0b1320">
+<title>Taussil – Fahrer (PROD v7)</title>
+<link rel="icon" href="icons/taussil-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0b1320; --card:#111a2b; --ink:#e6e9ef; --muted:#9aa4b2; --cta:#33BBDF;
+  --ok:#22c55e; --warn:#f59e0b; --err:#ef4444; --border:1px solid rgba(255,255,255,.08);
+  --radius:16px; --shadow:0 12px 40px rgba(0,0,0,.35); --hit:52px;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif}
+.app{max-width:560px;margin:0 auto;padding:12px 14px 24px;display:flex;flex-direction:column;gap:12px}
+
+/* Header */
+.header{position:sticky;top:0;z-index:5;background:linear-gradient(180deg,rgba(11,19,32,1),rgba(11,19,32,.75));backdrop-filter:blur(6px);
+  border-bottom:1px solid rgba(255,255,255,.08); padding:10px 12px;border-radius:0 0 14px 14px;display:flex;align-items:center;justify-content:space-between;gap:8px}
+.brand{display:flex;align-items:center;gap:10px;font-weight:800}
+.badge-dot{width:10px;height:10px;border-radius:50%;background:#555;margin-left:6px}
+.badge-dot.on{background:var(--ok)} .badge-dot.off{background:#555}
+.menu-btn{height:36px;min-width:36px;border-radius:10px;border:1px solid rgba(255,255,255,.12);background:#0f1a30;color:var(--ink);display:flex;align-items:center;justify-content:center;cursor:pointer}
+.menu{position:absolute;right:12px;top:58px;background:#0f1a30;border:1px solid rgba(255,255,255,.12);border-radius:12px;box-shadow:var(--shadow);display:none;flex-direction:column;min-width:220px;overflow:hidden}
+.menu.show{display:flex}
+.menu a{padding:10px 12px;color:var(--ink);text-decoration:none;border-top:1px solid rgba(255,255,255,.08)} .menu a:first-child{border-top:0}
+.menu a:hover{background:#142036}
+
+/* Online toggle */
+.toggle{display:flex;align-items:center;gap:8px}
+.tgl{position:relative;width:46px;height:26px;background:#2a3348;border-radius:999px;border:1px solid rgba(255,255,255,.12);cursor:pointer}
+.tgl::after{content:"";position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;background:#fff;transition:.18s}
+.tgl.on{background:#0f3e23;border-color:#1f8a53}
+.tgl.on::after{left:23px;background:#caffdc}
+.stat{font-size:12px;color:var(--muted)}
+
+/* Cards & inputs */
+.card{background:var(--card);border:var(--border);border-radius:var(--radius);box-shadow:var(--shadow);padding:12px}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.input, .btn, select, a.btn{height:var(--hit);background:#0f1a30;color:var(--ink);border:1px solid rgba(255,255,255,.12);border-radius:14px;padding:0 14px;font-size:16px;width:100%;text-decoration:none}
+.btn{display:flex;align-items:center;justify-content:center;cursor:pointer;font-weight:800}
+.btn:disabled{opacity:.6;cursor:not-allowed}
+.btn-cta{background:linear-gradient(180deg,#33BBDF,#1da9cf);border:none;color:#fff}
+.btn-ghost{background:#13213a;border:1px solid rgba(255,255,255,.14);color:#e6e9ef}
+.small{font-size:12px;color:var(--muted)}
+.kv{display:flex;justify-content:space-between;gap:8px;padding:6px 0;border-top:1px solid rgba(255,255,255,.08)}
+.kv:first-child{border-top:0}
+
+/* Orders list */
+.list{display:flex;flex-direction:column;gap:10px}
+.card-order{display:grid;grid-template-columns:56px 1fr auto;gap:10px;align-items:center;border:1px solid rgba(255,255,255,.08);border-radius:14px;background:#0f1a30;padding:8px 10px;cursor:pointer}
+.logo img{width:56px;height:56px;border-radius:12px;object-fit:cover;border:1px solid rgba(255,255,255,.08)}
+.logo .ph{width:56px;height:56px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-weight:800;background:#1a2742;border:1px solid rgba(255,255,255,.08)}
+.line{display:flex;align-items:center;gap:8px}
+.tag{font-size:11px;padding:4px 8px;border-radius:999px;border:1px solid rgba(255,255,255,.14);background:#0f1a30;color:#9aa4b2}
+.btn-icon{width:48px;height:48px;border-radius:12px;border:1px solid rgba(255,255,255,.12);background:#122037;display:flex;align-items:center;justify-content:center;cursor:pointer}
+.btn-go{background:linear-gradient(180deg,#4ade80,#22c55e);border:none;color:#06220f}
+.btn-done{background:linear-gradient(180deg,#a7f3d0,#34d399);border:none;color:#06220f}
+
+/* Detail bottom sheet */
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.45);display:none;align-items:flex-end;z-index:1000}
+.modal.show{display:flex}
+.sheet{background:#0f1a30;border-radius:16px 16px 0 0;width:100%;max-height:60vh;min-height:40vh;overflow:auto;border:1px solid rgba(255,255,255,.12);padding:12px;animation:rise .18s ease}
+@keyframes rise{from{transform:translateY(20px);opacity:.8}to{transform:translateY(0);opacity:1}}
+.sheet .hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}
+.sheet .title{font-weight:800}
+.sheet .close{width:36px;height:36px;border-radius:10px;border:1px solid rgba(255,255,255,.12);background:#111a2b;color:#e6e9ef;display:flex;align-items:center;justify-content:center;cursor:pointer}
+
+/* Incoming order popup */
+.pop{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.5);z-index:50}
+.pop.show{display:flex}
+.pop .box{background:#0f1a30;border:1px solid rgba(255,255,255,.14);border-radius:16px;box-shadow:var(--shadow);padding:14px;max-width:520px;width:92%}
+.pop .row{grid-template-columns:1fr 1fr}
+
+/* toast */
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:18px;background:#0f1a30;border:1px solid rgba(255,255,255,.14);color:#e6e9ef;border-radius:12px;padding:10px 14px;opacity:0;transition:opacity .18s}
+.toast.show{opacity:1}
+.tab-btn.active{
+  background:linear-gradient(180deg,#33BBDF,#1da9cf);
+  border:none;
+  color:#fff;
+}
+
+@media (max-width:460px){ .row{grid-template-columns:1fr} }
+</style>
+</head>
+<body>
+
+<!-- Auth Modal -->
+<div id="authModal" style="position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.55)">
+  <div style="width:min(560px,92%);background:#0f1a30;border:1px solid rgba(255,255,255,.14);border-radius:16px;padding:14px;box-shadow:0 12px 40px rgba(0,0,0,.35)">
+    <div style="display:flex;gap:6px;margin-bottom:10px">
+      <button id="tabLogin"    class="btn" style="flex:1">Anmelden</button>
+      <button id="tabRegister" class="btn" style="flex:1;opacity:.8">Registrieren</button>
+    </div>
+
+    <!-- Login -->
+    <form id="formLogin" onsubmit="return false">
+      <div class="row" style="grid-template-columns:1fr 1fr">
+        <input id="loginEmail" class="input" type="email" placeholder="E-Mail" autocomplete="username" required>
+        <input id="loginPass"  class="input" type="password" placeholder="Passwort" autocomplete="current-password" required>
+      </div>
+      <button id="loginBtn" class="btn btn-cta" style="margin-top:8px">Anmelden</button>
+      <div id="loginMsg" class="small" style="margin-top:6px;color:#fca5a5"></div>
+    </form>
+
+    <!-- Register -->
+    <form id="formRegister" onsubmit="return false" style="display:none">
+      <div class="row" style="grid-template-columns:1fr 1fr">
+        <input id="regFirst" class="input" type="text" placeholder="Vorname (≥ 2)" autocomplete="given-name" required>
+        <input id="regLast"  class="input" type="text" placeholder="Nachname (≥ 2)" autocomplete="family-name" required>
+      </div>
+      <div class="row" style="grid-template-columns:1fr 1fr">
+        <input id="regPhone" class="input" type="tel" placeholder="Telefonnummer (+49 …)" autocomplete="tel" inputmode="tel">
+        <input id="regEmail" class="input" type="email" placeholder="E-Mail" autocomplete="email" required>
+      </div>
+      <div class="row" style="grid-template-columns:1fr 1fr">
+        <input id="regPass"  class="input" type="password" placeholder="Passwort (6+)" autocomplete="new-password" required>
+        <label style="display:flex;align-items:center;gap:8px;user-select:none">
+          <input id="regTerms" type="checkbox" style="width:18px;height:18px" required>
+          <span class="small">
+            Ich akzeptiere
+            <a href="agb.html" target="_blank" rel="noopener noreferrer" style="color:#33BBDF;text-decoration:none">AGB</a>
+            &amp;
+            <a href="datenschutz.html" target="_blank" rel="noopener noreferrer" style="color:#33BBDF;text-decoration:none">Datenschutz</a>
+          </span>
+        </label>
+      </div>
+      <button id="registerBtn" class="btn btn-cta" style="margin-top:8px">Registrieren</button>
+      <div id="regMsg" class="small" style="margin-top:6px;color:#fca5a5"></div>
+      <div class="small" style="margin-top:4px;opacity:.85">Nach der Registrierung wird dein Konto vom Admin geprüft.</div>
+    </form>
+  </div>
+</div>
+
+<div id="appRoot" class="app" style="display:none">
+
+  <!-- Header -->
+  <div class="header">
+    <div class="brand">Fahrer <span id="netDot" class="badge-dot off"></span></div>
+    <div class="toggle">
+      <div class="stat" id="statText">Offline</div>
+      <div id="onlineToggle" class="tgl" title="Online/Offline"></div>
+    </div>
+    <div>
+      <button id="menuBtn" class="menu-btn">☰</button>
+      <div id="menu" class="menu">
+        <a href="#" id="mNav">🗺️ Navigation-App</a>
+        <a href="#" id="mLogout">🚪 Abmelden</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Orders -->
+  <section class="card">
+  <div class="kv">
+    <div class="small">Aufträge</div>
+    <div class="small" id="ordersInfo">—</div>
+  </div>
+
+  <!-- Tabs -->
+  <div class="row" id="tabsRow" style="grid-template-columns:repeat(3,1fr);margin-top:8px">
+    <button class="btn btn-ghost tab-btn active" data-tab="Neu">Neu</button>
+    <button class="btn btn-ghost tab-btn" data-tab="Geliefert">Geliefert</button>
+    <button class="btn btn-ghost tab-btn" data-tab="Abgebrochen">Abgebrochen</button>
+  </div>
+
+  <div id="ordersList" class="list"></div>
+</section>
+
+
+</div>
+
+<!-- Detail Bottom Sheet -->
+<div id="orderModal" class="modal">
+  <div class="sheet" role="dialog" aria-modal="true">
+    <div class="hdr">
+      <div class="title" id="md_title">Auftrag</div>
+      <button class="close" id="md_close">✕</button>
+    </div>
+    <div class="kv"><div class="small">Auftrag-ID</div><div class="small" id="md_id">—</div></div>
+    <div class="kv"><div class="small">Status</div><div class="small" id="md_status">—</div></div>
+    <div class="kv"><div class="small">Plattform</div><div class="small" id="md_platform">—</div></div>
+    <div class="kv"><div class="small">Restaurant</div><div class="small" id="md_rest">—</div></div>
+    <div class="kv"><div class="small">Adresse</div><div class="small" id="md_addr">—</div></div>
+    <div class="kv"><div class="small">Qty</div><div class="small" id="md_qty">—</div></div>
+    <div class="kv"><div class="small">Abholzeit</div><div class="small" id="md_pickup">—</div></div>
+    <div class="row" style="margin-top:8px">
+      <a id="md_nav" class="btn btn-cta" href="#" target="_blank" rel="noopener noreferrer">Navigation</a>
+      <button id="md_start" class="btn btn-ghost">Start Fahrt</button>
+      <button id="md_done"  class="btn btn-ghost">Geliefert</button>
+    </div>
+  </div>
+</div>
+
+<!-- Navigation preference modal -->
+<div id="navModal" class="modal">
+  <div class="sheet" role="dialog" aria-modal="true">
+    <div class="hdr">
+      <div class="title">Navigation-App</div>
+      <button class="close" id="nav_close">✕</button>
+    </div>
+    <div class="row" style="grid-template-columns:1fr">
+      <label class="small"><input type="radio" name="navpref" value="auto"> Auto (empfohlen)</label>
+      <label class="small"><input type="radio" name="navpref" value="google"> Google Maps</label>
+      <label class="small"><input type="radio" name="navpref" value="apple"> Apple Karten</label>
+    </div>
+    <button id="nav_save" class="btn btn-cta" style="margin-top:8px">Speichern</button>
+  </div>
+</div>
+
+<!-- Incoming order popup -->
+<div id="incoming" class="pop">
+  <div class="box">
+    <div style="font-weight:800;margin-bottom:8px">Neuer Auftrag</div>
+    <div id="in_text" class="small" style="margin-bottom:10px">—</div>
+    <div class="row">
+      <button id="in_accept" class="btn btn-cta">Akzeptieren</button>
+      <button id="in_reject" class="btn btn-ghost">Abbrechen</button>
+    </div>
+  </div>
+</div>
+
+<!-- Sounds -->
+<audio id="newOrderSound" src="neu1.mp3" preload="auto"></audio>
+
+<div id="toast" class="toast">OK</div>
+
+<script type="module">
+/* ===== Firebase ===== */
+import { initializeApp, getApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import {
+  getFirestore, collection, query, where, limit, onSnapshot, doc,
+  setDoc, updateDoc, getDoc, Timestamp, serverTimestamp
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import {
+  getDatabase, ref, onDisconnect, update as rUpdate, onValue, serverTimestamp as rServerTs
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+import {
+  getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword,
+  signOut, setPersistence, browserSessionPersistence
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyD0g9T3amjuPodsLS6ZQkHYWrzV1UrX_QI",
+  authDomain: "taussil-lieferservice-8bbe9.firebaseapp.com",
+  projectId: "taussil-lieferservice-8bbe9",
+  storageBucket: "taussil-lieferservice-8bbe9.firebasestorage.app",
+  messagingSenderId: "583536892937",
+  appId: "1:583536892937:web:5d5ff133de4d8b3b28ecd8",
+  databaseURL: "https://taussil-lieferservice-8bbe9-default-rtdb.europe-west1.firebasedatabase.app"
+};
+let app; try{ app=getApp(); }catch{ app=initializeApp(firebaseConfig); }
+const db = getFirestore(app);
+const rtdb = getDatabase(app);
+const auth = getAuth(app);
+await setPersistence(auth, browserSessionPersistence).catch(()=>{});
+
+/* ===== Address + Distance + Pricing Helpers ===== */
+
+/* مفتاح خرائط جوجل (استخدمت نفس المفتاح الموجود بواجهة المطعم) */
+const GMAPS_API_KEY = 'AIzaSyDipzUmxEQmAjaDkn6xQ91ZhqnkPmgl-2o';
+async function ensureGmaps(){
+  if (window.google?.maps) return true;
+  await new Promise((resolve, reject)=>{
+    const cb='gm_cb_'+Math.random().toString(36).slice(2);
+    window[cb]=()=>{ delete window[cb]; resolve(true); };
+    const s=document.createElement('script');
+    s.src=`https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(GMAPS_API_KEY)}&v=weekly&callback=${cb}`;
+    s.async=true; s.defer=true; s.onerror=()=>{ delete window[cb]; reject(new Error('gmaps-load-failed')); };
+    document.head.appendChild(s);
+  });
+  return true;
+}
+async function routeKm(origin, destination){
+  await ensureGmaps();
+  return new Promise((resolve, reject)=>{
+    const ds = new google.maps.DirectionsService();
+    ds.route({ origin, destination, travelMode: google.maps.TravelMode.DRIVING }, (res, status)=>{
+      const leg = res?.routes?.[0]?.legs?.[0];
+      if (status==='OK' && leg?.distance?.value!=null) {
+        resolve(leg.distance.value / 1000);
+      } else {
+        reject(new Error(status || 'no-route'));
+      }
+    });
+  });
+}
+function haversineKm(a,b){
+  if(!a||!b||!isFinite(a.lat)||!isFinite(a.lng)||!isFinite(b.lat)||!isFinite(b.lng)) return 0;
+  const R=6371, toRad=x=>x*Math.PI/180;
+  const dLat=toRad(b.lat-a.lat), dLng=toRad(b.lng-a.lng);
+  const s=Math.sin(dLat/2)**2 + Math.cos(toRad(a.lat))*Math.cos(toRad(b.lat))*Math.sin(dLng/2)**2;
+  return 2*R*Math.asin(Math.sqrt(s));
+}
+function getRestaurantAddr(o){
+  return (o?.restaurant?.addressText || o?.restaurant?.address_text || '').trim() || null;
+}
+function getDropAddr(o){
+  const cand = [
+    o?.dropoff?.addressText, o?.dropoff?.address_text,
+    o?.customer?.addressText, o?.customer?.address_text,
+    o?.destination?.addressText, o?.destination?.address_text,
+    o?.deliveryAddress, o?.delivery_address,
+    o?.addr, o?.address
+  ];
+  for (const v of cand){ if (v && String(v).trim()) return String(v).trim(); }
+  return null;
+}
+async function getCurrentLLOnce(){
+  return new Promise(res=>{
+    if(navigator.geolocation){
+      navigator.geolocation.getCurrentPosition(
+        p=>res({lat:p.coords.latitude, lng:p.coords.longitude}),
+        _=>res(null), {enableHighAccuracy:true, maximumAge:1000, timeout:7000}
+      );
+    } else { res(null); }
+  });
+}
+
+/* سلسلة التسليمات (multi-drop): نخزن آخر نقطة تسليم */
+const LS_CHAIN_LAST_DEST = 'driver:chain:lastDest';
+function getLastDest(){
+  try{ const s=localStorage.getItem(LS_CHAIN_LAST_DEST); return s? JSON.parse(s) : null; }catch(_){ return null; }
+}
+function setLastDestFromText(addr){ try{ localStorage.setItem(LS_CHAIN_LAST_DEST, JSON.stringify({addrText: String(addr||'').trim()})); }catch(_){ } }
+function setLastDestFromLL(ll){ try{ if(ll&&isFinite(ll.lat)&&isFinite(ll.lng)) localStorage.setItem(LS_CHAIN_LAST_DEST, JSON.stringify({lat: ll.lat, lng: ll.lng})); }catch(_){ } }
+
+/* أصل الرحلة: آخر تسليم وإلا المطعم */
+function computeLegOrigin(o){
+  const last = getLastDest();
+  if(last?.addrText) return last.addrText;
+  if(last && isFinite(last.lat) && isFinite(last.lng)) return {lat: last.lat, lng: last.lng};
+  return getRestaurantAddr(o);
+}
+
+/* كم حقيقي للرحلة الحالية */
+async function computeLegKmForOrder(o){
+  const origin = computeLegOrigin(o);
+  let destination = getDropAddr(o);
+  if(!destination){
+    // إن لم يكن عنوان التسليم محفوظًا في الوثيقة، نستخدم موقع السائق الحالي كوجهة
+    const ll = lastLL || await getCurrentLLOnce();
+    if(ll) destination = {lat: ll.lat, lng: ll.lng};
+  }
+  if(!origin || !destination) return 0;
+  try{
+    return await routeKm(origin, destination);
+  }catch(_){
+    if(typeof origin==='object' && 'lat' in origin && typeof destination==='object' && 'lat' in destination){
+      return haversineKm(origin, destination);
+    }
+    return 0;
+  }
+}
+
+/* مبلغ الطلب (Betrag) */
+function getOrderAmount(o){
+  // في نظامك، المطعم يرسل price كمبلغ الطلب و deliveryFee كبداية 0
+  const cands = [o.price, o.amount, o.total, o.orderTotal, o.sum];
+  for (const v of cands){
+    const n = Number(v);
+    if (Number.isFinite(n)) return n;
+  }
+  return 0;
+}
+
+/* معادلة Liefergebühr التي أرسلتها (مقربة للسنت) */
+function calcDeliveryFeeEUR(betrag, km){
+  const b = Number(betrag||0);
+  const d = Math.max(0, Number(km||0));
+  let fee = 0;
+
+  if (d <= 5) {
+    if (b <= 20)             fee = 3.5;
+    else if (b <= 25)        fee = 3.5 + (0.10 * d);
+    else                     fee = (b * 0.14) + (0.10 * d);
+  } else {
+    const over5 = d - 5;
+    if (b <= 20)             fee = 3.5 + (0.50 * over5);
+    else if (b <= 25)        fee = (3.5 + 0.10 * d) + (0.40 * over5);
+    else                     fee = ((b * 0.14) + (0.10 * d)) + (0.40 * over5);
+  }
+
+  if (d > 20)       fee += (0.50 * (20 - 15)) + (1.10 * (d - 20));
+  else if (d > 15)  fee += 0.50 * (d - 15);
+
+  return Math.round(fee * 100) / 100;
+}
+
+/* ===== Helpers/UI ===== */
+const $=s=>document.querySelector(s);
+const toast=t=>{ const el=$("#toast"); el.textContent=t; el.classList.add("show"); setTimeout(()=>el.classList.remove("show"),1600); if(navigator.vibrate) navigator.vibrate(20); };
+const nowStr=()=>new Date().toLocaleTimeString();
+
+/* ===== Navigation Preference & URL ===== */
+const NAV_PREF_KEY='taussil_nav_pref';
+function detectDefaultNav(){
+  const ua = navigator.userAgent||navigator.vendor||'';
+  const iOS = /iPad|iPhone|iPod/.test(ua);
+  const macTouch = /\bMacintosh\b/.test(ua) && 'ontouchend' in document;
+  return (iOS || macTouch) ? 'apple' : 'google';
+}
+function getNavPref(){ return localStorage.getItem(NAV_PREF_KEY) || 'auto'; }
+function makeNavUrl(addr){
+  const pref = getNavPref();
+  const mode = (pref==='auto')? detectDefaultNav() : pref;
+  const enc = encodeURIComponent(addr||'');
+  if(mode==='apple'){ return `https://maps.apple.com/?daddr=${enc}&dirflg=d`; }
+  return `https://www.google.com/maps/dir/?api=1&destination=${enc}&travelmode=driving`;
+}
+
+/* ===== Refs ===== */
+const netDot=$("#netDot"), statText=$("#statText"), onlineToggle=$("#onlineToggle"), menuBtn=$("#menuBtn"), menu=$("#menu");
+const mNav=$("#mNav"), mLogout=$("#mLogout");
+const navModal=$("#navModal"), navClose=$("#nav_close"), navSave=$("#nav_save");
+const listEl=$("#ordersList"), ordersInfo=$("#ordersInfo");
+const md=$("#orderModal"), mdClose=$("#md_close");
+const md_id=$("#md_id"), md_status=$("#md_status"), md_platform=$("#md_platform"), md_rest=$("#md_rest"), md_addr=$("#md_addr"), md_qty=$("#md_qty"), md_pickup=$("#md_pickup"), md_title=$("#md_title");
+const md_start=$("#md_start"), md_done=$("#md_done"), md_nav=$("#md_nav");
+const incoming=$("#incoming"), inText=$("#in_text"), inAccept=$("#in_accept"), inReject=$("#in_reject");
+/* === صوت التنبيه (موجود في الـHTML): <audio id="newOrderSound" src="neu1.mp3" preload="auto"></audio> === */
+const newOrderSound=$("#newOrderSound");
+const appRoot=$("#appRoot"); const authModal=$("#authModal");
+document.querySelectorAll('.tab-btn').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    currentTab = btn.getAttribute('data-tab') || 'Neu';
+    renderOrders(lastOrders); // إعادة رسم حسب التبويب
+  });
+});
+
+/* Auth popup elements */
+const tabLogin=$("#tabLogin"), tabRegister=$("#tabRegister");
+const formLogin=$("#formLogin"), formRegister=$("#formRegister");
+const loginEmail=$("#loginEmail"), loginPass=$("#loginPass"), loginBtn=$("#loginBtn"), loginMsg=$("#loginMsg");
+const regFirst=$("#regFirst"), regLast=$("#regLast"), regPhone=$("#regPhone"), regEmail=$("#regEmail"), regPass=$("#regPass"), regTerms=$("#regTerms"), registerBtn=$("#registerBtn"), regMsg=$("#regMsg");
+
+/* ===== State ===== */
+const ONLINE_PREF_KEY='taussil_driver_online_pref';
+const SESSION_OK='driver_session_ok';
+let lastAuthTab = localStorage.getItem('driver_auth_tab') || 'login';
+
+let uid=null, approved=false, online=false, watchId=null, lastLL=null, lastSentAt=0;
+let currentTab = 'Neu';
+let lastOrders = [];
+
+function normStatus(raw){
+  const s = String(raw||'').toLowerCase();
+  if (['bearbeitung','zugewiesen','assigned','angenommen','unterwegs'].includes(s)) return 'neu';
+  if (s==='geliefert')   return 'geliefert';
+  if (s==='abgebrochen') return 'abgebrochen';
+  return 'neu';
+}
+function inTab(o, tab){
+  const ns = normStatus(o?.status);
+  if (tab==='Neu')         return ns==='neu';
+  if (tab==='Geliefert')   return ns==='geliefert';
+  if (tab==='Abgebrochen') return ns==='abgebrochen';
+  return true;
+}
+
+let regInFlight = false; // ← تسجيل حساب جديد جارٍ
+
+/* ===== Menu ===== */
+menuBtn.addEventListener("click", (e)=>{ e.preventDefault(); menu.classList.toggle("show"); });
+document.addEventListener("click",(e)=>{ if(!e.target.closest(".menu") && !e.target.closest("#menuBtn")) menu.classList.remove("show"); });
+mLogout.addEventListener('click', async (e)=>{
+  e.preventDefault();
+  try{ await signOut(auth); }catch(_){}
+  sessionStorage.removeItem(SESSION_OK);
+  appRoot.style.display='none'; authModal.style.display='flex';
+  detachOrders(); stopPresence(); stopIncomingAlert();
+  toast('Abgemeldet');
+});
+
+/* ===== Navigation Pref UI ===== */
+function openNavPref(){
+  const pref=getNavPref();
+  navModal.classList.add('show');
+  document.querySelectorAll('input[name="navpref"]').forEach(r=>{ r.checked = (r.value===pref); });
+}
+mNav.addEventListener('click', (e)=>{ e.preventDefault(); openNavPref(); });
+navClose.addEventListener('click', ()=> navModal.classList.remove('show'));
+navModal.addEventListener('click',(e)=>{ if(e.target===navModal) navModal.classList.remove('show'); });
+navSave.addEventListener('click', (e)=>{
+  e.preventDefault();
+  const sel = document.querySelector('input[name="navpref"]:checked');
+  const val = sel? sel.value : 'auto';
+  localStorage.setItem(NAV_PREF_KEY, val);
+  navModal.classList.remove('show');
+  toast('Navigation gespeichert');
+});
+
+/* ===== Tabs ===== */
+function switchPane(which){
+  const reg = (which==='register');
+  formLogin.style.display    = reg ? 'none' : 'block';
+  formRegister.style.display = reg ? 'block': 'none';
+  tabLogin.style.opacity     = reg ? .7 : 1;
+  tabRegister.style.opacity  = reg ? 1 : .7;
+  lastAuthTab = reg? 'register':'login';
+  localStorage.setItem('driver_auth_tab', lastAuthTab);
+}
+tabLogin.addEventListener('click', (e)=>{ e.preventDefault(); switchPane('login'); });
+tabRegister.addEventListener('click', (e)=>{ e.preventDefault(); switchPane('register'); });
+
+/* ===== Auth Actions ===== */
+loginBtn.addEventListener('click', async (e)=>{
+  e.preventDefault();
+  loginMsg.textContent=''; loginBtn.disabled=true;
+  try{
+    const email=(loginEmail?.value||'').trim();
+    const pass =(loginPass ?.value||'');
+    if(!email || !pass){ loginMsg.textContent='Bitte E-Mail & Passwort eingeben.'; return; }
+    await signInWithEmailAndPassword(auth, email, pass);
+    sessionStorage.setItem(SESSION_OK,'1');
+  }catch(e){
+    console.error(e);
+    const map = {'auth/invalid-email':'E-Mail ungültig.','auth/user-not-found':'Kein Nutzer gefunden.','auth/wrong-password':'Falsches Passwort.','auth/too-many-requests':'Zu viele Versuche.','auth/network-request-failed':'Netzwerkfehler.'};
+    loginMsg.textContent = map[e?.code] || ('Anmeldung fehlgeschlagen: '+(e?.code||''));
+  }finally{ loginBtn.disabled=false; }
+});
+
+registerBtn.addEventListener('click', async (e)=>{
+  e.preventDefault();
+  regMsg.textContent=''; registerBtn.disabled=true; regInFlight = true;
+  const first=(regFirst?.value||'').trim();
+  const last =(regLast ?.value||'').trim();
+  const phone=(regPhone?.value||'').trim();
+  const email=(regEmail?.value||'').trim();
+  const pass =(regPass ?.value||'');
+  if(first.length<2){ regMsg.textContent='Bitte Vornamen (≥2)'; registerBtn.disabled=false; regInFlight=false; return; }
+  if(last.length<2){  regMsg.textContent='Bitte Nachnamen (≥2)'; registerBtn.disabled=false; regInFlight=false; return; }
+  if(!/\S+@\S+\.\S+/.test(email)){ regMsg.textContent='E-Mail ungültig'; registerBtn.disabled=false; regInFlight=false; return; }
+  if((pass||'').length<6){ regMsg.textContent='Passwort zu kurz'; registerBtn.disabled=false; regInFlight=false; return; }
+  if(!regTerms?.checked){ regMsg.textContent='Bitte AGB & Datenschutz akzeptieren.'; registerBtn.disabled=false; regInFlight=false; return; }
+  try{
+    const cred=await createUserWithEmailAndPassword(auth,email,pass);
+    const user=cred.user;
+    await user.getIdToken(true);
+    const tokenRes=await user.getIdTokenResult(true);
+    const claimsEmail=(tokenRes?.claims?.email ?? user.email ?? email).toString().trim();
+    const uref=doc(db,'users', user.uid);
+    const ex=await getDoc(uref);
+    if(ex.exists()){
+      regMsg.textContent='Konto existiert bereits. Bitte anmelden.';
+      await signOut(auth).catch(()=>{});
+      switchPane('login');
+      return;
+    }
+    const nowTs = Timestamp.now();
+    await setDoc(uref,{
+      email: claimsEmail, role:'driver', approved:false, status:'pending',
+      firstName:first, lastName:last, phone: phone||null,
+      createdAt: nowTs, updatedAt: nowTs
+    },{merge:false});
+    regMsg.textContent='Konto erstellt. Wird geprüft…';
+    await signOut(auth).catch(()=>{});
+    switchPane('login');
+  }catch(e){
+    console.error(e);
+    const map = {'permission-denied': 'Berechtigung verweigert (Rules).','auth/email-already-in-use':'E-Mail bereits vergeben.','auth/invalid-email':'E-Mail ungültig.','auth/weak-password':'Passwort zu schwach (6+).','auth/network-request-failed':'Netzwerkfehler.'};
+    regMsg.textContent = map[e?.code] || ('Registrierung fehlgeschlagen: '+(e?.code||''));
+  }finally{ registerBtn.disabled=false; regInFlight=false; }
+});
+
+/* ===== Online toggle ===== */
+onlineToggle.addEventListener("click", (e)=>{ e.preventDefault(); setOnline(!online); });
+function setOnline(flag){
+  if(!uid){ toast("Bitte zuerst anmelden."); return; }
+  if(!approved){ toast("Dein Konto wird geprüft"); return; }
+  online=!!flag;
+  onlineToggle.classList.toggle("on", online);
+  statText.textContent = online? "Online":"Offline";
+  localStorage.setItem(ONLINE_PREF_KEY, online?'1':'0');
+  if(online){ startPresence(); attachOrders(); attachInbox(); } else { stopPresence(); detachOrders(); detachInbox(); stopIncomingAlert(); }
+}
+
+/* ===== Presence + GPS (RTDB) ===== */
+let hbTimer = null; // مؤقت النبضات
+function startPresence(){
+  const pRef = ref(rtdb, `drivers_presence/${uid}`);
+  rUpdate(pRef,{ online:true, desired:true, ts: Date.now(), ver:'driver-web-v7' }).catch(()=>{});
+  try{ onDisconnect(pRef).update({ lastDisconnectAt: rServerTs() }); }catch(_){}
+  // ✨ ابدأ heartbeat كل 15 ثانية
+  if(hbTimer) clearInterval(hbTimer);
+  hbTimer = setInterval(()=>{
+    rUpdate(pRef,{ online:true, ts: Date.now(), ver:'driver-web-v7' }).catch(()=>{});
+  },15000);
+  startWatch();
+}
+function stopPresence(){
+  if(hbTimer){ clearInterval(hbTimer); hbTimer=null; }
+  try{ rUpdate(ref(rtdb,`drivers_presence/${uid}`), { online:false, desired:false, ts: Date.now() }); }catch(_){}
+  stopWatch();
+}
+function startWatch(){
+  if(!("geolocation" in navigator)){ return; }
+  if(watchId!=null) return;
+  watchId = navigator.geolocation.watchPosition(
+    pos=>{
+      const { latitude:lat, longitude:lng, accuracy, speed } = pos.coords;
+      lastLL={lat,lng};
+      const now=Date.now();
+      if(now-lastSentAt>=4000){
+        rUpdate(ref(rtdb,`drivers_locations/${uid}`), { lat,lng, accuracy: Number.isFinite(accuracy)?accuracy:null, updatedAt: now }).catch(()=>{});
+        lastSentAt=now;
+      }
+    },
+    _=>{},
+    { enableHighAccuracy:true, maximumAge:1000, timeout:10000 }
+  );
+}
+function stopWatch(){ if(watchId!=null){ try{ navigator.geolocation.clearWatch(watchId); }catch(_){ } watchId=null; } }
+
+/* ===== Orders ===== */
+let unsubOrders=null, unsubInbox=null;
+function detachOrders(){ unsubOrders?.(); unsubOrders=null; ordersInfo.textContent="—"; listEl.innerHTML=""; }
+function mapStatusLabel(s){ const low=String(s||"").toLowerCase(); if(low==="bearbeitung") return "Neu"; return s||"—"; }
+
+function attachOrders(){
+  detachOrders();
+  if(!uid){ ordersInfo.textContent="—"; return; }
+  const qMine=query(collection(db,"orders"), where("driver.id","==", uid), limit(50));
+  unsubOrders = onSnapshot(qMine,(snap)=>{
+    const items = snap.docs.map(d=>({ id:d.id, o:d.data()||{} }))
+      .sort((a,b)=>{
+        const ta=(a.o.updatedAt&&a.o.updatedAt.toMillis)?a.o.updatedAt.toMillis():0;
+        const tb=(b.o.updatedAt&&b.o.updatedAt.toMillis)?b.o.updatedAt.toMillis():0;
+        return tb-ta;
+      });
+    lastOrders = items.slice();
+    renderOrders(lastOrders);
+    snap.docChanges().forEach(ch=>{
+      const now=String(ch.doc.data()?.status||'').toLowerCase();
+      if(now==='zugewiesen' || now==='assigned'){ showIncoming({id:ch.doc.id, o:ch.doc.data()||{}}); }
+    });
+  }, ()=>{ ordersInfo.textContent="Wird geprüft…"; });
+}
+
+function renderOrders(items){
+  const filtered = items.filter(({o})=> inTab(o, currentTab));
+  ordersInfo.textContent = `${filtered.length} sichtbar (${currentTab})`;
+  if(filtered.length===0){ listEl.innerHTML = `<div class="small" style="opacity:.8">— Keine Aufträge —</div>`; return; }
+
+  listEl.innerHTML = filtered.map(({id,o})=>{
+    const stRaw=o.status||"—", st=mapStatusLabel(stRaw);
+    const rest=o.restaurant?.name||"—";
+    const addr=(o.restaurant?.addressText || o.restaurant?.address_text || "").trim();
+    const qty =Number(o.qty||0)||0;
+    const plat=Array.isArray(o.platform)? o.platform.join(" / ") : (o.platform||"—");
+    const lower=String(stRaw).toLowerCase();
+    const showStart = (lower==="angenommen" || lower==="zugewiesen" || lower==="assigned" || lower==="bearbeitung");
+    const showDone  = (lower==="unterwegs");
+    const logoUrl=o.restaurant?.logoUrl||"";
+    const logoHTML = logoUrl? `<img src="${logoUrl}" alt="${rest}">` : `<div class="ph">${(rest||"—").slice(0,2).toUpperCase()}</div>`;
+    const navHref = addr ? makeNavUrl(addr) : '#';
+    return `
+      <div class="card-order" data-id="${id}" data-addr="${encodeURIComponent(addr)}">
+        <div class="logo">${logoHTML}</div>
+        <div class="info">
+          <div class="line"><strong>${rest}</strong> <span class="tag">${st}</span></div>
+          <div class="small">${plat} · Qty ${qty}</div>
+          <div class="small" style="opacity:.85;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${addr || '—'}</div>
+        </div>
+        <div class="act">
+          ${ showStart ? `<a class="btn-icon btn-go" href="${navHref}" target="_blank" rel="noopener noreferrer" data-act="start">▶</a>` : ``}
+          ${ showDone  ? `<button class="btn-icon btn-done" data-act="delivered">✓</button>` : ``}
+        </div>
+      </div>
+    `;
+  }).join("");
+
+  // ربط الأحداث
+  listEl.querySelectorAll(".card-order").forEach(el=>{
+    el.addEventListener("click",(e)=>{
+      if(e.target.closest(".btn-icon")) return;
+      const id = el.getAttribute("data-id"); openDetail(id);
+    });
+    const startA = el.querySelector('a[data-act="start"]');
+    if(startA){
+      startA.addEventListener("click", async (e)=>{
+        const id = el.getAttribute("data-id");
+        const addr = decodeURIComponent(el.getAttribute("data-addr")||"").trim();
+        if(!addr){ e.preventDefault(); toast('Restaurant-Adresse fehlt'); return; }
+        await safeSetStatusToUnterwegs(id);
+      });
+    }
+    const doneBtn = el.querySelector('button[data-act="delivered"]');
+    if(doneBtn){
+      doneBtn.addEventListener("click", async (e)=>{
+        e.stopPropagation();
+        const id = el.getAttribute("data-id");
+        await finalizeOrderWithFee(id);
+      });
+    }
+  });
+}
+
+
+/* ===== Inbox (RTDB) ===== */
+function detachInbox(){ unsubInbox?.(); unsubInbox=null; }
+function attachInbox(){
+  detachInbox();
+  if(!uid) return;
+  const inboxRef = ref(rtdb, `drivers_inbox/${uid}`);
+  unsubInbox = onValue(inboxRef, (snap)=>{
+    const v = snap.val()||{};
+    const oid = v.lastOrderAssigned || null;
+    if(oid){
+      getDoc(doc(db,"orders", oid)).then(ds=>{
+        if(!ds.exists()) return;
+        const o=ds.data()||{};
+        const s=String(o.status||'').toLowerCase();
+        if(s==='abgebrochen' || s==='geliefert') return;
+        showIncoming({id:oid, o});
+      }).catch(()=>{});
+    }
+  });
+}
+
+/* ===== Incoming popup + تنبيه صوتي مُصحّح ===== */
+function showIncoming({id,o}){
+  inText.textContent = `${o.restaurant?.name||'—'} · ${Array.isArray(o.platform)?o.platform.join(' / '):(o.platform||'—')}`;
+  incoming.classList.add("show");
+  // 🔔 فعّل الصوت عند ظهور الـincoming
+  startIncomingSound(id);
+  inAccept.onclick = async (e)=>{ e.preventDefault(); await acceptAssigned(id); stopIncomingAlert(); closeIncoming(); };
+  inReject.onclick = async (e)=>{ e.preventDefault(); await rejectAssigned(id); stopIncomingAlert(); closeIncoming(); };
+}
+function closeIncoming(){ incoming.classList.remove("show"); /* أوقف الصوت عند الإغلاق */ stopIncomingAlert(); }
+
+/* === Audio Autoplay Unlock + Beep Scheduler (FIX) === */
+let beepTimer=null;
+let audioUnlocked=false;
+function unlockAudioOnce(){
+  if(audioUnlocked) return;
+  audioUnlocked = true;
+  try{
+    if(newOrderSound){
+      newOrderSound.muted = false;
+      newOrderSound.volume = 1;
+      // نبضة سريعة لفك القفل
+      newOrderSound.play().then(()=>newOrderSound.pause()).catch(()=>{});
+    }
+  }catch(_){}
+}
+// فك القفل بعد أي تفاعل لمرة واحدة
+['pointerdown','touchstart','keydown','focus'].forEach(evt=>{
+  window.addEventListener(evt, unlockAudioOnce, { once:true, capture:true });
+});
+
+function startIncomingSound(scope=''){
+  if(!newOrderSound) return;
+  // لا نسمح بتعدد المؤقتات
+  if(beepTimer){ clearInterval(beepTimer); beepTimer=null; }
+  const play = ()=>{
+    try{
+      newOrderSound.muted = false; newOrderSound.volume = 1;
+      newOrderSound.currentTime = 0;
+      newOrderSound.play().catch(()=>{ /* قد يرفض قبل unlock؛ لا مشكلة */ });
+    }catch(_){}
+  };
+  play();
+  // إعادة التنبيه كل 30 ثانية إذا ما تفاعل السائق
+  beepTimer = setInterval(play, 30000);
+}
+function stopIncomingAlert(){
+  if(beepTimer){ clearInterval(beepTimer); beepTimer=null; }
+  try{ newOrderSound?.pause(); }catch(_){}
+}
+
+/* ===== Start / Accept / Reject ===== */
+async function safeSetStatusToUnterwegs(id){
+  try{
+    const snap=await getDoc(doc(db,"orders", id));
+    const o=snap.exists()? (snap.data()||{}) : {};
+    const s=String(o.status||'').toLowerCase();
+    if(!(s==='angenommen' || s==='unterwegs')){ await patchOrder(id, { status:"Angenommen" }); }
+    await patchOrder(id, { status:"Unterwegs" });
+    toast("Unterwegs");
+  }catch(_){ toast("Fehler beim Start"); }
+}
+async function acceptAssigned(id){ await patchOrder(id, { status:"Angenommen" }); toast("Angenommen"); }
+async function rejectAssigned(id){ await patchOrder(id, { status:"Abgebrochen" }); toast("Abgebrochen"); }
+
+/* ===== Detail sheet ===== */
+async function openDetail(id){
+  const snap=await getDoc(doc(db,"orders", id)); if(!snap.exists()) return;
+  const o=snap.data()||{};
+  md_id.textContent=id;
+  md_status.textContent=mapStatusLabel(o.status||"—");
+  md_platform.textContent=Array.isArray(o.platform)?o.platform.join(" / "):(o.platform||"—");
+  md_rest.textContent=o.restaurant?.name||"—";
+  const addr=(o.restaurant?.addressText || o.restaurant?.address_text || "").trim();
+  md_addr.textContent=addr || '—';
+  md_qty.textContent=Number(o.qty||0)||0;
+  md_pickup.textContent=o.pickupTime || "—";
+  md_title.textContent=o.restaurant?.name||"Auftrag";
+  md.classList.add("show");
+  md_start.onclick=async (e)=>{
+    e.preventDefault();
+    if(!addr){ toast('Restaurant-Adresse fehlt'); return; }
+    window.open(makeNavUrl(addr), '_blank', 'noopener,noreferrer');
+    await safeSetStatusToUnterwegs(id);
+  };
+  md_done.onclick = async (e)=>{
+    e.preventDefault();
+    await finalizeOrderWithFee(id);
+    md.classList.remove("show");
+  };
+  md_nav.onclick  = (e)=>{
+    e.preventDefault();
+    if(!addr){ toast('Restaurant-Adresse fehlt'); return; }
+    window.open(makeNavUrl(addr), '_blank', 'noopener,noreferrer');
+  };
+}
+mdClose.addEventListener("click", ()=> md.classList.remove("show"));
+md.addEventListener("click",(e)=>{ if(e.target===md) md.classList.remove("show"); });
+
+/* ===== Patch order helper ===== */
+// لو أردت استخدام deliveryFee رسميًا: اسمح به في الـ Rules (أنظر أعلى الرسالة)
+const PREFER_DELIVERY_FEE_FIELD = true;
+async function patchOrder(id, fields){
+  const allowed = {};
+  if('status'      in fields) allowed.status      = fields.status;
+  if('price'       in fields) allowed.price       = Number(fields.price);
+  if('deliveryFee' in fields) allowed.deliveryFee = Number(fields.deliveryFee);
+  if('etmTargetMs' in fields) allowed.etmTargetMs = fields.etmTargetMs;
+  if('ETM_Target'  in fields) allowed.ETM_Target  = fields.ETM_Target;
+  allowed.updatedAt = serverTimestamp();
+  const refDoc=doc(db,"orders", id);
+  try{ await updateDoc(refDoc, allowed); }
+  catch{ await setDoc(refDoc, allowed, { merge:true }); }
+}
+
+/* كتابة الرسوم مع Fallback ليتوافق مع القواعد الحالية */
+async function writeFeeOnly(id, fee){
+  await patchOrder(id, { status:"Geliefert", deliveryFee: fee });
+  return { field:'deliveryFee', fee };
+}
+
+
+/* العملية الكاملة عند التسليم: route → km → Betrag → Fee → تحديث */
+async function finalizeOrderWithFee(id){
+  try{
+    const ds = await getDoc(doc(db,"orders", id));
+    if(!ds.exists()){ toast("Auftrag nicht gefunden"); return; }
+    const o = ds.data() || {};
+    const km = await computeLegKmForOrder(o);              // كم فعلي
+    const betrag = getOrderAmount(o);                      // مبلغ الطلب
+    const fee = calcDeliveryFeeEUR(betrag, km);            // المعادلة
+    const res = await writeFeeOnly(id, fee);
+    // اربط السلسلة: آخر نقطة = هذا التسليم
+    const drop = getDropAddr(o);
+    if(drop) setLastDestFromText(drop); else if(lastLL) setLastDestFromLL(lastLL);
+    toast(`Geliefert · ${km.toFixed(2)} km · Liefergebühr ${fee.toFixed(2)}€ (${res.field})`);
+  }catch(e){
+    console.error('finalizeOrderWithFee', e);
+    toast('Fehler beim Abschließen');
+  }
+}
+
+/* ===== Auth gate ===== */
+onAuthStateChanged(auth, async (user)=>{
+  // امنع الدخول التلقائي إلا أثناء التسجيل (regInFlight)
+  if (user && sessionStorage.getItem(SESSION_OK) !== '1' && !regInFlight) {
+    await signOut(auth).catch(()=>{});
+    authModal.style.display='flex'; appRoot.style.display='none';
+    return;
+  }
+  if(!user){
+    uid=null;
+    appRoot.style.display='none'; authModal.style.display='flex';
+    detachOrders(); stopPresence(); stopIncomingAlert();
+    switchPane(lastAuthTab==='register' ? 'register' : 'login');
+    return;
+  }
+  uid = user.uid;
+
+  // تحقق الموافقة
+  approved=false;
+  try{
+    const ds=await getDoc(doc(db,'users',uid));
+    if(ds.exists()){
+      const u=ds.data()||{};
+      approved=(u.approved===true && u.role==='driver');
+    }
+  }catch(_){}
+
+  authModal.style.display='none'; appRoot.style.display='block';
+  attachOrders();
+});
+
+/* ===== Network dot ===== */
+function setNet(on){ netDot.classList.toggle("on", on); netDot.classList.toggle("off", !on); }
+setNet(navigator.onLine);
+window.addEventListener("online", ()=>setNet(true));
+window.addEventListener("offline", ()=>setNet(false));
+
+/* ===== Init ===== */
+document.addEventListener('DOMContentLoaded', ()=>{
+  authModal.style.display='flex';
+  switchPane(lastAuthTab==='register' ? 'register' : 'login');
+});
+</script>
+
+</body>
+</html>

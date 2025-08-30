@@ -1,0 +1,2019 @@
+<!doctype html>
+<html lang="de" dir="ltr">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
+<title>Taussil – Admin</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#f7f8fb; --card:#fff; --ink:#0b1320; --muted:#6b7280; --cta:#33BBDF;
+  --border:1px solid rgba(0,0,0,.08); --radius:14px; --shadow:0 10px 30px rgba(0,0,0,.08);
+}
+*{box-sizing:border-box} html,body{margin:0;height:100%;font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:var(--bg);color:var(--ink)}
+.app{max-width:1400px;margin:0 auto;padding:14px;display:flex;flex-direction:column;gap:12px}
+.bar{display:flex;align-items:center;gap:10px;background:var(--card);border:var(--border);border-radius:12px;box-shadow:var(--shadow);padding:10px 12px;position:sticky;top:8px;z-index:5}
+.brand{display:flex;flex-direction:column;font-weight:800}
+.brand .sub{font-size:12px;color:var(--muted);font-weight:600}
+.controls{margin-inline-start:auto;display:flex;align-items:center;gap:8px}
+select, .btn, .icon{height:40px;border-radius:10px;border:1px solid rgba(0,0,0,.1);background:#fff;color:var(--ink);padding:0 10px;font-weight:700;cursor:pointer}
+.btn.secondary{background:#f3f4f6}
+.icon{width:40px;display:flex;align-items:center;justify-content:center}
+.small{font-size:12px;color:var(--muted)}
+.nav{display:flex;gap:8px}
+.nav button{padding:10px 12px;border-radius:10px;border:1px solid rgba(0,0,0,.08);background:#fff;cursor:pointer}
+.nav button.active{background:linear-gradient(180deg,#33BBDF,#1da9cf);color:#fff;border:none}
+.tabs{display:flex;flex-direction:column;gap:12px}
+.tab[hidden]{display:none}
+.card{background:#fff;border:var(--border);border-radius:12px;box-shadow:var(--shadow)}
+.card .ph{padding:12px 14px;border-bottom:1px solid rgba(0,0,0,.06);display:flex;align-items:center;justify-content:space-between}
+.card .pb{padding:12px 14px}
+.grid{display:grid;gap:10px}
+.grid.cols-2{grid-template-columns:1fr 1fr}
+.grid.cols-3{grid-template-columns:repeat(3,1fr)}
+.row{display:flex;align-items:center;gap:10px}
+.flex{display:flex;align-items:center;gap:10px}
+.right{margin-inline-start:auto}
+.logo{width:48px;height:48px;border-radius:12px;border:1px solid rgba(0,0,0,.06);object-fit:cover;background:#fff}
+.avatar{width:40px;height:40px;border-radius:999px;border:1px solid rgba(0,0,0,.08);object-fit:cover;background:#fff}
+.badge{font-size:11px;border-radius:999px;padding:4px 8px;border:1px solid rgba(0,0,0,.08);background:#f3f4f6}
+.badge.blue{background:#eff6ff;border-color:#dbeafe;color:#1e40af}
+.badge.green{background:#ecfdf5;border-color:#bbf7d0;color:#065f46}
+.badge.gray{background:#f3f4f6;border-color:#e5e7eb;color:#374151}
+.badge.rose{background:#fff1f2;border-color:#ffe4e6;color:#9f1239}
+.chip{display:inline-block;font-size:12px;padding:5px 9px;border-radius:999px;background:#f3f4f6;border:1px solid rgba(0,0,0,.06);margin-inline:4px}
+.table .tr{display:grid;grid-template-columns:auto 1fr 1fr auto auto auto;gap:10px;align-items:center;border-bottom:1px solid rgba(0,0,0,.06);padding:8px 0}
+.table .tr:last-child{border-bottom:0}
+.mono{font-family:ui-monospace,Menlo,monospace}
+.donut{--a:0deg;--b:0deg;--c:0deg;--d:360deg;width:140px;height:140px;border-radius:50%;background:
+ conic-gradient(#a1a1aa 0 var(--a), #60a5fa var(--a) var(--b), #34d399 var(--b) var(--c), #fda4af var(--c) var(--d));
+  mask:radial-gradient(circle at 50% 50%, transparent 0 50px, #000 50px);margin:auto}
+.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.kpi{background:#fff;border:var(--border);border-radius:12px;box-shadow:var(--shadow);padding:10px;display:flex;flex-direction:column;gap:6px;align-items:flex-start}
+.kpi .n{font-weight:800;font-size:22px}
+#gm{height:520px;border-radius:12px;border:1px solid rgba(0,0,0,.1)}
+/* Modals */
+.sheet, .modal{position:fixed;inset:0;display:none;align-items:center;justify-content:center;z-index:1000}
+.sheet.open, .modal.open{display:flex}
+.sheet .box, .modal .box{background:#fff;color:#0b1320;border:1px solid #e5e7eb;border-radius:16px;box-shadow:0 12px 40px rgba(0,0,0,.2);padding:14px;max-width:560px;width:92%}
+.modal.right .box{max-width:420px;width:min(420px,92%);margin-inline-start:auto}
+/* Auth overlay */
+#adminAuth{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.55);z-index:2000}
+#adminAuth .box{background:#0f1a30;color:#e6e9ef;border:1px solid rgba(255,255,255,.14);border-radius:16px;padding:14px;width:min(560px,92%)}
+#adminAuth .input, #adminAuth .btn{height:44px;border-radius:10px}
+#adminAuth .input{border:1px solid rgba(255,255,255,.12);background:#0f1a30;color:#e6e9ef;padding:0 12px}
+#adminAuth .btn{border:1px solid rgba(255,255,255,.12);background:#13213a;color:#e6e9ef}
+#adminAuth .btn-cta{background:linear-gradient(180deg,#33BBDF,#1da9cf);border:none}
+@media (max-width:900px){ .grid.cols-3{grid-template-columns:1fr} .table .tr{grid-template-columns:auto 1fr 1fr auto;grid-auto-rows:auto}}
+/* Mini Map (Dashboard) */
+/* ===== Dashboard layout (3/4 + 1/4) ===== */
+:root{
+  /* ارتفاع تقريبي للعمودين اليسار (يمكن تعديله) */
+  --dashCardH: 520px;
+  /* الخريطة نصف ارتفاع الأعمدة اليسار */
+  --miniMapH: calc(var(--dashCardH) / 2);
+}
+
+/* شبكة الداشبورد: عمودان لليسار (3/4) + عمود يمين للخريطة (1/4) */
+#tab-dashboard .grid.cols-3{
+  grid-template-columns: 3fr 3fr 2fr;   /* 37.5% + 37.5% + 25% */
+  grid-template-rows: auto auto;        /* صفّان: الخريطة فوق وبطاقة الرحلة تحت */
+  align-items: start;
+  gap: 12px;
+}
+
+/* اجعل الكاردين اليسار يمتدان على الصفّين (لتكون الخريطة نصف الارتفاع تقريبياً) */
+#tab-dashboard .grid.cols-3 > .card:nth-child(1),
+#tab-dashboard .grid.cols-3 > .card:nth-child(2){
+  grid-row: 1 / span 2;
+  min-height: var(--dashCardH);
+}
+
+/* عمود اليمين: الخريطة ثم بطاقة الرحلة */
+#miniMapCard{ grid-column: 3; grid-row: 1; align-self: start; }
+#miniTripCard{ grid-column: 3; grid-row: 2; align-self: start; }
+
+/* حجم الخريطة = نصف ارتفاع الأعمدة اليسار */
+#miniMapCard .pb{ padding: 12px; }
+#mini-map{
+  width: 100%;
+  height: var(--miniMapH);
+  min-height: 260px;
+  border-radius: 12px;
+  border: 1px solid rgba(0,0,0,.10);
+  overflow: hidden;
+}
+
+/* بطاقة الرحلة تحت الخريطة */
+#miniTripCard .pb{
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+}
+
+/* عناصر البطاقة (سائق/مطعم/كود/ETA/حالة/رسوم) */
+.trip-row{ display:flex; align-items:center; gap:10px; }
+.trip-row .chip{ margin-inline:0; }
+.trip-meta{ display:grid; grid-template-columns: 1fr auto; gap:8px; }
+.trip-meta .right{ margin-inline-start:auto; }
+.trip-money{ font-weight:800; }
+
+/* حماية من تمدد العناصر داخل صفوف الجداول */
+#tab-dashboard .table .tr{ overflow:hidden; }
+#tab-dashboard .table .tr > *{ min-width:0; }
+#tab-dashboard .right{ white-space:nowrap; }
+
+/* لا تسمح لقائمة الحالة أن تتمدد أكثر من اللازم */
+.dropdown select{ max-width:180px; }
+
+/* السماح بالتمرير داخل كل تبويب ومنع قص المحتوى */
+.tab{ overflow:auto; }
+
+/* استجابة للموبايل: عمود واحد */
+@media (max-width: 900px){
+  #tab-dashboard .grid.cols-3{
+    grid-template-columns: 1fr;
+    grid-template-rows: auto;
+  }
+  #tab-dashboard .grid.cols-3 > .card:nth-child(1),
+  #tab-dashboard .grid.cols-3 > .card:nth-child(2){
+    grid-row: auto;
+    min-height: auto;
+  }
+  #miniMapCard, #miniTripCard{
+    grid-column: auto; grid-row: auto;
+  }
+  #mini-map{ height: 320px; }
+}
+/* ===== Trip mini card ===== */
+.trip-card{
+  background:#fff;border:var(--border);border-radius:12px;box-shadow:var(--shadow);padding:10px;
+}
+.trip-grid{
+  display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center;
+}
+.trip-main .trip-line{ display:flex; gap:8px; align-items:center; }
+.trip-label{ font-size:12px; color:var(--muted); min-width:86px; }
+.trip-value{ font-weight:700; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.trip-stats{ display:flex; gap:8px; align-items:center; justify-content:flex-end; flex-wrap:wrap; }
+
+
+/* ============ Taussil Compact UI (Config-first) ============ */
+/* 🔧 جدول الإعدادات — غيّر القيم هنا بسرعة */
+:root{
+  --ui-font-base: 13px;     /* حجم النص الأساسي */
+  --ui-font-small: 11px;    /* النص الصغير (.small) */
+  --ui-gap: 8px;            /* المسافة بين عناصر الصف */
+  --ui-row-pad-y: 6px;      /* الحشوة العمودية لكل صف */
+  --ui-row-pad-x: 8px;      /* الحشوة الأفقية لكل صف */
+
+  --ui-btn-h: 32px;         /* ارتفاع الأزرار و الـselect */
+  --ui-btn-font: 12px;      /* حجم خط الأزرار */
+  --ui-btn-pad-x: 10px;     /* حشوة أفقية للأزرار */
+  --ui-radius: 10px;        /* نصف القطر للأزرار/الشارات */
+
+  --ui-badge-font: 11px;    /* حجم خط الشارات (badge) */
+  --ui-badge-pad-y: 2px;    /* حشوة الشارة عمودي */
+  --ui-badge-pad-x: 8px;    /* حشوة الشارة أفقي */
+
+  --ui-chip-font: 11px;     /* حجم خط الشرائح (chip) */
+  --ui-chip-pad-y: 2px;     /* حشوة الـchip عمودي */
+  --ui-chip-pad-x: 6px;     /* حشوة الـchip أفقي */
+
+  --ui-logo: 26px;          /* حجم شعار المطعم */
+  --ui-avatar: 28px;        /* حجم صورة السائق */
+  --ui-mono: 12px;          /* خط أحادي مثل الكود/الكمية */
+
+  --ui-break: 1400px;       /* تحته تنزل منطقة الإجراءات لسطر جديد */
+}
+
+/* (اختياري) وضع مضغوط جدًا بتبديل كلاس على body: <body class="compact-xxs"> */
+.compact-xxs{
+  --ui-font-base: 12px;
+  --ui-font-small: 10px;
+  --ui-gap: 6px;
+  --ui-btn-h: 28px;
+  --ui-btn-font: 11px;
+  --ui-logo: 22px;
+  --ui-avatar: 24px;
+  --ui-mono: 11px;
+}
+
+/* ============ التطبيق ============ */
+body{ font-size: var(--ui-font-base); }
+.small{ font-size: var(--ui-font-small) !important; }
+.mono{ font-size: var(--ui-mono); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+
+/* قوائم: الواردة/الفعّالة/السجل */
+#incoming-list .tr,
+#active-list .tr,
+#orders-log .tr{
+  display:flex; align-items:center;
+  gap: var(--ui-gap);
+  padding: var(--ui-row-pad-y) var(--ui-row-pad-x);
+  overflow:hidden;
+  flex-wrap:wrap;                /* مهم: لف العناصر داخل البطاقة */
+}
+#incoming-list .tr > *,
+#active-list .tr > *,
+#orders-log .tr > *{
+  min-width:0;                   /* مهم: يسمح بالانكماش داخل flex */
+}
+
+/* منطقة الإجراءات يمين الصف */
+#incoming-list .tr .right,
+#active-list   .tr .right,
+#orders-log    .tr .right{
+  margin-left:auto;
+  display:flex; align-items:center;
+  gap: var(--ui-gap);
+  flex-wrap:wrap;
+  min-width:0;
+}
+
+/* أزرار و select */
+#incoming-list .tr .btn,
+#active-list   .tr .btn,
+#orders-log    .tr .btn,
+.gm-btn,
+.dropdown select{
+  height: var(--ui-btn-h);
+  padding: 4px var(--ui-btn-pad-x);
+  font-size: var(--ui-btn-font);
+  border-radius: var(--ui-radius);
+  line-height:1;
+  white-space:nowrap;
+}
+
+/* شارات و شرائح */
+.badge{
+  font-size: var(--ui-badge-font);
+  padding: var(--ui-badge-pad-y) var(--ui-badge-pad-x);
+  border-radius: var(--ui-radius);
+  line-height:1.2;
+}
+.chip{
+  display:inline-block;
+  font-size: var(--ui-chip-font);
+  padding: var(--ui-chip-pad-y) var(--ui-chip-pad-x);
+  border-radius: var(--ui-radius);
+  line-height:1.2;
+}
+
+/* الصور */
+.logo  { width: var(--ui-logo);   height: var(--ui-logo);   object-fit:cover; }
+.avatar{ width: var(--ui-avatar); height: var(--ui-avatar); object-fit:cover; border-radius:50%; }
+
+/* منع خروج النصوص الطويلة (اسم/زر طويل مثل Details) */
+.tr .flex > div { min-width:0; }
+.tr .flex div div{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+
+/* التفاف منطقة الإجراءات تحت المحتوى عند الشاشات الأضيق */
+@media (max-width: var(--ui-break)){
+  #incoming-list .tr .right,
+  #active-list   .tr .right,
+  #orders-log    .tr .right{
+    flex-basis:100%;
+    justify-content:flex-start;
+  }
+}
+
+</style>
+</head>
+<body>
+
+<!-- ========= Admin Auth Modal ========= -->
+<div id="adminAuth" style="display:flex">
+  <div class="box">
+    <h3 style="margin:4px 0 10px">Admin Login</h3>
+    <div class="grid">
+      <input id="adEmail" class="input" type="email" placeholder="E-Mail">
+      <input id="adPass"  class="input" type="password" placeholder="Passwort">
+    </div>
+    <button id="adLoginBtn" class="btn btn-cta" style="margin-top:8px;width:100%">Anmelden</button>
+    <div id="adMsg" class="small" style="margin-top:6px;color:#fca5a5"></div>
+  </div>
+</div>
+
+<!-- ========= App Shell ========= -->
+<div class="app">
+  <header class="bar">
+    <div class="brand">
+      <div data-i18n="brand.title">Taussil Admin</div>
+      <div class="sub" data-i18n="brand.subtitle">Leitzentrale</div>
+    </div>
+
+    <div class="nav" id="nav">
+      <button class="active" data-tab="dashboard" data-i18n="nav.dashboard">Dashboard</button>
+      <button data-tab="restaurants" data-i18n="nav.restaurants">Restaurants</button>
+      <button data-tab="drivers" data-i18n="nav.drivers">Fahrer</button>
+      <button data-tab="orders" data-i18n="nav.orders">Auftragsprotokoll</button>
+      <button data-tab="map" data-i18n="nav.map">Karte</button>
+    </div>
+
+    <div class="controls">
+      <button id="btn-mute" class="icon" title="Mute/Unmute"><i data-lucide="volume-2"></i></button>
+      <label for="lang" class="small" data-i18n="lang.label">Sprache / Language / اللغة</label>
+      <select id="lang">
+        <option value="de">DE</option><option value="en">EN</option><option value="ar">AR</option>
+      </select>
+      <!-- زر تسجيل الخروج هنا -->
+      <button id="btn-logout" class="btn secondary" data-i18n="controls.logout">Abmelden</button>
+    </div>
+  </header>
+
+  <div class="tabs">
+    <!-- ===== Dashboard ===== -->
+    <section id="tab-dashboard" class="tab">
+      <div class="grid cols-3">
+        <div class="card">
+          <div class="ph">
+            <div>
+              <div style="font-weight:800" data-i18n="dashboard.incomingTitle">Eingehende Bestellungen</div>
+              <div class="small" data-i18n="dashboard.incomingSub">Bestellungen in Bearbeitung</div>
+            </div>
+            <div class="badge"><span id="incoming-count">0</span></div>
+          </div>
+          <div class="pb table" id="incoming-list"></div>
+        </div>
+
+        <div class="card">
+          <div class="ph"><div style="font-weight:800" data-i18n="dashboard.activeTitle">Laufende Lieferungen</div></div>
+          <div class="pb table" id="active-list"></div>
+        </div>
+
+        <!-- Mini Map (يأخذ مكان بطاقة الإحصائيات) -->
+        <div id="miniMapCard" class="card">
+          <div class="ph">
+            <div style="font-weight:800">Live-Karte (aktiver Auftrag)</div>
+            <div class="small" id="mini-map-info">—</div>
+          </div>
+          <div class="pb">
+  <div id="mini-map"></div>
+
+  <!-- بطاقة الرحلة المصغرة -->
+  <div id="mini-trip" class="trip-card" style="margin-top:10px">
+    <div class="trip-grid">
+      <div class="trip-main">
+        <div class="trip-line">
+          <span class="trip-label">Fahrer</span>
+          <span id="miniTripDriver" class="trip-value">—</span>
+        </div>
+        <div class="trip-line">
+          <span class="trip-label">Restaurant</span>
+          <span id="miniTripRestaurant" class="trip-value">—</span>
+        </div>
+        <div class="trip-line">
+          <span class="trip-label">Order</span>
+          <span id="miniTripOrder" class="trip-value mono">—</span>
+        </div>
+      </div>
+
+      <div class="trip-stats">
+        <div class="chip mono" id="miniTripEta">ETA —:—</div>
+        <div id="miniTripStatus" class="badge gray">—</div>
+        <div class="chip" id="miniTripFee">Liefergebühr: —</div>
+      </div>
+    </div>
+  </div>
+</div>
+    </section>
+
+    <!-- ===== Restaurants ===== -->
+    <section id="tab-restaurants" class="tab" hidden>
+      <div class="card">
+        <div class="ph"><div style="font-weight:800" data-i18n="nav.restaurants">Restaurants</div></div>
+        <div class="pb grid" id="restaurants-grid" style="grid-template-columns:1fr 1fr"></div>
+      </div>
+    </section>
+
+    <!-- ===== Drivers ===== -->
+    <section id="tab-drivers" class="tab" hidden>
+      <div class="card">
+        <div class="ph"><div style="font-weight:800" data-i18n="nav.drivers">Fahrer</div></div>
+        <div class="pb grid" id="drivers-grid" style="grid-template-columns:1fr 1fr"></div>
+      </div>
+    </section>
+
+    <!-- ===== Orders Log ===== -->
+    <section id="tab-orders" class="tab" hidden>
+      <div class="card">
+        <div class="ph">
+          <div style="font-weight:800" data-i18n="nav.orders">Auftragsprotokoll</div>
+          <input id="search" class="input" placeholder="Suche…" data-i18n-placeholder="search.placeholder" style="height:40px;border-radius:10px;border:1px solid rgba(0,0,0,.12)"/>
+        </div>
+        <div class="pb table" id="orders-log"></div>
+      </div>
+    </section>
+
+    <!-- ===== Map ===== -->
+    <section id="tab-map" class="tab" hidden>
+      <div class="card">
+        <div class="ph"><div style="font-weight:800" data-i18n="map.placeholder">Operationskarte</div></div>
+        <div class="pb"><div id="gm"></div></div>
+      </div>
+    </section>
+  </div>
+</div>
+
+<!-- ========= Order Details Modal ========= -->
+<div id="order-modal" class="modal">
+  <div class="box">
+    <div class="row" style="justify-content:space-between">
+      <strong data-i18n="order.details">Details</strong>
+      <button id="order-close" class="btn secondary" data-i18n="common.close">Schließen</button>
+    </div>
+    <div id="order-details" style="margin-top:10px"></div>
+  </div>
+</div>
+
+<!-- ========= User Details Modal ========= -->
+<div id="user-modal" class="modal">
+  <div class="box">
+    <div class="row" style="justify-content:space-between">
+      <strong id="user-title">Details</strong>
+      <button id="user-close" class="btn secondary" data-i18n="common.close">Schließen</button>
+    </div>
+    <div id="user-details" style="margin-top:10px"></div>
+  </div>
+</div>
+
+<!-- ========= Assign Sheet ========= -->
+<div id="assign-sheet" class="modal right">
+  <div class="box">
+    <div style="font-weight:800;margin-bottom:8px" data-i18n="assign.title">Fahrer zuweisen</div>
+    <div id="assign-order-box" class="small" style="margin-bottom:8px">—</div>
+    <select id="assign-driver-select" style="width:100%;height:42px;border:1px solid #e5e7eb;border-radius:10px">
+      <option value="">—</option>
+    </select>
+    <div class="row" style="justify-content:flex-end;margin-top:10px">
+      <button id="assign-cancel" class="btn secondary" data-i18n="assign.cancel">Abbrechen</button>
+      <button id="assign-confirm" class="btn" data-i18n="assign.confirm">Zuweisen</button>
+    </div>
+  </div>
+</div>
+
+<!-- ========= Sounds (ضع ملفاتك الفعلية هنا) ========= -->
+<audio id="snd-restaurant" src="neu1.mp3" preload="auto"></audio>
+<audio id="snd-driver"     src="neu1.mp3"   preload="auto"></audio>
+<audio id="snd-order"      src="neu1.mp3"    preload="auto"></audio>
+<audio id="snd-unterwegs"  src="neu1.mp3"   preload="auto"></audio>
+<audio id="snd-geliefert"  src="neu1.mp3"   preload="auto"></audio>
+
+<!-- Icons -->
+<script src="https://unpkg.com/lucide@0.344.0/dist/umd/lucide.js"></script>
+
+<script type="module">
+/* ===== Firebase (align with driver & restaurant) ===== */
+import { initializeApp, getApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import {
+  getAuth, onAuthStateChanged, signOut, signInWithEmailAndPassword,
+  setPersistence, browserLocalPersistence
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import {
+  getFirestore, collection, query, where, orderBy, limit, onSnapshot,
+  doc, getDoc, setDoc, updateDoc, serverTimestamp, deleteDoc
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import {
+  getDatabase, ref as rRef, onValue, update as rUpdate
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyD0g9T3amjuPodsLS6ZQkHYWrzV1UrX_QI",
+  authDomain: "taussil-lieferservice-8bbe9.firebaseapp.com",
+  projectId: "taussil-lieferservice-8bbe9",
+  storageBucket: "taussil-lieferservice-8bbe9.firebasestorage.app",
+  messagingSenderId: "583536892937",
+  appId: "1:583536892937:web:5d5ff133de4d8b3b28ecd8",
+  databaseURL: "https://taussil-lieferservice-8bbe9-default-rtdb.europe-west1.firebasedatabase.app"
+};
+
+let app; try{ app=getApp(); }catch{ app=initializeApp(firebaseConfig); }
+const auth = getAuth(app);
+const db   = getFirestore(app);
+const rtdb = getDatabase(app);
+await setPersistence(auth, browserLocalPersistence).catch(()=>{});
+
+/* ===== i18n ===== */
+const i18n = {
+  de:{'brand.title':'Taussil Admin','brand.subtitle':'Leitzentrale',
+      'nav.dashboard':'Dashboard','nav.restaurants':'Restaurants','nav.drivers':'Fahrer','nav.orders':'Auftragsprotokoll','nav.map':'Karte',
+      'lang.label':'Sprache / Language / اللغة','controls.logout':'Abmelden',
+      'dashboard.incomingTitle':'Eingehende Bestellungen','dashboard.incomingSub':'Bestellungen in Bearbeitung',
+      'dashboard.activeTitle':'Laufende Lieferungen','dashboard.pieTitle':'Bestellstatus',
+      'kpi.processing':'In Bearbeitung','kpi.cancelled':'Abgebrochen',
+      'assign.title':'Fahrer zuweisen','assign.cancel':'Abbrechen','assign.confirm':'Zuweisen',
+      'order.details':'Bestelldetails','common.close':'Schließen',
+      'labels.restaurant':'Restaurant','labels.driver':'Fahrer','labels.platform':'Plattform','labels.pickup':'Abholzeit','labels.qty':'Menge','labels.price':'Preis','labels.code':'Code','labels.status':'Status',
+      'empty.noIncoming':'Derzeit keine neuen Bestellungen.','empty.noActive':'Aktuell keine aktiven Fahrten.','map.placeholder':'Operationskarte',
+      'search.placeholder':'Suche… (Name, Telefon, Code)',
+      // [TAUSSIL-APPROVAL-I18N-START]
+      'approval.approve':'Genehmigen',
+      'approval.reject':'Ablehnen'
+      // [TAUSSIL-APPROVAL-I18N-END]
+  },
+  en:{'brand.title':'Taussil Admin','brand.subtitle':'Control Center',
+      'nav.dashboard':'Dashboard','nav.restaurants':'Restaurants','nav.drivers':'Drivers','nav.orders':'Orders Log','nav.map':'Map',
+      'lang.label':'Sprache / Language / اللغة','controls.logout':'Log out',
+      'dashboard.incomingTitle':'Incoming Orders','dashboard.incomingSub':'Orders in processing',
+      'dashboard.activeTitle':'Active Deliveries','dashboard.pieTitle':'Order Status',
+      'kpi.processing':'Processing','kpi.cancelled':'Cancelled',
+      'assign.title':'Assign Driver','assign.cancel':'Cancel','assign.confirm':'Confirm',
+      'order.details':'Order Details','common.close':'Close',
+      'labels.restaurant':'Restaurant','labels.driver':'Driver','labels.platform':'Platform','labels.pickup':'Pickup Time','labels.qty':'Quantity','labels.price':'Price','labels.code':'Code','labels.status':'Status',
+      'empty.noIncoming':'No new orders right now.','empty.noActive':'No active trips at the moment.','map.placeholder':'Operations map',
+      'search.placeholder':'Search… (name, phone, code)',
+      // [TAUSSIL-APPROVAL-I18N-START]
+      'approval.approve':'Approve',
+      'approval.reject':'Reject'
+      // [TAUSSIL-APPROVAL-I18N-END]
+  },
+  ar:{'brand.title':'Taussil Admin','brand.subtitle':'لوحة التحكم',
+      'nav.dashboard':'لوحة التحكم','nav.restaurants':'المطاعم','nav.drivers':'السائقون','nav.orders':'سجل الطلبات','nav.map':'الخريطة',
+      'lang.label':'Sprache / Language / اللغة','controls.logout':'تسجيل الخروج',
+      'dashboard.incomingTitle':'الطلبات الواردة','dashboard.incomingSub':'طلبات قيد المعالجة',
+      'dashboard.activeTitle':'طلبات قيد التوصيل','dashboard.pieTitle':'حالة الطلبات',
+      'kpi.processing':'قيد المعالجة','kpi.cancelled':'ملغي',
+      'assign.title':'إسناد سائق','assign.cancel':'إلغاء','assign.confirm':'تأكيد الإسناد',
+      'order.details':'تفاصيل الطلب','common.close':'إغلاق',
+      'labels.restaurant':'المطعم','labels.driver':'السائق','labels.platform':'المنصة','labels.pickup':'وقت الاستلام','labels.qty':'الكمية','labels.price':'السعر','labels.code':'كود','labels.status':'الحالة',
+      'empty.noIncoming':'لا توجد طلبات جديدة حالياً.','empty.noActive':'لا توجد رحلات نشطة الآن.','map.placeholder':'خريطة العمليات',
+      'search.placeholder':'بحث… (اسم، هاتف، كود)',
+      // [TAUSSIL-APPROVAL-I18N-START]
+      'approval.approve':'اعتماد',
+      'approval.reject':'رفض'
+      // [TAUSSIL-APPROVAL-I18N-END]
+  }
+};
+let currentLang='de';
+const isRTL = (lng)=> lng==='ar';
+function t(k){ const d=i18n[currentLang]||i18n.en; return d[k]||i18n.en[k]||k; }
+function translatePage(){
+  document.documentElement.lang=currentLang;
+  document.documentElement.dir=isRTL(currentLang)?'rtl':'ltr';
+  document.querySelectorAll('[data-i18n]').forEach(el=>{ el.textContent=t(el.getAttribute('data-i18n')); });
+  document.querySelectorAll('[data-i18n-placeholder]').forEach(el=>{ el.setAttribute('placeholder', t(el.getAttribute('data-i18n-placeholder'))); });
+  renderAll(); lucide.createIcons();
+  ensureOrdersBulkUI();
+  ensureExportBar(); // NEW
+}
+
+/* ===== State & helpers ===== */
+const $ = (s)=>document.querySelector(s);
+const platformChips = (arr)=> (Array.isArray(arr)?arr:[]).map(p=>`<span class="chip">${p}</span>`).join('');
+function statusBadge(s){
+  const map={ Bearbeitung:['gray','Bearbeitung'], Unterwegs:['blue','Unterwegs'], Geliefert:['green','Geliefert'], Abgebrochen:['rose','Abgebrochen'], Zugewiesen:['gray','Zugewiesen'], Angenommen:['blue','Angenommen'] };
+  const [cls, label] = map[s] || ['gray', s||'-']; return `<span class="badge ${cls}">${label}</span>`;
+}
+const firstWord = (s)=> String(s||'').trim().split(/\s+/)[0]||'—';
+const initialsOf = (nameOrEmail='')=>{
+  const s = String(nameOrEmail||'').trim();
+  if(!s) return 'D';
+  const parts = s.split(/\s+/);
+  if(parts.length===1){
+    const p = parts[0].includes('@') ? parts[0].split('@')[0] : parts[0];
+    return p.slice(0,2).toUpperCase();
+  }
+  return (parts[0][0] + (parts[1]?.[0]||'')).toUpperCase();
+};
+
+/* ===== Sounds (no 404, proper mute) ===== */
+const sounds = {
+  restaurant: $('#snd-restaurant'),
+  driver:     $('#snd-driver'),
+  order:      $('#snd-order'),
+  unterwegs:  $('#snd-unterwegs'),
+  geliefert:  $('#snd-geliefert'),
+};
+const SOUND_FILES = {
+  restaurant: 'new_restaurant_request.mp3',
+  driver:     'new_driver_request.mp3',
+  order:      'new_order_received.mp3',
+  unterwegs:  'status_to_unterwegs.mp3',
+  geliefert:  'status_to_geliefert.mp3',
+};
+Object.entries(sounds).forEach(([k,a])=>{
+  if(!a) return;
+  if(!a.getAttribute('src')){ a.setAttribute('src', `./sounds/${SOUND_FILES[k]}`); }
+  a.setAttribute('preload','auto');
+});
+let isMuted=false;
+const LS_MUTE_KEY='admin:muted';
+function playSound(key){ if(isMuted) return; const a=sounds[key]; if(!a) return; try{ a.currentTime=0; a.play().catch(()=>{});}catch(_){ } }
+function setMuted(v){
+  isMuted = !!v;
+  try{ localStorage.setItem(LS_MUTE_KEY, isMuted?'1':'0'); }catch(_){}
+  Object.values(sounds).forEach(a=>{ if(a){ a.muted = v; }});
+  $('#btn-mute i')?.setAttribute('data-lucide', v?'volume-x':'volume-2');
+  lucide.createIcons();
+}
+try{ setMuted(localStorage.getItem(LS_MUTE_KEY)==='1'); }catch(_){}
+
+const ordersMap = new Map();
+let orders=[], restaurants=[], drivers=[];
+/* [TAUSSIL-REST-APPROVED-STATE] */
+let restaurantUsersApproved = []; // from users(role=restaurant, approved=true)
+
+let presenceMap = {}; // uid -> true/false
+const driverInfoById = new Map(); // id -> {firstName, fullName, phone}
+
+/* ===== Map (big) ===== */
+const GMAPS_API_KEY = 'AIzaSyDipzUmxEQmAjaDkn6xQ91ZhqnkPmgl-2o';
+let gmap=null; const driverMarkers = new Map(); // uid -> google.maps.Marker
+let mapControlsReady=false;
+const MAP_STYLES = {
+  mono: [{elementType:'geometry',stylers:[{saturation:-100},{lightness:10}]},{elementType:'labels.text.fill',stylers:[{color:'#4b4b4b'}]},{featureType:'road',stylers:[{saturation:-100},{lightness:30}]}],
+};
+function loadGmaps(){
+  if(window.google?.maps) return Promise.resolve();
+  return new Promise((resolve,reject)=>{
+    const cb='gm_cb_'+Math.random().toString(36).slice(2);
+    window[cb]=()=>{ delete window[cb]; resolve(); };
+    const s=document.createElement('script');
+    s.src=`https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(GMAPS_API_KEY)}&v=weekly&callback=${cb}`;
+    s.async=true; s.defer=true; s.onerror=()=>{ delete window[cb]; reject(); };
+    document.head.appendChild(s);
+  });
+}
+function applyBigMapStyle(mode){
+  if(!gmap || !window.google?.maps) return;
+  if(mode==='satellite'){ gmap.setMapTypeId(google.maps.MapTypeId.SATELLITE); gmap.setOptions({styles:null}); }
+  else if(mode==='mono'){ gmap.setMapTypeId(google.maps.MapTypeId.ROADMAP); gmap.setOptions({styles:MAP_STYLES.mono}); }
+  else { gmap.setMapTypeId(google.maps.MapTypeId.ROADMAP); gmap.setOptions({styles:null}); }
+}
+function makeControlButton(text){
+  const btn=document.createElement('button');
+  btn.textContent=text;
+  btn.className='gm-btn';
+  btn.style.cssText='margin:8px;padding:6px 10px;border:1px solid #e5e7eb;border-radius:10px;background:#fff;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.08);font:500 13px system-ui';
+  return btn;
+}
+function ensureMapControls(){
+  if(mapControlsReady || !gmap || !window.google?.maps) return;
+  mapControlsReady=true;
+
+  const focusBtn = makeControlButton('👀 Fahrer Online');
+  focusBtn.onclick = ()=> fitOnlineDrivers();
+  gmap.controls[google.maps.ControlPosition.TOP_LEFT].push(focusBtn);
+
+  const wrap=document.createElement('div');
+  wrap.style.cssText='margin:8px';
+  const sel=document.createElement('select');
+  sel.innerHTML = `<option value="std">Standard</option><option value="mono">Mono</option><option value="satellite">Satellite</option>`;
+  sel.style.cssText='padding:6px 8px;border:1px solid #e5e7eb;border-radius:10px;background:#fff;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.08);font:500 13px system-ui';
+  sel.onchange=()=> applyBigMapStyle(sel.value);
+  wrap.appendChild(sel);
+  gmap.controls[google.maps.ControlPosition.TOP_RIGHT].push(wrap);
+}
+function driverMarkerIcon(isOnline){
+  return {
+    path: google.maps.SymbolPath.CIRCLE,
+    fillColor: isOnline? '#16a34a' : '#9ca3af',
+    fillOpacity: 0.95, strokeWeight:0, scale:12
+  };
+}
+function updateMarkerLabel(mk, uid){
+  const info = driverInfoById.get(uid) || {};
+  const label = initialsOf(info.fullName || info.firstName || info.email || 'D');
+  mk.setLabel({ text: label, color:'#fff', fontWeight:'700' });
+  mk.setTitle(info.fullName || info.firstName || 'Driver');
+}
+
+/* ===== Assign panel on map (InfoWindow anchored to marker) ===== */
+let assignInfoWindow = null;
+async function assignDriverToOrderFromMap(orderId, driverId){
+  const d = drivers.find(x=>x.id===driverId);
+  if(!d) return;
+  try{
+    await updateDoc(doc(db,'orders', orderId), {
+      driver:{ id:d.id, fullName:d.fullName||null, phone:d.phone||null, avatarUrl:d.avatarUrl||null },
+      status:'Zugewiesen', updatedAt: serverTimestamp()
+    }).catch(async ()=>{
+      await setDoc(doc(db,'orders', orderId), {
+        driver:{ id:d.id, fullName:d.fullName||null, phone:d.phone||null, avatarUrl:d.avatarUrl||null },
+        status:'Zugewiesen', updatedAt: serverTimestamp()
+      }, {merge:true});
+    });
+    await rUpdate(rRef(rtdb,`drivers_inbox/${d.id}`), { lastOrderAssigned: orderId, ts: Date.now() }).catch(()=>{});
+    playSound('driver');
+  }catch(_){}
+}
+function openMapAssignPanel(driverId){
+  if(!gmap || !window.google?.maps) return;
+  const mk = driverMarkers.get(driverId);
+  if(!mk) return;
+
+  const incoming = orders.filter(o=> String(o.status||'').toLowerCase()==='bearbeitung');
+
+  const wrap = document.createElement('div');
+  wrap.style.cssText='min-width:280px;max-width:360px;font:14px system-ui;line-height:1.4';
+  wrap.innerHTML = `
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px">
+      <div style="font-weight:800">${t('assign.title')}</div>
+      <button data-close style="border:0;background:#fff;cursor:pointer;font-size:16px;line-height:1">×</button>
+    </div>
+    <div class="small" style="margin-bottom:6px;opacity:.8">${(drivers.find(d=>d.id===driverId)?.fullName || 'Driver')}</div>
+    <div id="assign-list"></div>
+  `;
+  const list = wrap.querySelector('#assign-list');
+  if(incoming.length===0){
+    list.innerHTML = `<div class="small" style="opacity:.8">${t('empty.noIncoming')}</div>`;
+  }else{
+    list.innerHTML = incoming.map(o=>{
+      const plat = Array.isArray(o.platform)? o.platform.join(' / ') : (o.platform||'—');
+      const rid  = (o.nr!=null? `#${o.nr}` : (o.shortCode||o.id||'—'));
+      return `
+        <div class="tr" style="display:flex;align-items:center;gap:8px;border:1px solid #e5e7eb;border-radius:10px;padding:8px;margin-bottom:8px">
+          <div class="mono" style="min-width:82px">${rid}</div>
+          <div style="flex:1">
+            <div style="font-weight:700">${o.restaurant?.name||'-'}</div>
+            <div class="small" style="opacity:.8">${plat}</div>
+          </div>
+          <button class="btn" data-assign="${o.id}" style="height:34px">${t('assign.confirm')}</button>
+        </div>`;
+    }).join('');
+  }
+  wrap.querySelector('[data-close]')?.addEventListener('click', ()=> assignInfoWindow?.close());
+  wrap.querySelectorAll('[data-assign]')?.forEach(btn=>{
+    btn.addEventListener('click', async ()=>{
+      const oid = btn.getAttribute('data-assign');
+      await assignDriverToOrderFromMap(oid, driverId);
+      assignInfoWindow?.close();
+    });
+  });
+
+  if(!assignInfoWindow){
+    assignInfoWindow = new google.maps.InfoWindow({ maxWidth: 360, disableAutoPan: false });
+  }
+  assignInfoWindow.setContent(wrap);
+  assignInfoWindow.open({ map: gmap, anchor: mk });
+}
+
+function fitOnlineDrivers(){
+  if(!gmap || driverMarkers.size===0) return;
+  const b = new google.maps.LatLngBounds();
+  let any=false;
+  driverMarkers.forEach((mk, uid)=>{
+    if(presenceMap[uid]){
+      const p = mk.getPosition(); if(!p) return;
+      b.extend(p); any=true;
+    }
+  });
+  if(any) gmap.fitBounds(b, {top:40,bottom:40,left:40,right:40});
+}
+
+async function initMap(){
+  await loadGmaps().catch(()=>{});
+  if(!window.google?.maps) return;
+  const el = $('#gm'); if(!el) return;
+  if(!gmap){
+    gmap = new google.maps.Map(el, {center:{lat:54.3233,lng:10.1228}, zoom:12}); // Kiel-ish default
+    ensureMapControls();
+  }
+  onValue(rRef(rtdb,'drivers_locations'), (snap)=>{
+    const v=snap.val()||{};
+    const still = new Set(Object.keys(v));
+    driverMarkers.forEach((mk, uid)=>{ if(!still.has(uid)){ mk.setMap(null); driverMarkers.delete(uid); } });
+
+    Object.entries(v).forEach(([uid,obj])=>{
+      const {lat,lng}=obj||{}; if(!Number.isFinite(lat)||!Number.isFinite(lng)) return;
+      let mk = driverMarkers.get(uid);
+      const online = !!presenceMap[uid];
+      if(!mk){
+        mk = new google.maps.Marker({
+          map:gmap,
+          position:{lat,lng},
+          icon: driverMarkerIcon(online),
+          label: { text:'D', color:'#fff', fontWeight:'700' }
+        });
+        mk.addListener('click', ()=>{ openMapAssignPanel(uid); });
+        driverMarkers.set(uid,mk);
+      }else{
+        mk.setPosition({lat,lng});
+      }
+      mk.setIcon(driverMarkerIcon(online));
+      updateMarkerLabel(mk, uid);
+    });
+  });
+}
+
+/* ===== Mini Map (Dashboard) + Trip Card ===== */
+let miniMap=null, miniDirService=null, miniDirRenderer=null;
+let miniDriverMarker=null, miniRestMarker=null, miniCustMarker=null;
+let miniDrvUnsub=null, miniOrderUnsub=null;
+let miniTrackedOrderId=null, miniTrackedDriverId=null;
+
+let miniEtaSec=0, miniEtaUpdatedAt=0, miniTripTimer=null;
+
+const miniInfo     = document.getElementById('mini-map-info');
+const elTripDriver = document.getElementById('miniTripDriver');
+const elTripRest   = document.getElementById('miniTripRestaurant');
+const elTripOrder  = document.getElementById('miniTripOrder');
+const elTripEta    = document.getElementById('miniTripEta');
+const elTripStatus = document.getElementById('miniTripStatus');
+const elTripFee    = document.getElementById('miniTripFee');
+
+let miniOrder=null;
+
+async function initMiniMap(){
+  await loadGmaps().catch(()=>{});
+  const el = document.getElementById('mini-map');
+  if(!el || !window.google?.maps) return;
+  if(!miniMap){
+    miniMap = new google.maps.Map(el, {center:{lat:54.3233,lng:10.1228}, zoom:12, disableDefaultUI:false});
+    miniDirService  = new google.maps.DirectionsService();
+    miniDirRenderer = new google.maps.DirectionsRenderer({ map: miniMap, suppressMarkers:true, polylineOptions:{ strokeOpacity:.95, strokeWeight:5 } });
+  }
+}
+function setMiniInfo(txt){ if(miniInfo) miniInfo.textContent = txt || '—'; }
+function euro(v){ const n=Number(v); return Number.isFinite(n)? n.toFixed(2)+' €' : '—'; }
+function fmtMMSS(sec){ const s=Math.max(0,Math.round(sec)); const m=Math.floor(s/60), r=s%60; return `${m}:${String(r).padStart(2,'0')}`; }
+function stopMiniCountdown(){ if(miniTripTimer){ clearInterval(miniTripTimer); miniTripTimer=null; } }
+function startMiniCountdown(){
+  stopMiniCountdown();
+  miniTripTimer = setInterval(()=>{
+    if(!miniEtaSec||!miniEtaUpdatedAt){ if(elTripEta) elTripEta.textContent='ETA —:—'; return; }
+    const remain = Math.max(0, miniEtaSec - (Date.now()-miniEtaUpdatedAt)/1000);
+    if(elTripEta) elTripEta.textContent = 'ETA ' + fmtMMSS(remain);
+    if(remain<=0) stopMiniCountdown();
+  },1000);
+}
+function readFee(o){
+  return o?.deliveryFee ?? o?.fee ?? o?.delivery_fee ?? o?.liefergebuehr ?? o?.lieferGebuehr ?? 0;
+}
+function renderMiniTrip(o){
+  if(!o){
+    elTripDriver && (elTripDriver.textContent='—');
+    elTripRest   && (elTripRest.textContent='—');
+    elTripOrder  && (elTripOrder.textContent='—');
+    elTripEta    && (elTripEta.textContent='ETA —:—');
+    if(elTripStatus){ elTripStatus.className='badge gray'; elTripStatus.textContent='—'; }
+    elTripFee && (elTripFee.textContent='Liefergebühr: —');
+    return;
+  }
+  elTripDriver && (elTripDriver.textContent = o?.driver?.fullName || '—');
+  elTripRest   && (elTripRest.textContent   = o?.restaurant?.name || '—');
+  elTripOrder  && (elTripOrder.textContent  = (o.nr!=null? ('#'+o.nr) : (o.shortCode? ('#'+o.shortCode) : ('#'+(o.id||'—')))));
+  if(elTripStatus){
+    try{ elTripStatus.innerHTML = (typeof statusBadge==='function')? statusBadge(o?.status||'-') : (o?.status||'-'); }
+    catch{ elTripStatus.textContent = o?.status||'-'; }
+  }
+  elTripFee && (elTripFee.textContent = 'Liefergebühr: ' + euro(readFee(o)));
+}
+function ensureMarker(map, marker, label){
+  if(!marker) marker = new google.maps.Marker({ map, label });
+  else marker.setMap(map);
+  return marker;
+}
+function fitBoundsTo(...pos){
+  const b = new google.maps.LatLngBounds();
+  pos.filter(Boolean).forEach(p=> b.extend(new google.maps.LatLng(p.lat, p.lng)));
+  if(!b.isEmpty()) miniMap.fitBounds(b, {top:40,bottom:40,left:40,right:40});
+}
+function drawMiniRoute(origin, dest){
+  if(!origin || !dest || !miniDirService) return;
+  miniDirService.route({ origin, destination: dest, travelMode: google.maps.TravelMode.DRIVING },
+    (res, status)=>{
+      if(status!=='OK') return;
+      miniDirRenderer.setDirections(res);
+      const leg = res.routes?.[0]?.legs?.[0];
+      if(leg){
+        const km  = (leg.distance?.value||0)/1000;
+        const min = Math.round((leg.duration?.value||0)/60);
+        setMiniInfo(`${km.toFixed(2)} km • ETA ${min} min`);
+        miniEtaSec       = Math.max(0, Number(leg.duration?.value||0));
+        miniEtaUpdatedAt = Date.now();
+        startMiniCountdown();
+        renderMiniTrip(miniOrder);
+      }
+    });
+}
+const miniGeocodeCache = new Map();
+async function geocodeAddress(addr){
+  if(!addr || !window.google?.maps) return null;
+  if(miniGeocodeCache.has(addr)) return miniGeocodeCache.get(addr);
+  return new Promise((resolve)=>{
+    const g = new google.maps.Geocoder();
+    g.geocode({address: addr}, (res,status)=>{
+      if(status==='OK' && res[0]){
+        const p=res[0].geometry.location; const out={lat:p.lat(),lng:p.lng()};
+        miniGeocodeCache.set(addr,out); resolve(out);
+      }else resolve(null);
+    });
+  });
+}
+async function openMiniMapForOrder(o){
+  await initMiniMap(); if(!miniMap) return;
+
+  try{ miniDrvUnsub?.(); }catch(_){}
+  try{ miniOrderUnsub?.(); }catch(_){}
+  stopMiniCountdown();
+
+  miniOrder = o||null;
+  miniTrackedOrderId  = o?.id || null;
+  miniTrackedDriverId = o?.driver?.id || null;
+  renderMiniTrip(miniOrder);
+
+  const restAddr = o?.restaurant?.address_text || o?.restaurant?.addressText || '';
+  const restPos  = await geocodeAddress(restAddr);
+  const dropPos  = o?.dropoffPos || o?.to || o?.customer?.pos || null;
+
+  if(restPos){
+    miniRestMarker = ensureMarker(miniMap, miniRestMarker, 'R');
+    miniRestMarker.setPosition(restPos);
+  }else if(miniRestMarker){ miniRestMarker.setMap(null); }
+
+  if(dropPos && Number.isFinite(dropPos.lat) && Number.isFinite(dropPos.lng)){
+    miniCustMarker = ensureMarker(miniMap, miniCustMarker, 'C');
+    miniCustMarker.setPosition(dropPos);
+  }else if(miniCustMarker){ miniCustMarker.setMap(null); }
+
+  if(miniTrackedDriverId){
+    const ref = rRef(rtdb, `drivers_locations/${miniTrackedDriverId}`);
+    miniDrvUnsub = onValue(ref, (snap)=>{
+      const v=snap.val()||{}; const lat=Number(v.lat), lng=Number(v.lng);
+      if(Number.isFinite(lat)&&Number.isFinite(lng)){
+        const dPos={lat,lng};
+        miniDriverMarker = ensureMarker(miniMap, miniDriverMarker, 'D');
+        miniDriverMarker.setPosition(dPos);
+        if(restPos) drawMiniRoute(dPos, restPos);
+
+        const bounds = new google.maps.LatLngBounds();
+        bounds.extend(new google.maps.LatLng(dPos.lat, dPos.lng));
+        if(restPos) bounds.extend(new google.maps.LatLng(restPos.lat, restPos.lng));
+        if(miniCustMarker){
+          const p=miniCustMarker.getPosition().toJSON();
+          bounds.extend(new google.maps.LatLng(p.lat, p.lng));
+        }
+        if(!bounds.isEmpty()) miniMap.fitBounds(bounds, {top:40,bottom:40,left:40,right:40});
+      }
+    });
+  }else{
+    setMiniInfo('—');
+    if(restPos) fitBoundsTo(restPos, miniCustMarker? miniCustMarker.getPosition().toJSON(): null);
+  }
+
+  if(miniTrackedOrderId){
+    miniOrderUnsub = onSnapshot(doc(db,'orders', miniTrackedOrderId), (ds)=>{
+      if(!ds.exists()) return;
+      miniOrder = { id: ds.id, ...ds.data() };
+      renderMiniTrip(miniOrder);
+
+      const newDid = miniOrder?.driver?.id || null;
+      if(newDid && newDid !== miniTrackedDriverId){
+        miniTrackedDriverId = newDid;
+        try{ miniDrvUnsub?.(); }catch(_){}
+        const ref = rRef(rtdb, `drivers_locations/${miniTrackedDriverId}`);
+        miniDrvUnsub = onValue(ref, (snap)=>{
+          const v=snap.val()||{}; const lat=Number(v.lat), lng=Number(v.lng);
+          if(Number.isFinite(lat)&&Number.isFinite(lng)){
+            const dPos={lat,lng};
+            miniDriverMarker = ensureMarker(miniMap, miniDriverMarker, 'D');
+            miniDriverMarker.setPosition(dPos);
+            if(restPos) drawMiniRoute(dPos, restPos);
+          }
+        });
+      }
+
+      const st = String(miniOrder?.status||'').toLowerCase();
+      if(st==='geliefert' || st==='abgebrochen') stopMiniCountdown();
+    });
+  }
+}
+function bindMiniMapRowClicks(){
+  const wrap = document.getElementById('active-list');
+  if(!wrap) return;
+  wrap.querySelectorAll('[data-mini-map]').forEach(tr=>{
+    tr.style.cursor='pointer';
+    tr.addEventListener('click',(ev)=>{
+      if(ev.target.closest('button,select')) return;
+      const id = tr.getAttribute('data-mini-map');
+      const o = orders.find(x=>x.id===id);
+      if(o) openMiniMapForOrder(o);
+    });
+  });
+}
+
+/* ===== Rendering ===== */
+function renderDashboard(){
+  const incoming = orders.filter(o=>(o.status||'').toLowerCase()==='bearbeitung');
+  const active   = orders.filter(o=>['unterwegs','angenommen','zugewiesen','assigned'].includes(String(o.status||'').toLowerCase()));
+
+  const ic = document.getElementById('incoming-count'); if (ic) ic.textContent = incoming.length;
+
+  const incWrap = $('#incoming-list');
+  if(incWrap){
+    incWrap.innerHTML = incoming.map(o=>`
+      <div class="tr">
+        <div class="flex"><img class="logo" src="${o.restaurant?.logoUrl||''}"/><div><div style="font-weight:700">${o.restaurant?.name||'-'}</div><div class="small">${o.restaurant?.phone||''}</div></div></div>
+        <div>${platformChips(o.platform)}</div>
+        <div class="mono" style="text-align:center">x${Number(o.qty||0)}</div>
+        <div>${Number.isFinite(Number(o.price))? Number(o.price).toFixed(2)+' €':'—'}</div>
+        <div class="flex"><i data-lucide="clock"></i> ${o.pickupTime||'—'}</div>
+        <div class="right flex">
+          <label style="display:flex;align-items:center;gap:6px"><input type="checkbox" class="order-select" data-id="${o.id}"><span class="small">Select</span></label>
+          <button class="btn secondary" data-order-details="${o.id}" data-i18n="order.details">${t('order.details')}</button>
+          <button class="btn" data-assign="${o.id}" data-i18n="assign.confirm">${t('assign.confirm')}</button>
+        </div>
+      </div>`).join('') || `<div class="small">${t('empty.noIncoming')}</div>`;
+  }
+
+  const aWrap = $('#active-list');
+  if(aWrap){
+    aWrap.innerHTML = active.map(o=>`
+    <div class="tr" data-mini-map="${o.id}">
+      <div class="flex">
+        ${o.driver?.avatarUrl? `<img class="avatar" src="${o.driver.avatarUrl}">`:`<div class="avatar"></div>`}
+        <div>
+          <div style="font-weight:700">${o.driver?.fullName||'-'}</div>
+          <div class="sub">${o.driver?.phone||'—'}</div>
+        </div>
+      </div>
+      <div>${statusBadge(o.status)}</div>
+      <div class="right flex">
+        <label style="display:flex;align-items:center;gap:6px"><input type="checkbox" class="order-select" data-id="${o.id}"><span class="small">Select</span></label>
+        <button class="btn secondary" data-order-details="${o.id}">${t('order.details')}</button>
+        <div class="dropdown">
+          <select data-update-status="${o.id}">
+            <option value="">${t('labels.status')}…</option>
+            <option value="Unterwegs">Unterwegs</option>
+            <option value="Geliefert">Geliefert</option>
+            <option value="Abgebrochen">Abgebrochen</option>
+          </select>
+        </div>
+      </div>
+    </div>
+  `).join('') || `<div class="sub">${t('empty.noActive')}</div>`;
+  }
+
+  attachRowHandlers();
+  bindMiniMapRowClicks();
+  bindOrderSelectionHandlers();
+  ensureExportBar(); // NEW
+}
+
+/* ===== [TAUSSIL-REST-APPROVED-RENDER-START] ===== */
+function renderRestaurants(){
+  const wrap = $('#restaurants-grid'); if(!wrap) return;
+
+  // مصدر 1: وثائق restaurants المجموعة الرسمية
+  const docs = Array.isArray(restaurants) ? restaurants : [];
+
+  // مصدر 2: مستخدمون role=restaurant & approved=true من users
+  const byId = new Map(docs.map(r => [r.id, r]));
+  const extras = (restaurantUsersApproved || [])
+    .filter(u => !byId.has(u.id))
+    .map(u => ({
+      id: u.id,
+      name: u.name || u.id,
+      phone: u.phone || '',
+      address: u.address || '',
+      logoUrl: u.logoUrl || ''
+    }));
+
+  const merged = docs.concat(extras);
+
+  wrap.innerHTML = merged.map(r=>`
+    <div class="card" style="padding:12px">
+      <div class="flex">
+        <img class="logo" src="${r.logoUrl||''}"/>
+        <div>
+          <div style="font-weight:800">${r.name}</div>
+          <div class="small">${r.phone||''}</div>
+          <div class="small">${r.address||''}</div>
+        </div>
+        <span class="right"></span>
+        <button class="btn secondary"
+                data-user-details='${JSON.stringify({kind:"restaurant",name:r.name,phone:r.phone,logoUrl:r.logoUrl||''})}'
+                data-i18n="order.details">${t('order.details')}</button>
+      </div>
+    </div>`).join('');
+
+  attachRowHandlers();
+}
+/* ===== [TAUSSIL-REST-APPROVED-RENDER-END] ===== */
+
+function renderDrivers(){
+  const wrap = $('#drivers-grid'); if(!wrap) return;
+  wrap.innerHTML = drivers.map(d=>{
+    const online = !!presenceMap[d.id];
+    return `
+    <div class="card" style="padding:12px">
+      <div class="flex">
+        <img class="avatar" src="${d.avatarUrl||''}"/>
+        <div>
+          <div style="font-weight:800">${d.fullName}</div>
+          <div class="small">${d.phone||''}</div>
+          <div class="small">Status: ${online? '<b style="color:#16a34a">Online</b>' : 'Offline'}</div>
+        </div>
+        <span class="right"></span>
+        <button class="btn secondary" data-user-details='${JSON.stringify({kind:"driver",fullName:d.fullName,phone:d.phone,avatarUrl:d.avatarUrl||''})}' data-i18n="order.details">${t('order.details')}</button>
+      </div>
+    </div>`;
+  }).join('');
+  attachRowHandlers();
+
+  if(window.google?.maps){
+    driverMarkers.forEach((mk, uid)=> updateMarkerLabel(mk, uid));
+  }
+}
+function renderOrdersLog(){
+  const wrap = $('#orders-log'); if(!wrap) return;
+  wrap.innerHTML = orders.map(o=>`
+    <div class="tr">
+      <div><input type="checkbox" class="order-select" data-id="${o.id}"></div>
+      <div class="mono">#${o.nr!=null? o.nr : (o.shortCode||'—')}</div>
+      <div class="flex"><img class="logo" src="${o.restaurant?.logoUrl||''}"/><div><div style="font-weight:700">${o.restaurant?.name||'-'}</div><div class="small">${o.restaurant?.phone||''}</div></div></div>
+      <div>${o.driver? `<div><div style="font-weight:700">${o.driver.fullName||''}</div><div class="small">${o.driver.phone||''}</div></div>` : '<span class="small">-</span>'}</div>
+      <div>${platformChips(o.platform)}</div>
+      <div class="mono" style="text-align:center">x${Number(o.qty||0)}</div>
+      <div class="flex right">${statusBadge(o.status)} <button class="btn secondary" data-order-details="${o.id}" data-i18n="order.details">${t('order.details')}</button></div>
+    </div>`).join('');
+  attachRowHandlers();
+  bindOrderSelectionHandlers();
+  ensureExportBar(); // NEW
+}
+function attachRowHandlers(){
+  document.querySelectorAll('[data-order-details]').forEach(btn=>{
+    btn.onclick=()=>{ const id=btn.getAttribute('data-order-details'); const o=orders.find(x=>x.id===id); if(o) openOrderModal(o); };
+  });
+  document.querySelectorAll('[data-assign]').forEach(btn=>{
+    btn.onclick=()=>{ const id=btn.getAttribute('data-assign'); const o=orders.find(x=>x.id===id); if(o) openAssignSheet(o); };
+  });
+  document.querySelectorAll('select[data-update-status]').forEach(sel=>{
+    sel.onchange=async ()=>{ const id=sel.getAttribute('data-update-status'); const val=sel.value; if(!val) return; await changeStatus(id,val); sel.value=''; };
+  });
+  lucide.createIcons();
+}
+
+/* ===== Modals ===== */
+const orderModal   = $('#order-modal');
+const orderDetails = $('#order-details');
+$('#order-close')?.addEventListener('click',()=>orderModal?.classList.remove('open'));
+function openOrderModal(o){
+  if(!orderDetails || !orderModal) return;
+  orderDetails.innerHTML = `
+    <div class="grid cols-2">
+      <div><div class="small">${t('labels.code')}</div><div class="mono">#${o.nr!=null? o.nr : (o.shortCode||'—')}</div></div>
+      <div><div class="small">${t('labels.status')}</div>${statusBadge(o.status)}</div>
+      <div>
+        <div class="small">${t('labels.restaurant')}</div>
+        <div class="flex"><img class="logo" src="${o.restaurant?.logoUrl||''}"/><div><div style="font-weight:800">${o.restaurant?.name||'-'}</div><div class="small">${o.restaurant?.phone||''}</div></div></div>
+      </div>
+      <div>
+        <div class="small">${t('labels.driver')}</div>
+        ${o.driver? `<div class="flex">${o.driver.avatarUrl? `<img class="avatar" src="${o.driver.avatarUrl}">`:''}<div><div style="font-weight:800">${o.driver.fullName||''}</div><div class="small">${o.driver.phone||''}</div></div></div>` : '<div class="small">-</div>'}
+      </div>
+      <div><div class="small">${t('labels.platform')}</div>${platformChips(o.platform)}</div>
+      <div><div class="small">${t('labels.pickup')}</div>${o.pickupTime||'—'}</div>
+      <div><div class="small">${t('labels.qty')}</div>x${Number(o.qty||0)}</div>
+      <div><div class="small">${t('labels.price')}</div>${Number.isFinite(Number(o.price))? Number(o.price).toFixed(2)+' €':'—'}</div>
+    </div>
+    <div class="row" style="justify-content:flex-end;gap:8px;margin-top:12px">
+      <select id="order-status-select" style="height:40px;border-radius:10px;border:1px solid #e5e7eb">
+        <option value="">${t('labels.status')}…</option>
+        <option value="Bearbeitung">Bearbeitung</option>
+        <option value="Zugewiesen">Zugewiesen</option>
+        <option value="Angenommen">Angenommen</option>
+        <option value="Unterwegs">Unterwegs</option>
+        <option value="Geliefert">Geliefert</option>
+        <option value="Abgebrochen">Abgebrochen</option>
+      </select>
+      <button class="btn" id="order-status-apply" data-i18n="assign.confirm">${t('assign.confirm')}</button>
+    </div>
+    <div class="small" style="margin-top:6px">${o.updatedAt?.toDate?.()? o.updatedAt.toDate().toLocaleString() : (o.createdAt?.toDate?.()? o.createdAt.toDate().toLocaleString():'')}</div>
+  `;
+  orderModal.classList.add('open');
+  $('#order-status-apply').onclick = async ()=>{
+    const val = $('#order-status-select').value; if(!val) return;
+    await changeStatus(o.id, val); orderModal.classList.remove('open');
+  };
+  lucide.createIcons();
+}
+
+const userModal = $('#user-modal');
+const userTitle = $('#user-title');
+const userDetailsBox = $('#user-details');
+$('#user-close')?.addEventListener('click',()=>userModal?.classList.remove('open'));
+function openUserModal(payload){
+  if(!userModal||!userTitle||!userDetailsBox) return;
+  if(payload.kind==='driver'){
+    userTitle.textContent = currentLang==='de'?'Fahrerdetails':(currentLang==='en'?'Driver Details':'تفاصيل السائق');
+    userDetailsBox.innerHTML = `<div class="flex"><img class="avatar" src="${payload.avatarUrl||''}"/><div><div style="font-weight:800">${payload.fullName}</div><div class="small">${payload.phone||''}</div></div></div>`;
+  }else{
+    userTitle.textContent = currentLang==='de'?'Restaurantdetails':(currentLang==='en'?'Restaurant Details':'تفاصيل المطعم');
+    userDetailsBox.innerHTML = `<div class="flex"><img class="logo" src="${payload.logoUrl||''}"/><div><div style="font-weight:800">${payload.name}</div><div class="small">${payload.phone||''}</div></div></div>`;
+  }
+  userModal.classList.add('open'); lucide.createIcons();
+}
+document.addEventListener('click',(e)=>{ const ud=e.target.closest('[data-user-details]'); if(ud){ try{ openUserModal(JSON.parse(ud.getAttribute('data-user-details')));}catch(_){} } });
+
+/* ===== Assign Sheet (كما في ملفك) ===== */
+const assignSheet   = $('#assign-sheet');
+const assignBox     = $('#assign-order-box');
+const assignSelect  = $('#assign-driver-select');
+$('#assign-cancel')?.addEventListener('click',()=>assignSheet?.classList.remove('open'));
+$('#assign-confirm')?.addEventListener('click', async ()=>{
+  const oid = assignSheet?.dataset.oid; const val=assignSelect?.value; if(!oid || !val) return;
+  const d = drivers.find(x=>x.id===val); if(!d) return;
+  try{
+    await updateDoc(doc(db,'orders', oid), {
+      driver:{ id:d.id, fullName:d.fullName||null, phone:d.phone||null, avatarUrl:d.avatarUrl||null },
+      status:'Zugewiesen', updatedAt: serverTimestamp()
+    }).catch(async ()=>{
+      await setDoc(doc(db,'orders', oid), {
+        driver:{ id:d.id, fullName:d.fullName||null, phone:d.phone||null, avatarUrl:d.avatarUrl||null },
+        status:'Zugewiesen', updatedAt: serverTimestamp()
+      }, {merge:true});
+    });
+    await rUpdate(rRef(rtdb,`drivers_inbox/${d.id}`), { lastOrderAssigned: oid, ts: Date.now() }).catch(()=>{});
+    playSound('driver');
+  }finally{ assignSheet?.classList.remove('open'); }
+});
+function openAssignSheet(o){
+  if(!assignSheet||!assignBox||!assignSelect) return;
+  assignSheet.dataset.oid = o.id;
+  assignBox.textContent = `#${o.nr!=null?o.nr:o.id} · ${o.restaurant?.name||'-'}`;
+  assignSelect.innerHTML = '<option value=""></option>' + drivers.map(d=>{
+    const tag = presenceMap[d.id] ? ' (Online)' : ' (Offline)';
+    return `<option value="${d.id}">${d.fullName} — ${d.phone||''}${tag}</option>`;
+  }).join('');
+  assignSheet.classList.add('open');
+}
+
+/* ===== Actions ===== */
+async function changeStatus(orderId, next){
+  try{
+    await updateDoc(doc(db,'orders', orderId), { status: next, updatedAt: serverTimestamp() });
+  }catch(_){
+    await setDoc(doc(db,'orders', orderId), { status: next, updatedAt: serverTimestamp() }, { merge:true });
+  }
+  if(next==='Unterwegs') playSound('unterwegs');
+  if(next==='Geliefert') playSound('geliefert');
+  renderAll();
+}
+
+/* ===== Search ===== */
+$('#search')?.addEventListener('input',(e)=>{
+  const q=(e.target.value||'').trim().toLowerCase();
+  const wrap = $('#orders-log'); if(!wrap) return;
+  const list = !q? orders : orders.filter(o=>
+    String(o.shortCode||'').toLowerCase().includes(q) ||
+    String(o.nr||'').toLowerCase().includes(q) ||
+    String(o.restaurant?.name||'').toLowerCase().includes(q) ||
+    String(o.restaurant?.phone||'').toLowerCase().includes(q) ||
+    (o.driver && (String(o.driver.fullName||'').toLowerCase().includes(q) || String(o.driver.phone||'').toLowerCase().includes(q)))
+  );
+  wrap.innerHTML = list.map(o=>`
+    <div class="tr">
+      <div><input type="checkbox" class="order-select" data-id="${o.id}"></div>
+      <div class="mono">#${o.nr!=null? o.nr : (o.shortCode||'—')}</div>
+      <div class="flex"><img class="logo" src="${o.restaurant?.logoUrl||''}"/><div><div style="font-weight:700">${o.restaurant?.name||'-'}</div><div class="small">${o.restaurant?.phone||''}</div></div></div>
+      <div>${o.driver? `<div><div style="font-weight:700">${o.driver.fullName||''}</div><div class="small">${o.driver.phone||''}</div></div>` : '<span class="small">-</span>'}</div>
+      <div>${platformChips(o.platform)}</div>
+      <div class="mono" style="text-align:center">x${Number(o.qty||0)}</div>
+      <div class="flex right">${statusBadge(o.status)} <button class="btn secondary" data-order-details="${o.id}" data-i18n="order.details">${t('order.details')}</button></div>
+    </div>`).join('');
+  attachRowHandlers();
+  bindOrderSelectionHandlers();
+  ensureExportBar(); // NEW
+});
+
+/* ===== Top bar events ===== */
+$('#btn-mute')?.addEventListener('click',()=>setMuted(!isMuted));
+$('#lang')?.addEventListener('change',()=>{ currentLang=$('#lang').value; translatePage(); });
+$('#nav')?.addEventListener('click',(e)=>{
+  const btn=e.target.closest('button[data-tab]'); if(!btn) return;
+  document.querySelectorAll('.nav button').forEach(b=>b.classList.toggle('active', b===btn));
+  const tab=btn.getAttribute('data-tab');
+  document.querySelectorAll('.tab').forEach(t=>t.hidden=true);
+  $('#tab-'+tab).hidden=false;
+  if(tab==='map') initMap();
+});
+
+/* ===== Login / Logout Gate ===== */
+const adminAuth = $('#adminAuth');
+const adEmail   = $('#adEmail');
+const adPass    = $('#adPass');
+const adLoginBtn= $('#adLoginBtn');
+const adMsg     = $('#adMsg');
+
+function showAdminAuth(show=true, msg=''){
+  if(adminAuth) adminAuth.style.display = show? 'flex':'none';
+  if(adMsg) adMsg.textContent = msg || '';
+}
+adLoginBtn?.addEventListener('click', async ()=>{
+  if(adMsg) adMsg.textContent='';
+  const email=(adEmail?.value||'').trim(); const pass=(adPass?.value||'');
+  if(!email || !pass){ if(adMsg) adMsg.textContent='Bitte E-Mail & Passwort eingeben.'; return; }
+  adLoginBtn.disabled=true;
+  try{ await signInWithEmailAndPassword(auth, email, pass); }
+  catch(e){ if(adMsg) adMsg.textContent = (e?.code==='auth/invalid-credential')? 'Falsche Zugangsdaten.' : ('Fehler: '+(e?.code||'')); }
+  finally{ adLoginBtn.disabled=false; }
+});
+$('#btn-logout')?.addEventListener('click', async ()=>{
+  try{ await signOut(auth); }catch(_){}
+  detachRealtime();
+  showAdminAuth(true);
+});
+
+/* ===== Realtime bindings (approved admin only) ===== */
+let unsubOrders=null, unsubRestaurants=null, unsubDrivers=null, presenceUnsub=null;
+/* [TAUSSIL-REST-APPROVED-UNSUB] */
+let unsubRestaurantUsersApproved = null;
+
+function detachRealtime(){
+  try{ unsubOrders?.(); }catch(_){}
+  try{ unsubRestaurants?.(); }catch(_){}
+  try{ unsubDrivers?.(); }catch(_){}
+  try{ presenceUnsub?.(); }catch(_){}
+  /* [TAUSSIL-REST-APPROVED-DETACH] */
+  try{ unsubRestaurantUsersApproved?.(); }catch(_){}
+  unsubOrders=unsubRestaurants=unsubDrivers=presenceUnsub=null;
+  unsubRestaurantUsersApproved = null;
+
+  ordersMap.clear(); orders=[]; restaurants=[]; drivers=[];
+  restaurantUsersApproved = [];
+  presenceMap={};
+  renderAll();
+}
+async function bindRealtimeOnce(){
+  if (unsubOrders || unsubRestaurants || unsubDrivers) return;
+
+  unsubOrders = onSnapshot(
+    query(collection(db,'orders'), orderBy('updatedAt','desc'), limit(200)),
+    (snap)=>{
+      snap.docChanges().forEach(ch=>{
+        const id=ch.doc.id; const data=ch.doc.data()||{}; const prev=ordersMap.get(id);
+        if(ch.type==='removed'){ ordersMap.delete(id); return; }
+        ordersMap.set(id,data);
+        if(ch.type==='added' && (data.status||'').toLowerCase()==='bearbeitung') playSound('order');
+        if(ch.type==='modified'){
+          const before=(prev?.status||'').toLowerCase(); const now=(data.status||'').toLowerCase();
+          if(before!==now){ if(now==='unterwegs') playSound('unterwegs'); if(now==='geliefert') playSound('geliefert'); }
+        }
+      });
+      orders = Array.from(ordersMap.entries()).map(([id,o])=>({id,...o}));
+      renderAll();
+    },
+    (err)=>console.warn('orders listener error:', err?.code||err)
+  );
+
+  unsubRestaurants = onSnapshot(
+    query(collection(db,'restaurants'), limit(100)),
+    (snap)=>{
+      restaurants = snap.docs.map(d=>{
+        const r=d.data()||{};
+        return { id:d.id, name:r.name||d.id, phone:r.phone||'', address:r.address_text||r.addressText||'', logoUrl:r.logoUrl||'' };
+      });
+      renderRestaurants();
+    }
+  );
+
+  /* [TAUSSIL-REST-APPROVED-LISTENER-START] */
+  if(!unsubRestaurantUsersApproved){
+    unsubRestaurantUsersApproved = onSnapshot(
+      // شرط role فقط، ونفلتر approved على الواجهة لتجنّب فهرس مركّب
+      query(collection(db,'users'), where('role','==','restaurant'), limit(200)),
+      (snap)=>{
+        const rows = snap.docs.map(d => {
+          const u = d.data() || {};
+          return {
+            id: d.id,
+            approved: u.approved === true,
+            name: u.name || u.displayName || u.firstName || u.email || d.id,
+            phone: u.phone || '',
+            address: u.address_text || u.addressText || '',
+            logoUrl: u.logoUrl || ''
+          };
+        });
+        restaurantUsersApproved = rows.filter(r => r.approved);
+        renderRestaurants();
+      },
+      (err)=> console.warn('restaurant users listener error:', err?.code||err)
+    );
+  }
+  /* [TAUSSIL-REST-APPROVED-LISTENER-END] */
+
+  unsubDrivers = onSnapshot(
+    query(collection(db,'users'), where('role','==','driver'), where('approved','==', true), limit(200)),
+    (snap)=>{
+      drivers = snap.docs.map(d=>{
+        const u=d.data()||{};
+        const full = (u.firstName&&u.lastName)? `${u.firstName} ${u.lastName}` : (u.name||u.email||d.id);
+        driverInfoById.set(d.id, { firstName: u.firstName || firstWord(full), fullName: full, phone: u.phone||'', email:u.email||'' });
+        return { id:d.id, fullName: full, phone:u.phone||'', avatarUrl:u.avatarUrl||'' };
+      });
+      renderDrivers();
+    }
+  );
+
+  presenceUnsub = onValue(rRef(rtdb,'drivers_presence'), (snap)=>{
+    const val=snap.val()||{}; const m={};
+    Object.entries(val).forEach(([uid, obj])=>{
+      const online = !!(obj && obj.online===true && obj.desired!==false);
+      m[uid]=online;
+    });
+    presenceMap = m;
+
+    if(window.google?.maps){
+      driverMarkers.forEach((mk, uid)=>{
+        mk.setIcon(driverMarkerIcon(!!presenceMap[uid]));
+      });
+    }
+    renderDrivers();
+  });
+}
+
+/* ===== Orders bulk delete (UI + logic) ===== */
+const selectedOrders = new Set();
+function ensureOrdersBulkUI(){
+  const logWrap = $('#orders-log');
+  if(!logWrap) return;
+  if($('#orders-bulk-bar')) return;
+
+  const bar=document.createElement('div');
+  bar.id='orders-bulk-bar';
+  bar.style.cssText='display:flex;gap:10px;align-items:center;justify-content:space-between;margin:8px 0;padding:8px;border:1px solid #e5e7eb;border-radius:10px;background:#fafafa';
+  bar.innerHTML = `
+    <div style="display:flex;align-items:center;gap:10px">
+      <label style="display:flex;align-items:center;gap:6px"><input type="checkbox" id="orders-select-all"><span>Alle wählen</span></label>
+      <span class="small" id="orders-selected-count" style="opacity:.8">0 ausgewählt</span>
+    </div>
+    <div style="display:flex;gap:8px">
+      <button class="btn" id="orders-delete-selected" disabled>🗑 Löschen</button>
+    </div>
+  `;
+  logWrap.parentElement?.insertBefore(bar, logWrap);
+  $('#orders-select-all').addEventListener('change', (e)=> selectAllOrders(e.target.checked));
+  $('#orders-delete-selected').addEventListener('click', deleteSelectedOrders);
+  updateBulkBar();
+}
+function updateBulkBar(){
+  const cntEl = $('#orders-selected-count');
+  const delBtn= $('#orders-delete-selected');
+  if(cntEl) cntEl.textContent = `${selectedOrders.size} ausgewählt`;
+  if(delBtn) delBtn.disabled = selectedOrders.size===0;
+}
+function bindOrderSelectionHandlers(){
+  document.querySelectorAll('input.order-select').forEach(ch=>{
+    ch.onchange = ()=> { const id=ch.getAttribute('data-id'); if(!id) return; if(ch.checked) selectedOrders.add(id); else selectedOrders.delete(id); updateBulkBar(); };
+  });
+}
+function selectAllOrders(flag){
+  selectedOrders.clear();
+  document.querySelectorAll('input.order-select').forEach(ch=>{
+    ch.checked = !!flag;
+    const id=ch.getAttribute('data-id'); if(flag && id) selectedOrders.add(id);
+  });
+  updateBulkBar();
+}
+async function deleteSelectedOrders(){
+  if(selectedOrders.size===0) return;
+  const ok = confirm(`Bestätigen: ${selectedOrders.size} Auftrag/⎯e löschen? Diese Aktion ist dauerhaft.`);
+  if(!ok) return;
+  const ids=[...selectedOrders];
+  for(const id of ids){
+    try{ await deleteDoc(doc(db,'orders', id)); }catch(e){ console.warn('delete fail', id, e); }
+  }
+  selectedOrders.clear();
+  updateBulkBar();
+}
+
+/* ===== Export & Print (CSV + Print/PDF) ===== */
+/* ===== Print & CSV — Report Tables (Invoices-ready) ===== */
+
+/* 1) CSS الطباعة والتقرير */
+function ensurePrintStyles(){
+  if (document.getElementById('taussil-print-css')) return;
+  const css = `
+#print-report{ display:none; padding:24px; font:13px/1.45 system-ui, -apple-system, Segoe UI, Roboto, sans-serif; color:#111827; }
+#print-report h1{ font-size:18px; margin:0 0 10px; }
+#print-report .meta{ font-size:12px; color:#6b7280; margin-bottom:12px; }
+#print-report table{ width:100%; border-collapse:collapse; }
+#print-report th, #print-report td{ border:1px solid #e5e7eb; padding:6px 8px; vertical-align:top; }
+#print-report th{ background:#f8fafc; text-align:left; font-weight:700; }
+#print-report tfoot td{ font-weight:700; background:#f9fafb; }
+@media print {
+  body > *:not(#print-report){ display:none !important; }
+  #print-report{ display:block !important; }
+  thead{ display:table-header-group; }
+  tr{ page-break-inside:avoid; }
+}
+  `.trim();
+  const style=document.createElement('style');
+  style.id='taussil-print-css';
+  style.textContent=css;
+  document.head.appendChild(style);
+}
+
+/* 2) أدوات تنسيق */
+function fmtNum(n){ const x=Number(n); return Number.isFinite(x)? x.toFixed(2) : ''; }
+function fmtTs(ts){
+  try{
+    if (ts?.toDate) return ts.toDate().toLocaleString();
+    if (typeof ts==='number') return new Date(ts).toLocaleString();
+    return ts || '';
+  }catch(_){ return ''; }
+}
+function getAllOrdersLoaded(){ return Array.isArray(orders)? orders : []; }
+function getVisibleOrderIds(){
+  const wrap = document.getElementById('orders-log');
+  if(!wrap) return [];
+  return Array.from(wrap.querySelectorAll('.tr input.order-select[data-id]'))
+    .map(el => el.getAttribute('data-id')).filter(Boolean);
+}
+function getVisibleOrders(){
+  const ids = getVisibleOrderIds();
+  if(ids.length===0) return [];
+  const map = new Map(orders.map(o=>[o.id,o]));
+  return ids.map(id => map.get(id)).filter(Boolean);
+}
+
+/* 3) بناء تقرير للطباعة (جداول) */
+function buildPrintableReport(rows){
+  let host = document.getElementById('print-report');
+  if(host) host.remove();
+  host = document.createElement('div');
+  host.id = 'print-report';
+
+  let sumQty=0, sumPrice=0, sumFee=0;
+  rows.forEach(o=>{
+    sumQty += Number(o.qty||0);
+    sumPrice += Number(o.price||0);
+    sumFee += Number(readFee(o)||0);
+  });
+
+  const now = new Date().toLocaleString();
+  const title = currentLang==='ar' ? 'تقرير الطلبات'
+              : currentLang==='de' ? 'Auftragsbericht'
+              : 'Orders Report';
+
+  const headCols = ['Nr/Code','OrderId','Restaurant','Rest.Phone','Driver','Driver.Phone','Platform','Qty','Price €','Del.Fee €','Status','Pickup','Created','Updated'];
+  const esc = s => String(s ?? '').replace(/[<>&]/g, c=>({ '<':'&lt;','>':'&gt;','&':'&amp;' }[c]));
+
+  const bodyRows = rows.map(o=>{
+    const nrOr = (o.nr!=null? `#${o.nr}` : (o.shortCode || (o.id || '')));
+    const plat = Array.isArray(o.platform)? o.platform.join(' / ') : (o.platform||'');
+    const rName= o.restaurant?.name || '';
+    const rPhone=o.restaurant?.phone || '';
+    const dName= o.driver?.fullName || '';
+    const dPhone=o.driver?.phone || '';
+    const price= fmtNum(o.price);
+    const fee  = fmtNum(readFee(o));
+    const created = fmtTs(o.createdAt);
+    const updated = fmtTs(o.updatedAt);
+    return `<tr>
+      <td>${esc(nrOr)}</td>
+      <td>${esc(o.id||'')}</td>
+      <td>${esc(rName)}</td>
+      <td>${esc(rPhone)}</td>
+      <td>${esc(dName)}</td>
+      <td>${esc(dPhone)}</td>
+      <td>${esc(plat)}</td>
+      <td>${Number(o.qty||0)}</td>
+      <td>${esc(price)}</td>
+      <td>${esc(fee)}</td>
+      <td>${esc(o.status||'')}</td>
+      <td>${esc(o.pickupTime||'')}</td>
+      <td>${esc(created)}</td>
+      <td>${esc(updated)}</td>
+    </tr>`;
+  }).join('');
+
+  const footer = `<tr>
+    <td colspan="7">Totals</td>
+    <td>${sumQty}</td>
+    <td>${fmtNum(sumPrice)}</td>
+    <td>${fmtNum(sumFee)}</td>
+    <td colspan="4"></td>
+  </tr>`;
+
+  host.innerHTML = `
+    <h1>${esc(title)}</h1>
+    <div class="meta">${esc(now)} • ${rows.length} rows</div>
+    <table>
+      <thead><tr>${headCols.map(h=>`<th>${esc(h)}</th>`).join('')}</tr></thead>
+      <tbody>${bodyRows}</tbody>
+      <tfoot>${footer}</tfoot>
+    </table>
+  `;
+  document.body.appendChild(host);
+  return host;
+}
+
+/* 4) CSV عام */
+function exportCsv(rows, filenameTag){
+  const headers = ['NrOrCode','OrderId','Restaurant','RestaurantPhone','Driver','DriverPhone','Platform','Qty','PriceEUR','DeliveryFeeEUR','Status','PickupTime','CreatedAt','UpdatedAt'];
+  const esc = v => {
+    if (v === null || v === undefined) return '';
+    const s = String(v).replace(/"/g,'""');
+    return /[",\n]/.test(s) ? `"${s}"` : s;
+  };
+  const rec = o=>{
+    const nrOr = (o.nr!=null? `#${o.nr}` : (o.shortCode || (o.id || '')));
+    const plat = Array.isArray(o.platform)? o.platform.join(' / ') : (o.platform||'');
+    const price= fmtNum(o.price);
+    const fee  = fmtNum(readFee(o));
+    return [
+      nrOr, o.id||'', o.restaurant?.name||'', o.restaurant?.phone||'',
+      o.driver?.fullName||'', o.driver?.phone||'',
+      plat, Number(o.qty||0), price, fee, o.status||'',
+      o.pickupTime||'', fmtTs(o.createdAt), fmtTs(o.updatedAt)
+    ].map(esc).join(',');
+  };
+  const csv = [headers.join(','), ...rows.map(rec)].join('\n');
+  const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
+  const url  = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  const tag = filenameTag || new Date().toISOString().slice(0,19).replace(/[:T]/g,'-');
+  a.href = url; a.download = `taussil-orders_${tag}.csv`;
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
+}
+
+/* 5) شريط الأزرار */
+function ensureExportBar(){
+  const logWrap = document.getElementById('orders-log');
+  if(!logWrap) return;
+  if(document.getElementById('orders-export-bar')) return;
+
+  const bar = document.createElement('div');
+  bar.id = 'orders-export-bar';
+  bar.style.cssText = 'display:flex;gap:8px;align-items:center;justify-content:flex-end;margin:8px 0;';
+  bar.innerHTML = `
+    <button id="btn-print" class="btn secondary" title="Print / PDF">🖨️ Print/PDF</button>
+    <button id="btn-csv-visible" class="btn" title="Export CSV (Shown)">⬇️ CSV (Shown)</button>
+    <button id="btn-csv-all" class="btn" title="Export CSV (All)">⬇️ CSV (All)</button>
+  `;
+  logWrap.parentElement?.insertBefore(bar, logWrap);
+
+  document.getElementById('btn-print').addEventListener('click', ()=>{
+    const visible = getVisibleOrders();
+    const rows = visible.length ? visible : getAllOrdersLoaded();
+    if(!rows.length){ alert('لا توجد بيانات للطباعة'); return; }
+    ensurePrintStyles();
+    const host = buildPrintableReport(rows);
+    const cleanup = ()=>{ host?.remove(); window.removeEventListener('afterprint', cleanup); };
+    window.addEventListener('afterprint', cleanup);
+    window.print();
+  });
+
+  document.getElementById('btn-csv-visible').addEventListener('click', ()=>{
+    const rows = getVisibleOrders();
+    if(!rows.length){ alert('لا توجد صفوف ظاهرة للتصدير'); return; }
+    exportCsv(rows, 'visible');
+  });
+
+  document.getElementById('btn-csv-all').addEventListener('click', ()=>{
+    const rows = getAllOrdersLoaded();
+    if(!rows.length){ alert('لا توجد بيانات'); return; }
+    exportCsv(rows, 'all');
+  });
+}
+
+/* ===== Pending Approvals (Admin Inbox) ===== */
+let pendingDrivers = [];
+let pendingRestaurantUsers = [];   // users with role == 'restaurant' & approved == false
+let pendingRestaurantDocs  = [];   // restaurants collection with approved == false
+
+let unsubPendingDrv=null, unsubPendingRestUsers=null, unsubPendingRestDocs=null;
+
+/* UI containers (injected above drivers/restaurants grids) */
+function ensurePendingUI(){
+  const dgrid = document.getElementById('drivers-grid');
+  if(dgrid && !document.getElementById('pending-drivers-wrap')){
+    const wrap = document.createElement('div');
+    wrap.id = 'pending-drivers-wrap';
+    wrap.style.cssText='margin:10px 0; padding:10px; border:1px solid #e5e7eb; border-radius:10px; background:#fff';
+    wrap.innerHTML = `
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+        <strong>Driver approvals</strong>
+        <span id="pending-drivers-count" class="badge gray">0</span>
+      </div>
+      <div id="pending-drivers" style="display:grid; gap:8px"></div>
+    `;
+    dgrid.parentElement?.insertBefore(wrap, dgrid);
+  }
+
+  const rgrid = document.getElementById('restaurants-grid');
+  if(rgrid && !document.getElementById('pending-restaurants-wrap')){
+    const wrap = document.createElement('div');
+    wrap.id = 'pending-restaurants-wrap';
+    wrap.style.cssText='margin:10px 0; padding:10px; border:1px solid #e5e7eb; border-radius:10px; background:#fff';
+    wrap.innerHTML = `
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+        <strong>Restaurant approvals</strong>
+        <span id="pending-restaurants-count" class="badge gray">0</span>
+      </div>
+      <div id="pending-restaurants" style="display:grid; gap:8px"></div>
+    `;
+    rgrid.parentElement?.insertBefore(wrap, rgrid);
+  }
+}
+
+/* ===== [TAUSSIL-APPROVAL-UI-DRIVERS-START] ===== */
+function renderPendingDrivers(){
+  const list = document.getElementById('pending-drivers');
+  const cnt  = document.getElementById('pending-drivers-count');
+  if(!list || !cnt) return;
+  const rows = (pendingDrivers||[]).filter(u => String(u.status||'pending').toLowerCase() !== 'rejected');
+  cnt.textContent = rows.length;
+
+  list.innerHTML = rows.length ? rows.map(u=>`
+    <div class="tr" style="display:flex;align-items:center;gap:10px;border:1px solid #e5e7eb;border-radius:10px;padding:8px">
+      <div class="avatar" style="width:28px;height:28px;background:#f3f4f6;border-radius:50%"></div>
+      <div style="flex:1;min-width:0">
+        <div style="font-weight:700">${u.firstName? (u.firstName + (u.lastName? (' ' + u.lastName) : '')) : (u.name||u.email||u.id)}</div>
+        <div class="small" style="opacity:.8">${u.phone||''}</div>
+      </div>
+      <div style="display:flex;gap:6px">
+        <button class="btn"           data-approve-driver="${u.id}" style="height:32px">${t('approval.approve')}</button>
+        <button class="btn secondary" data-reject-driver="${u.id}"  style="height:32px">${t('approval.reject')}</button>
+      </div>
+    </div>
+  `).join('') : `<div class="small" style="opacity:.7">No pending drivers</div>`;
+}
+/* ===== [TAUSSIL-APPROVAL-UI-DRIVERS-END] ===== */
+
+/* ===== [TAUSSIL-APPROVAL-UI-RESTS-START] ===== */
+function renderPendingRestaurants(){
+  const list = document.getElementById('pending-restaurants');
+  const cnt  = document.getElementById('pending-restaurants-count');
+  if(!list || !cnt) return;
+
+  const merged = [
+    ...pendingRestaurantUsers
+      .filter(u => String(u.status||'pending').toLowerCase() !== 'rejected')
+      .map(u=>({ kind:'user', id:u.id, name:u.name||u.displayName||u.email||u.id, phone:u.phone||'', email:u.email||'' })),
+    ...pendingRestaurantDocs
+      .filter(r => String(r.status||'pending').toLowerCase() !== 'rejected')
+      .map(r=>({ kind:'doc',  id:r.id, name:r.name||r.id, phone:r.phone||'',  email:r.email||'' }))
+  ];
+
+  cnt.textContent = merged.length;
+  list.innerHTML = merged.length? merged.map(x=>`
+    <div class="tr" style="display:flex;align-items:center;gap:10px;border:1px solid #e5e7eb;border-radius:10px;padding:8px">
+      <img class="logo" style="width:26px;height:26px;object-fit:cover;border-radius:6px;background:#f3f4f6">
+      <div style="flex:1;min-width:0">
+        <div style="font-weight:700">${x.name}</div>
+        <div class="small" style="opacity:.8">${x.phone||x.email||''}</div>
+      </div>
+      <div style="display:flex;gap:6px">
+        ${x.kind==='user'
+          ? `<button class="btn"           data-approve-restaurant-user="${x.id}" style="height:32px">${t('approval.approve')}</button>
+             <button class="btn secondary" data-reject-restaurant-user="${x.id}"  style="height:32px">${t('approval.reject')}</button>`
+          : `<button class="btn"           data-approve-restaurant-doc="${x.id}"  style="height:32px">${t('approval.approve')}</button>
+             <button class="btn secondary" data-reject-restaurant-doc="${x.id}"   style="height:32px">${t('approval.reject')}</button>`
+        }
+      </div>
+    </div>
+  `).join('') : `<div class="small" style="opacity:.7">No pending restaurants</div>`;
+}
+/* ===== [TAUSSIL-APPROVAL-UI-RESTS-END] ===== */
+
+/* ===== Approve/Reject actions (WRITE BOTH approved + status) ===== */
+/* ===== [TAUSSIL-APPROVAL-REPO-START] ===== */
+async function approveDriver(uid){
+  const adminUid = auth.currentUser?.uid || null;
+  const payload = {
+    approved: true,
+    status: 'active',
+    approvedAt: serverTimestamp(),
+    approvedBy: adminUid,
+    updatedAt: serverTimestamp()
+  };
+  try{ await updateDoc(doc(db,'users', uid), payload); }
+  catch(_){ await setDoc(doc(db,'users', uid), payload, { merge:true }); }
+}
+async function rejectDriver(uid){
+  const adminUid = auth.currentUser?.uid || null;
+  const payload = {
+    approved: false,
+    status: 'rejected',
+    rejectedAt: serverTimestamp(),
+    rejectedBy: adminUid,
+    updatedAt: serverTimestamp()
+  };
+  try{ await updateDoc(doc(db,'users', uid), payload); }
+  catch(_){ await setDoc(doc(db,'users', uid), payload, { merge:true }); }
+}
+
+async function approveRestaurantUser(uid){
+  const adminUid = auth.currentUser?.uid || null;
+  const payload = {
+    approved: true,
+    status: 'active',
+    approvedAt: serverTimestamp(),
+    approvedBy: adminUid,
+    updatedAt: serverTimestamp()
+  };
+  try { await updateDoc(doc(db,'users', uid), payload); }
+  catch (_) { await setDoc(doc(db,'users', uid), payload, { merge:true }); }
+
+  // INSERT👇 (بلوك النسخ إلى restaurants)
+  try {
+    const uSnap = await getDoc(doc(db, "users", uid));
+    if (uSnap.exists()) {
+      const u = uSnap.data() || {};
+      await setDoc(
+        doc(db, "restaurants", uid),
+        {
+          id: uid,
+          // الاسم من restName وإن لم يوجد نأخذ الجزء قبل @ من الإيميل
+          name: u.restName ?? (u.email ? u.email.split("@")[0] : uid),
+          // إضافة حقول الإيميل والهاتف صراحةً
+          email: u.email ?? "",
+          phone: u.phone ?? "",
+          // واجهتك تقرأ address_text أو addressText
+          address_text: u.address_text ?? "",
+          logoUrl: u.logoUrl ?? "",
+          approved: true,
+          status: "active",
+          createdAt: u.createdAt ?? serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        },
+        { merge: true }
+      );
+      console.log("Mirrored → restaurants/", uid);
+    }
+  } catch (e) {
+    console.warn("Mirror write failed:", (e && e.code) || e);
+  }
+  // END
+}
+
+
+async function rejectRestaurantUser(uid){
+  const adminUid = auth.currentUser?.uid || null;
+  const payload = {
+    approved: false,
+    status: 'rejected',
+    rejectedAt: serverTimestamp(),
+    rejectedBy: adminUid,
+    updatedAt: serverTimestamp()
+  };
+  try{ await updateDoc(doc(db,'users', uid), payload); }
+  catch(_){ await setDoc(doc(db,'users', uid), payload, { merge:true }); }
+}
+
+async function approveRestaurantDoc(id){
+  const adminUid = auth.currentUser?.uid || null;
+  const payload = {
+    approved: true,
+    status: 'active',
+    approvedAt: serverTimestamp(),
+    approvedBy: adminUid,
+    updatedAt: serverTimestamp()
+  };
+  try{ await updateDoc(doc(db,'restaurants', id), payload); }
+  catch(_){ await setDoc(doc(db,'restaurants', id), payload, { merge:true }); }
+}
+async function rejectRestaurantDoc(id){
+  const adminUid = auth.currentUser?.uid || null;
+  const payload = {
+    approved: false,
+    status: 'rejected',
+    rejectedAt: serverTimestamp(),
+    rejectedBy: adminUid,
+    updatedAt: serverTimestamp()
+  };
+  try{ await updateDoc(doc(db,'restaurants', id), payload); }
+  catch(_){ await setDoc(doc(db,'restaurants', id), payload, { merge:true }); }
+}
+/* ===== [TAUSSIL-APPROVAL-REPO-END] ===== */
+
+/* Click handlers (delegated) */
+/* ===== [TAUSSIL-APPROVAL-BIND-START] ===== */
+document.addEventListener('click', (e)=>{
+  const b1 = e.target.closest('[data-approve-driver]');
+  if(b1){ approveDriver(b1.getAttribute('data-approve-driver')); }
+
+  const b1r = e.target.closest('[data-reject-driver]');
+  if(b1r){ rejectDriver(b1r.getAttribute('data-reject-driver')); }
+
+  const b2 = e.target.closest('[data-approve-restaurant-user]');
+  if(b2){ approveRestaurantUser(b2.getAttribute('data-approve-restaurant-user')); }
+
+  const b2r = e.target.closest('[data-reject-restaurant-user]');
+  if(b2r){ rejectRestaurantUser(b2r.getAttribute('data-reject-restaurant-user')); }
+
+  const b3 = e.target.closest('[data-approve-restaurant-doc]');
+  if(b3){ approveRestaurantDoc(b3.getAttribute('data-approve-restaurant-doc')); }
+
+  const b3r = e.target.closest('[data-reject-restaurant-doc]');
+  if(b3r){ rejectRestaurantDoc(b3r.getAttribute('data-reject-restaurant-doc')); }
+});
+/* ===== [TAUSSIL-APPROVAL-BIND-END] ===== */
+
+/* Realtime listeners for pending */
+async function bindPendingRealtime(){
+  ensurePendingUI();
+
+  if(!unsubPendingDrv){
+    unsubPendingDrv = onSnapshot(
+      query(collection(db,'users'), where('role','==','driver'), where('approved','==', false), limit(200)),
+      (snap)=>{
+        /* ===== [TAUSSIL-APPROVAL-FILTER-PENDING-START] ===== */
+        pendingDrivers = snap.docs
+          .map(d=>({id:d.id, ...d.data()}))
+          .filter(u => String(u.status||'pending').toLowerCase() !== 'rejected');
+        /* ===== [TAUSSIL-APPROVAL-FILTER-PENDING-END] ===== */
+        renderPendingDrivers();
+        snap.docChanges().forEach(ch=>{ if(ch.type==='added') playSound('driver'); });
+      }
+    );
+  }
+
+  if(!unsubPendingRestUsers){
+    unsubPendingRestUsers = onSnapshot(
+      query(collection(db,'users'), where('role','==','restaurant'), where('approved','==', false), limit(200)),
+      (snap)=>{
+        /* ===== [TAUSSIL-APPROVAL-FILTER-PENDING-RESTUSERS-START] ===== */
+        pendingRestaurantUsers = snap.docs
+          .map(d=>({id:d.id, ...d.data()}))
+          .filter(u => String(u.status||'pending').toLowerCase() !== 'rejected');
+        /* ===== [TAUSSIL-APPROVAL-FILTER-PENDING-RESTUSERS-END] ===== */
+        renderPendingRestaurants();
+        snap.docChanges().forEach(ch=>{ if(ch.type==='added') playSound('restaurant'); });
+      }
+    );
+  }
+
+  if(!unsubPendingRestDocs){
+    try{
+      unsubPendingRestDocs = onSnapshot(
+        query(collection(db,'restaurants'), where('approved','==', false), limit(200)),
+        (snap)=>{
+          /* ===== [TAUSSIL-APPROVAL-FILTER-PENDING-RESTDOCS-START] ===== */
+          pendingRestaurantDocs = snap.docs
+            .map(d=>({id:d.id, ...d.data()}))
+            .filter(r => String(r.status||'pending').toLowerCase() !== 'rejected');
+          /* ===== [TAUSSIL-APPROVAL-FILTER-PENDING-RESTDOCS-END] ===== */
+          renderPendingRestaurants();
+          snap.docChanges().forEach(ch=>{ if(ch.type==='added') playSound('restaurant'); });
+        }
+      );
+    }catch(_){
+      // إذا ما في حقل approved بالمجموعة، تجاهل هذا السماع
+    }
+  }
+}
+
+/* دمج مع دورة الرسم الحالية */
+const _origRenderDrivers = renderDrivers;
+renderDrivers = function(){
+  _origRenderDrivers.apply(this, arguments);
+  ensurePendingUI();
+  renderPendingDrivers();
+};
+
+const _origRenderRestaurants = renderRestaurants;
+renderRestaurants = function(){
+  _origRenderRestaurants.apply(this, arguments);
+  ensurePendingUI();
+  renderPendingRestaurants();
+};
+
+/* ===== Auth guard ===== */
+onAuthStateChanged(auth, async (user)=>{
+  if(!user){ detachRealtime(); showAdminAuth(true); return; }
+  let ok=false;
+  try{
+    const ds = await getDoc(doc(db,'users', user.uid));
+    if(ds.exists()){
+      const u=ds.data()||{};
+      ok = (u.role==='admin' && u.approved===true);
+    }
+  }catch(_){}
+  if(!ok){
+    try{ await signOut(auth); }catch(_){}
+    detachRealtime();
+    showAdminAuth(true, currentLang==='ar'?'هذا الحساب غير مخوّل كآدمن.':'Dieser Account ist kein Admin.');
+    return;
+  }
+  showAdminAuth(false);
+  bindRealtimeOnce();
+  bindPendingRealtime(); // NEW: attach pending approvals listeners
+});
+
+/* ===== Init ===== */
+function renderAll(){
+  renderDashboard();
+  renderRestaurants();
+  renderDrivers();
+  renderOrdersLog();
+  ensureOrdersBulkUI();
+  ensureExportBar(); // NEW
+}
+setMuted(isMuted);
+translatePage();
+lucide.createIcons();
+initMiniMap().catch(()=>{});
+</script>
+
+
+</body>
+</html>

@@ -1,0 +1,1589 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
+<title>Taussil – Restaurant (PROD v7)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+<style>
+:root{ --bg:#f7f8fb; --card:#fff; --ink:#111; --muted:#6b7280; --cta:#33BBDF; --border:1px solid rgba(0,0,0,.08); --radius:14px; --shadow:0 8px 24px rgba(0,0,0,.10); --hit:44px; --gap:12px; }
+/* === Bindings: تفعيل التوكنز بأمان (fallback يحافظ على الشكل الحالي) === */
+
+/* قاعدة عامة */
+html,body{
+  background: var(--clr-bg, var(--bg));
+  color:      var(--clr-ink, var(--ink));
+  font-size:  var(--fs-base, 14px);
+}
+
+/* الشبكة الرئيسية */
+.shell{
+  gap:      var(--shell-gap, var(--gap));
+  padding:  var(--shell-pad, var(--gap));
+}
+
+/* البطاقات/اللوحات */
+.panel, .panel .pb, .panel .ph,
+.card, .trip, .map-wrap, .stat, .rowx, .banner{
+  border-radius: var(--radius-card, var(--radius));
+  box-shadow:    var(--shadow-soft, var(--shadow));
+  background:    var(--clr-card, var(--card));
+  color:         var(--clr-ink, var(--ink));
+  border-color:  var(--clr-border, rgba(0,0,0,.08));
+}
+
+/* رأس اللوحات */
+.ph .t{ font-weight: var(--fw-bold, 800); }
+.ph .s{ font-size:  var(--fs-small, 12px); color: var(--clr-muted, var(--muted)); }
+
+/* أزرار عامة ومدخلات */
+.input, select, .btn, a.btn{
+  height:        var(--input-h, var(--hit));
+  border-radius: var(--input-radius, 10px);
+  font-size:     var(--fs-base, 14px);
+}
+.btn{
+  height:        var(--btn-h, var(--hit));
+  border-radius: var(--btn-radius, 12px);
+  font-weight:   var(--fw-bold, 800);
+}
+.btn-mini{
+  height:  calc(var(--btn-h, var(--hit)) * .75);
+  border-radius: 10px;
+  padding: 2px 10px;
+  font-size: var(--fs-small, 12px);
+}
+
+/* أزرار الأيقونة الصغيرة (قوائم الطلبات) */
+.btn-icon{
+  width:  var(--btn-icon-size, 48px);
+  height: var(--btn-icon-size, 48px);
+  border-radius: 12px;
+}
+
+/* شبكة مزوّدي المنصّات */
+.providers{
+  grid-template-columns: repeat(var(--prov-cols, 5), 1fr);
+}
+.provider{
+  height: var(--prov-card-h, 66px);
+}
+.p-qty{
+  height: var(--prov-badge-h, 22px);
+  line-height: var(--prov-badge-h, 22px);
+}
+
+/* صورة/شعار الطلب */
+.logo img, .logo .ph{
+  width:  var(--logo-size, 56px);
+  height: var(--logo-size, 56px);
+  border-radius: 12px;
+}
+
+/* الدرج الجانبي والمودالات البيضاء */
+.drawer .sheet{
+  width: min(var(--drawer-w, 360px), var(--drawer-maxvw, 86vw));
+}
+.modal.white .box{
+  max-width: var(--log-max, 920px);
+  width:     var(--log-w, 92%);
+}
+
+/* شارات ونصوص صغيرة */
+.small{ font-size: var(--fs-small, 12px); color: var(--clr-muted, var(--muted)); }
+
+/* ألوان CTA والنجاح والتحذير والخطأ (اختياري إن أردت توحيدها) */
+.btn-cta{
+  background: linear-gradient(180deg, var(--clr-cta, #33BBDF), color-mix(in oklab, var(--clr-cta, #33BBDF) 70%, #0aa));
+}
+.banner{
+  border-color: color-mix(in oklab, var(--clr-ok, #22c55e) 40%, #fff);
+  background:   color-mix(in oklab, var(--clr-ok, #22c55e) 12%, #fff);
+  color:        #166534;
+}
+
+*{box-sizing:border-box}
+html,body{margin:0;padding:0;height:100dvh;background:var(--bg);color:var(--ink);font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;overflow:hidden}
+/* ثلاثة أعمدة متساوية العرض على الشاشات الكبيرة */
+.shell{
+  display:grid;
+  grid-template-columns: 1fr 1fr 1fr;   /* ← تساوي العرض */
+  gap:var(--gap);
+  height:100dvh;
+  padding:var(--gap);
+}
+
+.panel{background:var(--card);border:var(--border);border-radius:var(--radius);box-shadow:var(--shadow);display:flex;flex-direction:column;min-height:0}
+.ph{padding:12px 14px;border-bottom:1px solid rgba(0,0,0,.06);display:flex;align-items:center;justify-content:space-between}
+.ph .t{font-weight:800} .ph .s{color:var(--muted);font-size:12px}
+.pb{flex:1;min-height:0;overflow:auto;padding:12px 14px}
+
+/* left: form */
+.providers{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:10px}
+.provider{position:relative;height:66px;border-radius:14px;overflow:hidden;border:1px solid rgba(0,0,0,.06);background:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center}
+/* الصورة طبقة سفلى صافية */
+.provider img{
+  width:100%;height:100%;
+  object-fit:contain;display:block;
+  padding:6px;background:#fff;
+  position:relative; z-index:0;
+}
+/* شارة الكمية تبقى أعلى كل شيء لكن بدون أي انعكاس */
+.p-qty{ z-index:3; mix-blend-mode:normal; }
+
+/* إزالة أي هالة/Outline على أزرار +/− عند التركيز */
+.p-qty button:focus,
+.p-qty button:focus-visible{
+  outline:none; box-shadow:none;
+}
+
+/* إطار خارجي فقط (لا يلمس محتوى الصورة) */
+.provider.is-selected{ box-shadow:0 0 0 3px #33BBDF; }
+
+.p-qty{position:absolute;right:6px;bottom:6px;display:none;gap:6px;align-items:center;background:rgba(255,255,255,.98);border:1px solid rgba(0,0,0,.12);border-radius:999px;padding:3px 6px;box-shadow:0 2px 8px rgba(0,0,0,.12);z-index:3}
+.p-qty .n{ font-size:12px; line-height:1; font-weight:700; min-width:18px; text-align:center; font-variant-numeric:tabular-nums }
+.p-qty button{width:20px;height:20px;border:1px solid rgba(0,0,0,.15);border-radius:6px;background:#fff;cursor:pointer;line-height:1;font-weight:800}
+
+.row{display:grid;grid-template-columns:1fr 1fr;gap:8px;align-items:center}
+.qty-wrap{display:flex;align-items:center;justify-content:center;gap:6px}
+.btn-step{width:44px;height:var(--hit);border:1px solid rgba(0,0,0,.12);border-radius:9px;background:#fff;cursor:pointer;font-weight:800;font-size:18px;line-height:1}
+.btn-step:disabled{opacity:.5;cursor:not-allowed}
+.input, select{height:var(--hit);border:var(--border);border-radius:10px;background:#fff;padding:0 10px;font-size:14px;width:100%;margin-top:15px}
+.row .input{margin-top:0}
+.input.center{text-align:center}
+.input:focus{outline:none;box-shadow:0 0 0 2px #aee7f5}
+.full{grid-column:1/-1}
+input[type="number"]::-webkit-outer-spin-button,input[type="number"]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+input[type="number"]{-moz-appearance:textfield;text-align:center;font-variant-numeric:tabular-nums}
+.send{margin-top:10px;width:100%;height:var(--hit);border:none;border-radius:12px;background:linear-gradient(180deg,#33BBDF,#1da9cf);color:#fff;font-weight:800;cursor:pointer;box-shadow:0 8px 18px rgba(51,187,223,.35)}
+.send:disabled{opacity:.6;cursor:not-allowed}
+.banner{margin-top:10px;display:none;align-items:center;justify-content:center;height:38px;border-radius:10px;border:1px solid #34c759;background:#ecfdf5;color:#166534;font-weight:800}
+.banner.show{display:flex}
+
+/* trip */
+.trip{margin-top:20px;border:var(--border);border-radius:12px;background:#fff;box-shadow:var(--shadow);padding:7px 12px}
+.trip.hidden{display:none}
+.trip-title{font-weight:800;margin-bottom:6px}
+.trip-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:6px 0;border-top:1px solid rgba(0,0,0,.06)}
+.trip-row:first-child{border-top:0}
+.trip-row .k{color:var(--muted);font-size:12px}
+.trip-row .v{font-weight:600}
+.countdown{font-weight:800;color:#16a34a}
+
+/* map */
+.map-wrap{position:relative;height:100%;border-radius:12px;overflow:hidden;border:1px solid rgba(0,0,0,.08)}
+#map{position:absolute;inset:0}
+.map-ui{position:absolute;right:10px;top:10px;display:flex;gap:6px;background:rgba(255,255,255,.95);border:1px solid rgba(0,0,0,.08);border-radius:10px;padding:6px 8px;font-size:12px;z-index:2}
+.map-ui select{border:1px solid rgba(0,0,0,.2);border-radius:6px;padding:2px 6px;background:#fff}
+
+/* right */
+.stats{display:grid;grid-template-columns:1fr;gap:8px;margin-bottom:10px}
+.stat{background:#fff;border:var(--border);border-radius:12px;padding:10px;display:flex;align-items:center;justify-content:space-between}
+.stat .k{font-weight:800}.stat .t{color:var(--muted);font-size:12px}
+.list{display:flex;flex-direction:column;gap:8px}
+.rowx{display:flex;gap:8px;align-items:center;justify-content:space-between;border:1px solid rgba(0,0,0,.06);border-radius:10px;padding:8px 10px;background:#fff;cursor:pointer}
+.rowx .id{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;opacity:.85}
+.rowx .tag{font-size:11px;padding:3px 8px;border-radius:999px;background:#f3f4f6;border:1px solid rgba(0,0,0,.05)}
+
+*{-webkit-tap-highlight-color:transparent}
+@media (pointer:coarse){.input{font-size:16px}}
+@media (max-width:1100px){.shell{grid-template-columns:340px 1fr}.right{grid-column:1/-1;order:3}}
+@media (max-width:740px){.shell{grid-template-columns:1fr}.left{order:1}.center{order:2}.right{order:3}}
+
+/* Auth modal (Restaurant) */
+#restAuth{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.55);z-index:10000}
+#restAuth .box{width:min(560px,92%);background:#0f1a30;border:1px solid rgba(255,255,255,.14);border-radius:16px;padding:14px;box-shadow:0 12px 40px rgba(0,0,0,.35);color:#e6e9ef}
+#restAuth .btn{height:44px;padding:0 12px;border-radius:10px;border:1px solid rgba(255,255,255,.12);background:#13213a;color:#e6e9ef;cursor:pointer;font-weight:700}
+#restAuth .btn-cta{background:linear-gradient(180deg,#33BBDF,#1da9cf);border:none;color:#fff}
+#restAuth .input{height:44px;border-radius:10px;border:1px solid rgba(255,255,255,.12);background:#0f1a30;color:#e6e9ef;padding:0 12px}
+#restAuth .small{font-size:12px;color:#9aa4b2}
+
+/* tiny button */
+.btn-mini{border:1px solid rgba(0,0,0,.15);background:#fff;border-radius:8px;padding:2px 8px;font-size:12px;cursor:pointer}
+
+/* === ADDED: Countdown warning blink === */
+@keyframes blinkRed { 0%,100%{color:#ef4444} 50%{color:transparent} }
+.countdown.blink-red{ animation:blinkRed 1s linear infinite; }
+/* تعتيم 50% فوق الصورة فقط */
+.provider.is-selected::after{
+  content:"";
+  position:absolute;
+  inset:0;
+  background:rgba(0,0,0,.5);   /* 50% */
+  border-radius:14px;           /* يطابق الكرت */
+  z-index:1;                    /* فوق الصورة وتحت الشارة */
+  pointer-events:none;
+}
+
+/* علامة ✓ صغيرة لتوضيح التحديد */
+.provider.is-selected::before{
+  content:"✓";
+  position:absolute;
+  top:6px; left:6px;
+  width:22px; height:22px;
+  border-radius:999px;
+  background:#10b981; color:#fff;
+  font-weight:800; font-size:14px; line-height:1;
+  display:flex; align-items:center; justify-content:center;
+  box-shadow:0 2px 6px rgba(0,0,0,.18);
+  z-index:2;                    /* فوق التعتيم وتحت شارة الكمية */
+  pointer-events:none;
+}
+/* Drawer (right, white) */
+.backdrop{position:fixed;inset:0;background:rgba(0,0,0,.35);display:none;z-index:1200}
+.backdrop.show{display:block}
+.drawer{position:fixed;inset:0;display:none;justify-content:flex-end;z-index:1201}
+.drawer.show{display:flex}
+.drawer .sheet{width:min(360px,86vw);height:100%;background:#fff;color:#111;border-left:1px solid rgba(0,0,0,.1);display:flex;flex-direction:column;padding:12px}
+.drawer .hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.drawer .item{padding:12px;border-radius:10px;color:#111;text-decoration:none;border:1px solid rgba(0,0,0,.08);background:#fff;margin-bottom:8px}
+.drawer .item:hover{background:#f3f4f6}
+
+/* Log modal (white) */
+.modal.white{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.45);z-index:1300}
+.modal.white.show{display:flex}
+.modal.white .box{background:#fff;color:#111;border-radius:16px;max-width:920px;width:92%;padding:12px;border:1px solid #e5e7eb}
+.log-head{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.log-actions button{margin-left:6px}
+.log-list{display:flex;flex-direction:column;gap:6px;margin-top:8px}
+.log-row{display:grid;grid-template-columns:auto 1fr auto auto auto;gap:8px;align-items:center;border:1px solid #e5e7eb;border-radius:10px;padding:8px;background:#fff}
+.log-id{font-family:ui-monospace,Menlo,monospace;font-size:12px;opacity:.9}
+.log-tag{font-size:11px;padding:3px 8px;border-radius:999px;background:#eef2ff;border:1px solid #e5e7eb}
+.chip{display:inline-block;font-size:12px;padding:6px 10px;border-radius:999px;background:#f3f4f6;border:1px solid #e5e7eb;margin-right:6px}
+/* === Log modal: fixed size + internal scrolling === */
+.modal.white .box{
+  display:flex; flex-direction:column;
+  max-height: 86vh; /* ارتفاع ثابت تقريبًا */
+  overflow:hidden;  /* ممنوع تتمدّد خارج الشاشة */
+}
+.log-filter{
+  display:grid; grid-template-columns: 1fr 1fr 1fr auto; gap:8px;
+  background:#fff; border:1px solid #e5e7eb; border-radius:12px; padding:8px;
+  position:sticky; top:0; z-index:1; /* يثبت أعلى الصندوق أثناء التمرير */
+}
+.log-filter .input, .log-filter select, .log-filter button{
+  height:38px; border-radius:10px; border:1px solid #e5e7eb; background:#fff;
+}
+.log-scroll{ flex:1; min-height:0; overflow:auto; padding-top:8px; }
+.log-list{ display:flex; flex-direction:column; gap:6px; }
+.log-row{
+  display:grid; grid-template-columns:auto 1fr auto auto auto auto; gap:8px; align-items:center;
+  border:1px solid #e5e7eb; border-radius:10px; padding:8px; background:#fff;
+}
+.log-id{ font-family: ui-monospace, Menlo, monospace; font-size:12px; opacity:.9 }
+.log-tag{ font-size:11px; padding:3px 8px; border-radius:999px; background:#eef2ff; border:1px solid #e5e7eb }
+
+</style>
+</head>
+<!-- Drawer (right) -->
+<div id="drawerBackdrop" class="backdrop"></div>
+<div id="sideMenu" class="drawer">
+  <div class="sheet">
+    <div class="hdr">
+      <strong>Menü</strong>
+      <button id="drawerClose" class="btn-mini">✕</button>
+    </div>
+    <a href="#" id="navLog" class="item">📒 Bestellverlauf</a>
+    <a href="#" id="navLogout" class="item">🚪 Abmelden</a>
+  </div>
+</div>
+<!-- Orders Log Modal (white) -->
+<div id="logModal" class="modal white">
+  <div class="box">
+    <div class="log-head">
+      <h3 style="margin:0">Bestellverlauf</h3>
+      <div class="log-actions">
+        <button id="logPrint" class="btn-mini">Drucken</button>
+        <button id="logPDF"   class="btn-mini">PDF</button>
+		  <button id="logCSV"   class="btn-mini">CSV</button>
+      </div>
+    </div>
+    <div class="log-sums">
+	<!-- ضع هذا داخل .box في أعلى محتوى السجل (بعد الشيبس/المجاميع) -->
+<div class="log-filter">
+  <input id="logTo"   class="input" type="date" />
+  <select id="logProvider">
+    <option value="">Alle Plattformen</option>
+    <option>Lieferando</option>
+    <option>Uber Eats</option>
+    <option>Wolt</option>
+    <option>Restablo</option>
+    <option>Andere</option>
+  </select>
+  <button id="logReset" class="btn-mini" type="button">Zurücksetzen</button>
+</div>
+
+      <span class="chip">Summe Preise: <b id="logSumPrice">0,00€</b></span>
+      <span class="chip">Summe Liefergebühren: <b id="logSumFee">0,00€</b></span>
+    </div>
+    <div id="logScroll" class="log-scroll">
+  <div id="logList" class="log-list"></div>
+</div>
+
+    <div style="display:flex;justify-content:center;margin-top:8px">
+      <button id="logClose" class="btn btn-ghost" style="height:38px">Schließen</button>
+    </div>
+  </div>
+</div>
+
+<body>
+  <!-- Auth Modal (Restaurant) -->
+  <div id="restAuth">
+    <div class="box">
+      <div style="display:flex;gap:6px;margin-bottom:10px">
+        <button id="rTabLogin" class="btn" style="flex:1">Anmelden</button>
+        <button id="rTabRegister" class="btn" style="flex:1;opacity:.8">Registrieren</button>
+      </div>
+
+      <!-- Login -->
+      <form id="rPaneLogin">
+        <div style="display:grid;gap:8px">
+          <input id="rLoginEmail" class="input" type="email" placeholder="E-Mail" autocomplete="username" required>
+          <input id="rLoginPass"  class="input" type="password" placeholder="Passwort" autocomplete="current-password" required>
+        </div>
+        <button id="rLoginBtn" class="btn btn-cta" style="margin-top:8px">Anmelden</button>
+        <div id="rLoginMsg" class="small" style="margin-top:6px;color:#fca5a5"></div>
+      </form>
+
+      <!-- Register -->
+      <form id="rPaneRegister" style="display:none">
+        <div style="display:grid;gap:8px">
+          <input id="rRestName" class="input" type="text" placeholder="Restaurant-Name" required>
+          <input id="rRestPhone" class="input" type="tel"  placeholder="Telefon (+49 …)" required>
+          <input id="rRestAddr"  class="input" type="text" placeholder="Adresse (für Karte)" required>
+          <input id="rRegEmail"  class="input" type="email" placeholder="E-Mail" required>
+          <input id="rRegPass"   class="input" type="password" placeholder="Passwort (6+)" required>
+        </div>
+        <button id="rRegisterBtn" class="btn btn-cta" style="margin-top:8px">Registrieren</button>
+        <div id="rRegMsg" class="small" style="margin-top:6px;color:#fca5a5"></div>
+        <div class="small" style="opacity:.85;margin-top:4px">Nach der Registrierung prüft der Admin dein Konto.</div>
+      </form>
+    </div>
+  </div>
+
+  <div class="shell">
+    <!-- left -->
+    <section class="panel left">
+      <div class="ph"><div class="t">Neue Bestellung</div><div class="s">Nr: <span id="nrBox">—</span> <button id="sndBtn" class="btn-mini" title="Audio wählen (Alt = Dateien)">🔊</button></div></div>
+      <div class="pb">
+        <div class="providers" id="providers">
+          <div class="provider" data-src="Lieferando"><img src="Lieferando.png" alt="Lieferando"><div class="p-qty"><button class="p-dec">−</button><span class="n">1</span><button class="p-inc">+</button></div></div>
+          <div class="provider" data-src="Uber Eats"><img src="Uber.png" alt="Uber Eats"><div class="p-qty"><button class="p-dec">−</button><span class="n">1</span><button class="p-inc">+</button></div></div>
+          <div class="provider" data-src="Wolt"><img src="Wolt.png" alt="Wolt"><div class="p-qty"><button class="p-dec">−</button><span class="n">1</span><button class="p-inc">+</button></div></div>
+          <div class="provider" data-src="Restablo"><img src="Restablo.jpg" alt="Restablo"><div class="p-qty"><button class="p-dec">−</button><span class="n">1</span><button class="p-inc">+</button></div></div>
+          <div class="provider" data-src="Andere"><img src="Andere.png" alt="Andere"><div class="p-qty"><button class="p-dec">−</button><span class="n">1</span><button class="p-inc">+</button></div></div>
+        </div>
+        <div class="row">
+          <div class="qty-wrap">
+            <button id="qtyMinus" class="btn-step" type="button">−</button>
+            <input id="qty" class="input center" type="number" value="0" placeholder="0" readonly>
+            <button id="qtyPlus" class="btn-step" type="button">+</button>
+          </div>
+          <input id="price" class="input center" type="text" value="0,00€" placeholder="0,00€">
+        </div>
+        <input id="time" class="input center full" type="time" placeholder="HH:MM">
+        <button id="sendBtn" class="send" type="button" disabled>Senden</button>
+        <div id="banner" class="banner">✔ Gesendet</div>
+
+        <!-- Trip card -->
+        <div class="trip hidden" id="tripCard">
+          <div class="trip-title">Fahrt & Bestellung</div>
+          <div class="trip-row"><div class="k">Vorname</div><div class="v" id="tripDriverName">—</div></div>
+          <div class="trip-row"><div class="k">Status</div><div class="v" id="tripStatus">—</div></div>
+          <div class="trip-row"><div class="k">Auftrag-ID</div><div class="v" id="tripOrderId">—</div></div>
+          <div class="trip-row"><div class="k">ETM (zum Restaurant)</div><div class="v countdown" id="tripETM">--:--</div></div>
+          <div class="trip-row"><div class="k">Distanz</div><div class="v" id="tripDistance">— km</div></div>
+          <div class="trip-row"><div class="k">Liefergebühr</div><div class="v" id="tripDeliveryFee">0,00€</div></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- center -->
+    <section class="panel center">
+      <div class="ph"><div class="t">Karte</div><div class="s" id="mapInfo">—</div></div>
+      <div class="pb" style="padding:12px">
+        <div class="map-wrap">
+          <div class="map-ui">
+            <span>Style:</span>
+            <select id="mapStyle">
+              <option value="classic">Klassisch</option>
+              <option value="mono">Monochrom</option>
+              <option value="cartoon">Cartoon</option>
+              <option value="satellite">Satellit</option>
+            </select>
+          </div>
+          <div id="map"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- right -->
+    <section class="panel right">
+<div class="ph" id="overviewHeader">
+  <div class="t">Übersicht</div>
+  <div class="s">Live</div>
+  <button id="menuBtn" class="btn-mini" style="margin-left:auto">☰</button>
+</div>
+
+      <div class="pb">
+        <div class="stats">
+          <div class="stat"><div class="t">Summe Preise (≠ Abgebrochen)</div><div class="k" id="sumPreis">0,00€</div></div>
+          <div class="stat"><div class="t">Summe Liefergebühren (≠ Abgebrochen)</div><div class="k" id="sumLiefer">0,00€</div></div>
+        </div>
+        <h4 style="margin:10px 2px">Letzte Aufträge</h4>
+        <div id="lastList" class="list"></div>
+      </div>
+    </section>
+  </div>
+
+  <!-- sounds -->
+  <audio id="sendSound"      src="senden.mp3"     preload="auto"></audio>
+  <audio id="unterwegsSound" src="unterwegs.mp3"  preload="auto"></audio>
+  <audio id="timer160Sound"  src="Ankunft.mp3"    preload="auto"></audio>
+  <audio id="deliveredSound" src="Geliefert.mp3"  preload="auto"></audio>
+  <input id="soundPicker" type="file" accept="audio/mpeg" multiple style="display:none">
+
+<script type="module">
+/* ================= Firebase Core ================= */
+const firebaseConfig = {
+  apiKey: "AIzaSyD0g9T3amjuPodsLS6ZQkHYWrzV1UrX_QI", /* ← أعيد كما كان */
+  authDomain: "taussil-lieferservice-8bbe9.firebaseapp.com",
+  projectId: "taussil-lieferservice-8bbe9",
+  storageBucket: "taussil-lieferservice-8bbe9.firebasestorage.app",
+  messagingSenderId: "583536892937",
+  appId: "1:583536892937:web:5d5ff133de4d8b3b28ecd8",
+  databaseURL: "https://taussil-lieferservice-8bbe9-default-rtdb.europe-west1.firebasedatabase.app"
+};
+
+import { initializeApp, getApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import {
+  getFirestore, collection, doc, setDoc, getDoc, serverTimestamp,
+  onSnapshot, query, where, orderBy, limit, getDocs,
+  getCountFromServer
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+import { getDatabase, ref as rRef, get as rGet, onValue as rOn, off as rOff } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, setPersistence, browserLocalPersistence } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+
+let app; try{ app=getApp(); }catch{ app=initializeApp(firebaseConfig); }
+const db   = getFirestore(app);
+const rtdb = getDatabase(app);
+const auth = getAuth(app);
+setPersistence(auth, browserLocalPersistence).catch(()=>{});
+
+/* ================= Shortcuts & State ================= */
+const $ = (s)=>document.querySelector(s);
+const money = n=> (Number(n||0)).toLocaleString("de-DE",{minimumFractionDigits:2,maximumFractionDigits:2})+"€";
+const parsePrice = s => { if(s==null) return 0; const n = parseFloat(String(s).replace(/[^\d.,-]/g,"").replace(",",".")); return Number.isFinite(n)?n:0; };
+
+/* === Persist keys (localStorage) === */
+const LS_TRIP_OID   = 'trip:selectedOrderId';
+const LS_TRIP_TARGET= 'trip:targetMs';
+const LS_REST_POS   = 'rest:pos';
+
+/* Helpers: localStorage */
+const ls = {
+  set(k,v){ try{ localStorage.setItem(k, typeof v==='string'? v : JSON.stringify(v)); }catch(_){} },
+  get(k, def=null){ try{ const v=localStorage.getItem(k); return v==null? def : (v.startsWith('{')||v.startsWith('[')? JSON.parse(v): (isFinite(+v)? +v : v)); }catch(_){ return def; } },
+  del(k){ try{ localStorage.removeItem(k);}catch(_){} }
+};
+
+/* UI refs */
+const providersRoot = $("#providers");
+const providerEls   = providersRoot ? Array.from(providersRoot.querySelectorAll(".provider")) : [];
+const qtyEl   = $("#qty");
+const priceEl = $("#price");
+const timeEl  = $("#time");
+const sendBtn = $("#sendBtn");
+const banner  = $("#banner");
+const lastList = $("#lastList");
+const sumPreis = $("#sumPreis");
+const sumLiefer= $("#sumLiefer");
+const nrBox    = $("#nrBox");
+const qtyMinus = $("#qtyMinus");
+const qtyPlus  = $("#qtyPlus");
+
+/* Auth modal refs (Restaurant) */
+const restAuth     = $("#restAuth");
+const rTabLogin    = $("#rTabLogin");
+const rTabRegister = $("#rTabRegister");
+const rPaneLogin   = $("#rPaneLogin");
+const rPaneRegister= $("#rPaneRegister");
+const rLoginEmail  = $("#rLoginEmail");
+const rLoginPass   = $("#rLoginPass");
+const rLoginBtn    = $("#rLoginBtn");
+const rLoginMsg    = $("#rLoginMsg");
+const rRegName     = $("#rRestName");
+const rRegPhone    = $("#rRestPhone");
+const rRegAddr     = $("#rRestAddr");
+const rRegEmail    = $("#rRegEmail");
+const rRegPass     = $("#rRegPass");
+const rRegisterBtn = $("#rRegisterBtn");
+const rRegMsg      = $("#rRegMsg");
+
+/* Hidden defaults */
+const hiddenDefaults = { Restaurant_ID: null, Restaurant_Name: null, Restaurant_Adresse: null, Telefon: null };
+
+/* ===== Tabs (login/register) ===== */
+function switchPane(which){
+  const reg = which==='register';
+  if(rPaneLogin)    rPaneLogin.style.display    = reg ? 'none' : 'block';
+  if(rPaneRegister) rPaneRegister.style.display = reg ? 'block': 'none';
+  if(rTabLogin)     rTabLogin.style.opacity     = reg ? .7 : 1;
+  if(rTabRegister)  rTabRegister.style.opacity  = reg ? 1 : .7;
+}
+rTabLogin?.addEventListener('click', (e)=>{ e.preventDefault(); switchPane('login'); });
+rTabRegister?.addEventListener('click', (e)=>{ e.preventDefault(); switchPane('register'); });
+
+/* ===== Providers + Qty logic ===== */
+const selectedProviders = new Set();
+const providerQty = new Map();
+
+function refreshQtyAndSendState(){
+  if(!qtyEl || !sendBtn) return;
+  const sel = selectedProviders.size;
+
+  providerEls.forEach(el=> el.classList.toggle('show-badge', sel===1 && selectedProviders.has(el.getAttribute('data-src'))));
+
+  if(sel===0){
+    qtyEl.value='0'; qtyEl.readOnly=true; sendBtn.disabled = true;
+    if(qtyMinus) qtyMinus.disabled = true; if(qtyPlus) qtyPlus.disabled = true;
+  }else if(sel===1){
+    const key=[...selectedProviders][0];
+    if(!providerQty.has(key) || providerQty.get(key)<1) providerQty.set(key,1);
+    qtyEl.value=String(providerQty.get(key)); qtyEl.readOnly=false; sendBtn.disabled = false;
+    if(qtyMinus) qtyMinus.disabled = false; if(qtyPlus) qtyPlus.disabled = false;
+  }else{
+    selectedProviders.forEach(k=>providerQty.set(k,1));
+    qtyEl.value=String(sel); qtyEl.readOnly=true; sendBtn.disabled = false;
+    if(qtyMinus) qtyMinus.disabled = true; if(qtyPlus) qtyPlus.disabled = true;
+  }
+}
+
+if(providersRoot){
+  providersRoot.addEventListener('click', (ev)=>{
+    const card = ev.target.closest('.provider'); if(!card) return;
+    const inc = ev.target.closest('.p-inc');
+    const dec = ev.target.closest('.p-dec');
+    const key = card.getAttribute('data-src');
+
+    if(inc || dec){
+      if(selectedProviders.size!==1 || !selectedProviders.has(key)) return;
+      const cur = providerQty.get(key)||1;
+      providerQty.set(key, Math.max(1, cur + (inc?+1:-1)));
+      refreshQtyAndSendState();
+      return;
+    }
+
+    card.classList.toggle('is-selected');
+    if(card.classList.contains('is-selected')) { selectedProviders.add(key); if(!providerQty.has(key)) providerQty.set(key,1); }
+    else { selectedProviders.delete(key); }
+    refreshQtyAndSendState();
+  });
+}
+
+qtyMinus?.addEventListener('click', ()=>{
+  if(selectedProviders.size===1){
+    const key=[...selectedProviders][0];
+    const cur=providerQty.get(key)||1;
+    providerQty.set(key, Math.max(1, cur-1));
+    refreshQtyAndSendState();
+  }
+});
+qtyPlus?.addEventListener('click', ()=>{
+  if(selectedProviders.size===1){
+    const key=[...selectedProviders][0];
+    const cur=providerQty.get(key)||1;
+    providerQty.set(key, cur+1);
+    refreshQtyAndSendState();
+  }
+});
+
+if(priceEl){
+  if(!priceEl.value) priceEl.value="0,00€";
+  priceEl.addEventListener("input", ()=>{ priceEl.value = priceEl.value.replace(/[^\d.,]/g,""); });
+  priceEl.addEventListener("blur",  ()=>{ priceEl.value = money(parsePrice(priceEl.value)); });
+  priceEl.addEventListener("focus", ()=>{ const n=parsePrice(priceEl.value); priceEl.value = n===0 ? "" : String(n).replace(".",","); });
+}
+
+/* ===== Auth (Restaurant) ===== */
+function showAuth(on=true){ if(restAuth) restAuth.style.display = on?'flex':'none'; }
+
+rLoginBtn?.addEventListener('click', async (ev)=>{
+  ev.preventDefault();
+  const email=(rLoginEmail?.value||'').trim();
+  const pass =(rLoginPass ?.value||'');
+  if(!email || !pass){ if(rLoginMsg) rLoginMsg.textContent='Bitte E-Mail & Passwort eingeben.'; return; }
+  rLoginBtn.disabled=true; if(rLoginMsg) rLoginMsg.textContent='…';
+  try{
+    await signInWithEmailAndPassword(auth, email, pass);
+    if(rLoginMsg) rLoginMsg.textContent='';
+    showAuth(false);
+  }catch(e){
+    console.error(e);
+    if(rLoginMsg) rLoginMsg.textContent = (e && e.code) ? ('Fehler: '+e.code) : 'Anmeldung fehlgeschlagen.';
+  }finally{ rLoginBtn.disabled=false; }
+});
+
+rRegisterBtn?.addEventListener('click', async (ev)=>{
+  ev.preventDefault();
+  const restName=(rRegName?.value||'').trim();
+  const phone   =(rRegPhone?.value||'').trim();
+  const addr    =(rRegAddr ?.value||'').trim();
+  const email   =(rRegEmail?.value||'').trim();
+  const pass    =(rRegPass ?.value||'');
+
+  // ✅ تحقّق لين: يكفي الاسم + العنوان + الإيميل + كلمة مرور 6+
+  if(!restName || !addr || !email || (pass||'').length<6){
+    if(rRegMsg) rRegMsg.textContent='Bitte gültige Daten eingeben.'; 
+    return;
+  }
+  rRegisterBtn.disabled=true; if(rRegMsg) rRegMsg.textContent='…';
+
+  try{
+    const cred = await createUserWithEmailAndPassword(auth, email, pass);
+    const uid  = cred.user.uid;
+
+    await setDoc(doc(db,'users', uid), {
+      email, role:'restaurant', status:'pending', approved:false,
+      restName, phone: phone || null, address_text: addr,
+      createdAt: serverTimestamp(), updatedAt: serverTimestamp()
+    }, { merge:false });
+
+    if(rRegMsg) rRegMsg.textContent='Konto erstellt. Wird geprüft…';
+    await signOut(auth).catch(()=>{});
+    switchPane('login'); showAuth(true);
+  }catch(e){
+    console.error(e);
+    const map = {
+      'auth/email-already-in-use':'E-Mail bereits verwendet.',
+      'auth/invalid-email':'Ungültige E-Mail.',
+      'auth/weak-password':'Passwort zu schwach.',
+    };
+    if(rRegMsg) rRegMsg.textContent = map[e?.code] || (`Fehler: ${e?.code||'unbekannt'}`);
+  }finally{ rRegisterBtn.disabled=false; }
+});
+/* ===== Approval Gate (Firestore first, RTDB fallback) ===== */
+let RESTAURANT_ID = null;
+let ORDERS_UNSUB = null;
+onAuthStateChanged(auth, async (user)=>{
+  try{
+    if(!user){
+      RESTAURANT_ID=null; hiddenDefaults.Restaurant_ID=null;
+      if(ORDERS_UNSUB){ ORDERS_UNSUB(); ORDERS_UNSUB=null; }
+      showAuth(true);
+      return;
+    }
+    RESTAURANT_ID = user.uid;
+    let approved=false, role=null;
+    try{
+      const us = await getDoc(doc(db,'users', RESTAURANT_ID));
+      if(us.exists()){
+        const u=us.data()||{};
+        approved = (u.approved===true);
+        role = u.role||null;
+      }
+    }catch(_){}
+    if(!approved){
+      try{
+        const snap = await rGet(rRef(rtdb, `users_meta/${RESTAURANT_ID}`));
+        const meta = snap.val()||{};
+        if(meta.role==='restaurant' && meta.approved===true){ approved=true; }
+      }catch(_){}
+    }
+    if(!approved || role!=='restaurant'){
+      if(rLoginMsg) rLoginMsg.textContent='Konto wird geprüft…';
+      showAuth(true);
+      return;
+    }
+    try{
+      const rs = await getDoc(doc(db,'restaurants', RESTAURANT_ID));
+      const rd = rs.exists()? (rs.data()||{}) : {};
+      hiddenDefaults.Restaurant_ID = RESTAURANT_ID;
+      hiddenDefaults.Restaurant_Name = rd.name || user.email || null;
+      hiddenDefaults.Restaurant_Adresse = rd.address_text || null;
+      hiddenDefaults.Telefon = rd.phone || null;
+    }catch(_){}
+    showAuth(false);
+    ensureRestaurantGeocoded();
+    attachMyTotalsAndLast();
+  }catch(e){
+    console.error('auth flow error', e);
+    showAuth(true);
+  }
+});
+/* ===== Next serial ===== */
+const LS_NR_KEY = (rid)=> `rest:last_nr:${rid}`;
+
+async function nextSerialForRestaurant(restId){
+  const localBase = Number(ls.get(LS_NR_KEY(restId), 0)) || 0;
+  try{
+    const qs = await getDocs(
+      query(
+        collection(db,'orders'),
+        where('restaurant.id','==', restId),
+        orderBy('nr','desc'),
+        limit(1)
+      )
+    );
+    const remote = (!qs.empty ? Number(qs.docs[0].data()?.nr || 0) : 0);
+    const next = Math.max(localBase, remote) + 1;
+    ls.set(LS_NR_KEY(restId), next);
+    return next;
+  }catch(e){
+    console.warn('nextSerialForRestaurant()', e);
+    const next = localBase + 1;
+    ls.set(LS_NR_KEY(restId), next);
+    return next;
+  }
+}
+/* ===== Audio controller & Trip state ===== */
+const snd = {
+  send: document.getElementById('sendSound'),
+  unterwegs: document.getElementById('unterwegsSound'),
+  timer160: document.getElementById('timer160Sound'),
+  delivered: document.getElementById('deliveredSound'),
+};
+let SND_MUTED = localStorage.getItem('sndMuted')==='1';
+function renderSndBtn(){
+  const b=document.getElementById('sndBtn');
+  if(b){ b.textContent = SND_MUTED ? '🔇' : '🔊'; b.title = SND_MUTED? 'Unmute (Alt = Dateien wählen)' : 'Mute (Alt = Dateien wählen)'; }
+}
+renderSndBtn();
+const played = new Set();
+function playSnd(key, oid){
+  try{
+    const tag = key+'::'+(oid||'');
+    if(played.has(tag)) return;
+    played.add(tag);
+    if(!SND_MUTED && snd[key]){ snd[key].currentTime=0; snd[key].play().catch(()=>{}); }
+    setTimeout(()=>played.delete(tag), 1200);
+  }catch(_){}
+}
+function playOncePerOrder(key, oid){
+  if(!oid) return playSnd(key);
+  const flag=key+':'+oid;
+  if(localStorage.getItem(flag)) return;
+  playSnd(key, oid);
+  localStorage.setItem(flag,'1');
+}
+let SELECTED_ORDER_ID=null;
+let TRIP_TIMER=null;
+let TRIP_TARGET_MS=null;
+let DRIVER_SUB=null;
+let lastDriverPos=null;
+const ORDER_CACHE=new Map();
+/* ===== Send Order ===== */
+async function computeFormQty(){
+  if(selectedProviders.size===0) return 0;
+  if(selectedProviders.size===1) return providerQty.get([...selectedProviders][0])||1;
+  return selectedProviders.size;
+}
+sendBtn?.addEventListener('click', async ()=>{
+  if(!RESTAURANT_ID){ if(rLoginMsg) rLoginMsg.textContent='Bitte zuerst anmelden.'; showAuth(true); return; }
+  const platforms = Array.from(selectedProviders);
+  const qty = await computeFormQty();
+  const preis = Math.max(0, parsePrice(priceEl?.value||0));
+  const pickup = timeEl?.value || null;
+  if(platforms.length<1 || qty<1) return;
+  try{
+    sendBtn.disabled=true;
+    const qNr   = query(collection(db,'orders'), where('restaurant.id','==', RESTAURANT_ID));
+    const cSnap = await getCountFromServer(qNr);
+    const nr    = Number(cSnap.data().count || 0) + 1;
+    const id  = Math.random().toString(36).slice(2,8).toUpperCase();
+    const ref = doc(db,'orders', id);
+	console.log('DBG hiddenDefaults.address_text =', hiddenDefaults?.address_text);
+	const rSnap = await getDoc(doc(db,'restaurants', RESTAURANT_ID));
+const addr  = rSnap.exists() ? (rSnap.data().address_text ?? rSnap.data().addressText ?? null) : null;
+if(!addr){ alert('عنوان المطعم غير متوفر في ملف المطعم.'); return; }
+
+    await setDoc(ref, {
+      nr,
+      status: 'Bearbeitung',
+      platform: platforms,
+      qty,
+      price: Math.round(preis * 100) / 100,
+      deliveryFee: 0,
+      pickupTime: pickup,
+      restaurant: {
+  id: RESTAURANT_ID,
+  name: hiddenDefaults?.Restaurant_Name ?? null,
+  phone: hiddenDefaults?.Telefon ?? null,
+  address_text: addr
+},
+
+	  
+      driver: { id:null, firstName:null, pos:null },
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp()
+    });
+    playSnd('send', id);
+    if(nrBox) nrBox.textContent = nr;
+    if(banner){ banner.textContent='✔ Gesendet'; banner.classList.add('show'); setTimeout(()=>banner.classList.remove('show'),1600); }
+    providerQty.clear(); selectedProviders.clear();
+    providerEls.forEach(el=>el.classList.remove('is-selected'));
+    if(qtyEl){ qtyEl.value='0'; qtyEl.readOnly=true; }
+    if(priceEl) priceEl.value='0,00€';
+    if(timeEl) timeEl.value='';
+    refreshQtyAndSendState();
+  }catch(e){
+    console.error(e);
+    alert("Senden fehlgeschlagen. Prüfe Berechtigungen & Indizes.");
+  }finally{
+    sendBtn.disabled=false;
+  }
+});
+/* ===== Totals + Last list ===== */
+function attachMyTotalsAndLast(){
+  if(ORDERS_UNSUB){ ORDERS_UNSUB(); ORDERS_UNSUB=null; }
+  if(!RESTAURANT_ID) return;
+  onSnapshot(query(collection(db,'orders'), where('restaurant.id','==', RESTAURANT_ID)), (snap)=>{
+    let sumP=0, sumL=0;
+    snap.forEach(d=>{
+      const o=d.data()||{};
+      if(String(o.status||'')==='Abgebrochen') return;
+      const p=Number(o.price||0), l=Number(o.deliveryFee||0);
+      if(Number.isFinite(p)) sumP+=p;
+      if(Number.isFinite(l)) sumL+=l;
+    });
+    if(sumPreis) sumPreis.textContent=money(sumP);
+    if(sumLiefer) sumLiefer.textContent=money(sumL);
+  });
+  ORDERS_UNSUB = onSnapshot(
+    query(collection(db,'orders'),
+      where('restaurant.id','==', RESTAURANT_ID),
+      orderBy('updatedAt','desc'),
+      limit(8)),
+    (snap)=>{
+      if(!lastList) return;
+      if(snap.empty){
+        lastList.innerHTML = `<div class="rowx"><span>— Keine Daten —</span></div>`;
+        return;
+      }
+      lastList.innerHTML = snap.docs.map(d=>{
+        const o=d.data()||{};
+        const plat = Array.isArray(o.platform)? o.platform.join(' / ') : (o.platform||'—');
+        const preis= money(Number(o.price||0));
+        const name = o.restaurant?.name || '—';
+        const qty  = Number(o.qty||0);
+        const nr   = (o.nr!=null ? `#${o.nr}` : '');
+        return `<div class="rowx" data-oid="${d.id}">
+          <div class="id">${d.id} ${nr}</div>
+          <div class="tag">${plat}</div>
+          <div style="flex:1"></div>
+          <div>${name}</div>
+          <div>${qty>0? qty : ''}</div>
+          <div>${preis}</div>
+        </div>`;
+      }).join('');
+      snap.docChanges().forEach(ch=>{
+        const id = ch.doc.id; const o = ch.doc.data()||{};
+        const prev = ORDER_CACHE.get(id)?.status;
+        ORDER_CACHE.set(id, {status:o.status});
+        if(prev !== undefined && prev !== o.status){
+          if(o.status === 'Unterwegs'){
+            playSnd('unterwegs', id);
+            if(!SELECTED_ORDER_ID){ showTripCard(id, o); }
+          }
+          if(o.status === 'Geliefert'){
+            playSnd('delivered', id);
+            if(SELECTED_ORDER_ID===id){
+              stopDriverTracking();
+              clearMapArtifacts();
+              resetTripTimesUI();
+            }
+          }
+        }
+        if(SELECTED_ORDER_ID===id){ showTripCard(id, o); }
+      });
+      if(!lastList.__bound){
+        lastList.__bound = true;
+        lastList.addEventListener('click', async (e)=>{
+          const row = e.target.closest('.rowx'); if(!row) return;
+          const oid = row.getAttribute('data-oid'); if(!oid) return;
+          try{
+            const ds = await getDoc(doc(db,'orders', oid));
+            if(ds.exists()) showTripCard(oid, ds.data());
+          }catch(_){}
+        });
+      }
+    }
+  );
+}
+/* ===== Driver name resolver (Vorname فقط) ===== */
+const firstWord = (s)=> {
+  const t = String(s||'').replace(/\s+/g,' ').trim();
+  return t ? t.split(' ')[0] : '—';
+};
+async function resolveDriverName(drv){
+  try{
+    if (drv?.firstName && typeof drv.firstName === 'string') {
+      return firstWord(drv.firstName);
+    }
+    if (drv?.id) {
+      const ds = await getDoc(doc(db,'drivers', drv.id));
+      if (ds.exists()) {
+        const v = ds.data() || {};
+        let n = v.firstName || v.name || v.profile?.firstName || '';
+        if (!n && typeof v.email === 'string') n = v.email.split('@')[0];
+        if (n) return firstWord(n);
+      }
+    }
+    if (typeof drv?.email === 'string') {
+      return firstWord(drv.email.split('@')[0]);
+    }
+  } catch (_) {}
+  return '—';
+}
+/* ===== Trip card + order live listener ===== */
+let TRIP_ORDER_UNSUB = null;
+/* === ETM Live flags (Kill Switch + Buffer) === */
+const ETM_LIVE_V1 = true;           // يمكن إطفاؤه سريعاً إن لزم
+const ETM_BUFFER_SEC = 180;         // هامش أمان فوق مدة الطريق
+let SERVER_ETM_ACTIVE = false;
+function showTripCard(oid, o){
+  SELECTED_ORDER_ID = oid;
+  const card = document.getElementById('tripCard'); if(!card) return;
+  card.classList.remove('hidden');
+  document.getElementById('tripOrderId').textContent  = oid;
+  document.getElementById('tripStatus').textContent   = o.status || '—';
+  document.getElementById('tripDeliveryFee').textContent = money(Number(o.deliveryFee||0));
+  resolveDriverName(o.driver||{}).then(n=>{
+    const el=document.getElementById('tripDriverName'); if(el) el.textContent=n||'—';
+  });
+  attachOrderListener(oid);
+}
+function attachOrderListener(orderId){
+  if(TRIP_ORDER_UNSUB){ TRIP_ORDER_UNSUB(); TRIP_ORDER_UNSUB=null; }
+  const ref = doc(db,'orders', orderId);
+  TRIP_ORDER_UNSUB = onSnapshot(ref, async (ds)=>{
+    if(!ds.exists()) return;
+    const o = ds.data() || {};
+    document.getElementById('tripStatus').textContent = o.status || '—';
+    document.getElementById('tripDeliveryFee').textContent= money(Number(o.deliveryFee||0));
+    resolveDriverName(o.driver||{}).then(n=>{
+      const el=document.getElementById('tripDriverName'); if(el) el.textContent=n||'—';
+    });
+    const status = String(o.status||'');
+    const serverMs = Number(o.etmTargetMs ?? o.ETM_Target ?? 0);
+    if(status === 'Unterwegs' && o.driver?.id){
+      if(Number.isFinite(serverMs) && serverMs > Date.now() - 12*60*60*1000){
+        SERVER_ETM_ACTIVE = true;
+        TRIP_TARGET_MS = serverMs;
+        ls.set(LS_TRIP_OID, orderId);
+        ls.set(LS_TRIP_TARGET, TRIP_TARGET_MS);
+        lastETARoundedSec = Math.ceil((TRIP_TARGET_MS - Date.now())/1000);
+        startCountdown();
+      }else{
+        SERVER_ETM_ACTIVE = false; // الاعتماد على Directions المحلي
+      }
+      startDriverTracking(orderId, o.driver.id);
+      ensureRestaurantGeocoded();
+    } else if(status === 'Geliefert' || status === 'Abgebrochen'){
+      stopDriverTracking(); clearMapArtifacts(); resetTripTimesUI();
+    } else {
+      stopDriverTracking(); clearMapArtifacts(); resetTripTimesUI();
+    }
+  });
+}
+/* ===== Helpers: clear map & reset UI ===== */
+function clearMapArtifacts(){
+  try{ if(window.__dirRenderer){ window.__dirRenderer.setDirections({routes:[]}); } }catch(_){}
+  try{
+    if(window.__driverMarker){ window.__driverMarker.setMap(null); window.__driverMarker=null; }
+    if(window.__restMarker){   window.__restMarker.setMap(null);   window.__restMarker=null; }
+  }catch(_){}
+  const mi = document.getElementById('mapInfo'); if(mi) mi.textContent='—';
+}
+function resetTripTimesUI(){
+  const et = document.getElementById('tripETM');
+  const di = document.getElementById('tripDistance');
+  if(et){ et.textContent='--:--'; et.classList.remove('blink-red'); }
+  if(di){ di.textContent='— km'; }
+}
+/* ===== Geometry & Map update ===== */
+function haversine(a,b){
+  const R=6371, toRad=x=>x*Math.PI/180;
+  const dLat=toRad(b.lat-a.lat), dLng=toRad(b.lng-a.lng);
+  const s=Math.sin(dLat/2)**2 + Math.cos(toRad(a.lat))*Math.cos(toRad(b.lat))*Math.sin(dLng/2)**2;
+  return 2*R*Math.asin(Math.sqrt(s));
+}
+let restGeocoded=false;
+function updateMapAndDistance(dLat,dLng){
+  const distEl = document.getElementById('tripDistance');
+  const map = window.__map; if(!map) return;
+  if(window.__restPos){
+    window.__restMarker = window.__restMarker || new google.maps.Marker({map, label:'R'});
+    window.__restMarker.setPosition(window.__restPos);
+  }
+  if(!restGeocoded && hiddenDefaults.Restaurant_Adresse){
+    const geocoder = new google.maps.Geocoder();
+    geocoder.geocode({address:hiddenDefaults.Restaurant_Adresse}, (res,status)=>{
+      if(status==='OK' && res[0]){
+        const p=res[0].geometry.location;
+        window.__restPos={lat:p.lat(), lng:p.lng()};
+        restGeocoded=true;
+        ls.set(LS_REST_POS, window.__restPos);
+        map.setCenter(window.__restPos);
+        computeRouteAndETA({lat:dLat, lng:dLng});
+        window.__restMarker = window.__restMarker || new google.maps.Marker({map, label:'R'});
+        window.__restMarker.setPosition(window.__restPos);
+      }
+    });
+  }
+  window.__driverMarker = window.__driverMarker || new google.maps.Marker({map, label:'D'});
+  window.__driverMarker.setPosition({lat:dLat,lng:dLng});
+  if(window.__restPos){
+    const d = haversine(window.__restPos, {lat:dLat,lng:dLng});
+    if(distEl) distEl.textContent = (d||0).toFixed(2)+' km';
+    const bounds=new google.maps.LatLngBounds();
+    bounds.extend(new google.maps.LatLng(window.__restPos.lat, window.__restPos.lng));
+    bounds.extend(new google.maps.LatLng(dLat, dLng));
+    map.fitBounds(bounds, {top:60,bottom:60,left:60,right:60});
+  }
+  computeRouteAndETA({lat:dLat, lng:dLng});
+}
+/* === Realtime tracking + Directions/ETA === */
+let lastRouteTs = 0;
+let lastETARoundedSec = null;
+function formatSeconds(total){
+  const s = Math.max(0, Math.floor(total));
+  const m = Math.floor(s/60);
+  const ss = String(s%60).padStart(2,'0');
+  return `${m}:${ss}`;
+}
+function kmFromMeters(m){ return Number.isFinite(m) ? (m/1000) : null; }
+function renderMapInfo(km, sec){
+  const mi = document.getElementById('mapInfo');
+  if(!mi) return;
+  const parts = [];
+  if(Number.isFinite(km)) parts.push(`${km.toFixed(2)} km`);
+  if(Number.isFinite(sec)) parts.push(`ETA ${Math.round(sec/60)} min`);
+  mi.textContent = parts.length ? parts.join(' • ') : '—';
+}
+function ensureDirections(){
+  if(!window.google?.maps || !window.__map) return false;
+  window.__dirService  = window.__dirService  || new google.maps.DirectionsService();
+  if(!window.__dirRenderer){
+    window.__dirRenderer = new google.maps.DirectionsRenderer({
+      map: window.__map,
+      suppressMarkers: true,
+      polylineOptions: { strokeColor:'#1da9cf', strokeOpacity:0.95, strokeWeight:5 }
+    });
+  }
+  return true;
+}
+/* === ETM Live (to pickup): لا نعيد ضبط الهدف عند كل تحديث — نحدده مرة واحدة ونضيف Buffer === */
+function computeRouteAndETA(driverPos){
+  if(!window.__restPos || !ensureDirections()) return;
+  const now = Date.now();
+  if(now - lastRouteTs < 2000) return;
+  lastRouteTs = now;
+  window.__dirService.route({
+    origin: driverPos,
+    destination: window.__restPos,
+    travelMode:  google.maps.TravelMode.DRIVING
+  }, (res, status)=>{
+    if(status !== 'OK' || !res?.routes?.[0]?.legs?.[0]) return;
+    window.__dirRenderer.setDirections(res);
+    const leg = res.routes[0].legs[0];
+    const distanceMeters = leg.distance?.value ?? null;
+    const durationSec    = leg.duration?.value ?? null;
+    const distEl = document.getElementById('tripDistance');
+    if(distanceMeters!=null && distEl){
+      const km = distanceMeters / 1000;
+      distEl.textContent = `${km.toFixed(2)} km`;
+    }
+    // ——— أهم تعديل: لا نغيّر TRIP_TARGET_MS إذا كان مضبوطًا بالفعل ———
+    if(ETM_LIVE_V1 && !SERVER_ETM_ACTIVE && Number.isFinite(durationSec)){
+      // اضبط الهدف مرة واحدة فقط (على أول حساب)، وأضف Buffer لتجنّب الإنذارات الكاذبة
+      if(!TRIP_TARGET_MS){
+        TRIP_TARGET_MS = Date.now() + (durationSec + ETM_BUFFER_SEC) * 1000;
+        if(SELECTED_ORDER_ID){ ls.set(LS_TRIP_OID, SELECTED_ORDER_ID); }
+        ls.set(LS_TRIP_TARGET, TRIP_TARGET_MS);
+        lastETARoundedSec = Math.ceil((TRIP_TARGET_MS - Date.now())/1000);
+        startCountdown();
+      }
+    }
+    // عرض معلومات فقط — لا يؤثر على العداد
+    renderMapInfo(kmFromMeters(distanceMeters), durationSec);
+  });
+}
+function startCountdown(){
+  const el = document.getElementById('tripETM'); if(!el) return;
+  if(TRIP_TIMER) clearInterval(TRIP_TIMER);
+  TRIP_TIMER = setInterval(()=>{
+    if(!TRIP_TARGET_MS){
+      el.textContent = '--:--'; el.classList.remove('blink-red'); return;
+    }
+    const remainSec = Math.ceil((TRIP_TARGET_MS - Date.now())/1000);
+    const safeRemain = Math.max(0, remainSec);
+    if(lastETARoundedSec !== null && lastETARoundedSec > 120 && safeRemain <= 120){
+      playOncePerOrder('timer160', SELECTED_ORDER_ID);
+    }
+    lastETARoundedSec = safeRemain;
+    if(safeRemain <= 120) el.classList.add('blink-red');
+    else el.classList.remove('blink-red');
+    el.textContent = formatSeconds(safeRemain);
+  }, 1000);
+}
+function stopDriverTracking(){
+  if(TRIP_TIMER){ clearInterval(TRIP_TIMER); TRIP_TIMER=null; }
+  TRIP_TARGET_MS = null;
+  lastETARoundedSec = null;
+  try{ if(DRIVER_SUB){ rOff(DRIVER_SUB.ref, 'value', DRIVER_SUB.cb); } }catch(_){}
+  DRIVER_SUB = null;
+  ls.del(LS_TRIP_TARGET);
+  ls.del(LS_TRIP_OID);
+}
+function startDriverTracking(orderId, driverId){
+  stopDriverTracking();
+  if(!driverId) return;
+  const ref = rRef(rtdb, `drivers_locations/${driverId}`);
+  const cb  = (snap)=>{
+    const val = snap.val() || {};
+    const lat = Number(val.lat), lng = Number(val.lng);
+    if(Number.isFinite(lat) && Number.isFinite(lng)){ updateMapAndDistance(lat, lng); }
+  };
+  rOn(ref, cb);
+  DRIVER_SUB = { ref, cb };
+}
+/* ===== Restaurant Geocode (persist & early render) ===== */
+function ensureRestaurantGeocoded(){
+  const cached = ls.get(LS_REST_POS, null);
+  if(cached && cached.lat && cached.lng && window.__map && window.google?.maps){
+    window.__restPos = { lat:Number(cached.lat), lng:Number(cached.lng) };
+    window.__restMarker = window.__restMarker || new google.maps.Marker({map: window.__map, label:'R'});
+    window.__restMarker.setPosition(window.__restPos);
+  }
+  if(!window.__restPos && hiddenDefaults.Restaurant_Adresse && window.__map && window.google?.maps){
+    const geocoder = new google.maps.Geocoder();
+    geocoder.geocode({address:hiddenDefaults.Restaurant_Adresse}, (res,status)=>{
+      if(status==='OK' && res[0]){
+        const p=res[0].geometry.location;
+        window.__restPos={lat:p.lat(), lng:p.lng()};
+        ls.set(LS_REST_POS, window.__restPos);
+        window.__restMarker = window.__restMarker || new google.maps.Marker({map: window.__map, label:'R'});
+        window.__restMarker.setPosition(window.__restPos);
+      }
+    });
+  }
+}
+/* ===== Map ===== */
+const GMAPS_API_KEY = 'AIzaSyDipzUmxEQmAjaDkn6xQ91ZhqnkPmgl-2o';
+function applyMapStyle(map, mode){
+  const MONO=[{elementType:'geometry',stylers:[{saturation:-100},{lightness:10}]},{elementType:'labels.text.fill',stylers:[{color:'#4b4b4b'}]},{featureType:'road',stylers:[{saturation:-100},{lightness:30}]}];
+  const CARTOON=[{elementType:'geometry',stylers:[{color:'#fef7e0'}]},{featureType:'road',elementType:'geometry',stylers:[{color:'#fdd96a'}]},{featureType:'water',elementType:'geometry',stylers:[{color:'#a2d2ff'}]}];
+  if(mode==='satellite'){ map.setMapTypeId(google.maps.MapTypeId.SATELLITE); map.setOptions({styles:null}); }
+  else if(mode==='mono'){ map.setMapTypeId(google.maps.MapTypeId.ROADMAP); map.setOptions({styles:MONO}); }
+  else if(mode==='cartoon'){ map.setMapTypeId(google.maps.MapTypeId.ROADMAP); map.setOptions({styles:CARTOON}); }
+  else { map.setMapTypeId(google.maps.MapTypeId.ROADMAP); map.setOptions({styles:null}); }
+}
+async function initMap(){
+  const mapEl=document.getElementById('map'); if(!mapEl) return;
+  const ensure=()=>new Promise((res,rej)=>{
+    if(window.google?.maps) return res();
+    const cb='__gm_'+Math.random().toString(36).slice(2);
+    window[cb]=()=>{ delete window[cb]; res(); };
+    const s=document.createElement('script');
+    s.src=`https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(GMAPS_API_KEY)}&v=weekly&callback=${cb}`;
+    s.async=true; s.defer=true; s.onerror=()=>{ delete window[cb]; rej(); };
+    document.head.appendChild(s);
+  });
+  try{ await ensure(); }catch(_){ return; }
+  const map=new google.maps.Map(mapEl,{ center:{lat:54.3233,lng:10.1228}, zoom:12, disableDefaultUI:true, gestureHandling:'greedy' });
+  window.__map = map;
+  const styleSel=document.getElementById('mapStyle');
+  styleSel?.addEventListener('change', e=>applyMapStyle(map, e.target.value));
+  ensureRestaurantGeocoded();
+  // Bootstrap العدّاد من التخزين قبل وصول Snapshot
+  (function restoreCountdownEarly(){
+    const savedMs = ls.get(LS_TRIP_TARGET, null);
+    const savedOid= ls.get(LS_TRIP_OID, null);
+    if(Number.isFinite(savedMs) && savedMs > Date.now() && savedOid){
+      SELECTED_ORDER_ID = savedOid;
+      TRIP_TARGET_MS = savedMs;
+      lastETARoundedSec = Math.ceil((TRIP_TARGET_MS - Date.now())/1000);
+      const card = document.getElementById('tripCard'); if(card) card.classList.remove('hidden');
+      startCountdown();
+    }
+  })();
+}
+initMap();
+/* ===== Sound picker ===== */
+const sndBtn=document.getElementById('sndBtn');
+const sndPicker=document.getElementById('soundPicker');
+sndBtn?.addEventListener('click',(e)=>{
+  if(e.altKey){ sndPicker?.click(); return; }
+  SND_MUTED=!SND_MUTED;
+  localStorage.setItem('sndMuted', SND_MUTED?'1':'0');
+  renderSndBtn();
+});
+sndPicker?.addEventListener('change',(e)=>{
+  const files=Array.from(e.target.files||[]);
+  files.forEach(f=>{
+    const name=f.name.toLowerCase();
+    const url=URL.createObjectURL(f);
+    if(name.includes('senden')||name.includes('send')) snd.send.src=url;
+    else if(name.includes('unterwegs')||name.includes('start')) snd.unterwegs.src=url;
+    else if(name.includes('160')||name.includes('timer')) snd.timer160.src=url;
+    else if(name.includes('geliefert')||name.includes('deliver')||name.includes('liefer')) snd.delivered.src=url;
+  });
+});
+/* ===== Error banners ===== */
+window.addEventListener('error', (e)=>{
+  try{
+    if(banner){
+      banner.textContent='⚠️ '+(e?.message||'Unbekannter Fehler');
+      banner.classList.add('show');
+      setTimeout(()=>banner.classList.remove('show'), 4000);
+    }
+  }catch(_){}
+});
+window.addEventListener('unhandledrejection', (e)=>{
+  try{
+    const msg=(e?.reason && e.reason.message) || String(e?.reason||'');
+    if(banner){
+      banner.textContent='⚠️ '+msg;
+      banner.classList.add('show');
+      setTimeout(()=>banner.classList.remove('show'), 4000);
+    }
+  }catch(_){}
+});
+/* ===== Init ===== */
+function showAuthSafe(){ switchPane('login'); showAuth(true); }
+refreshQtyAndSendState();
+if(priceEl && !priceEl.value) priceEl.value="0,00€";
+showAuthSafe();
+/* Drawer/Menu — isolated (no globals touched) */
+(() => {
+  const btn   = document.getElementById('menuBtn');
+  const side  = document.getElementById('sideMenu');
+  const back  = document.getElementById('drawerBackdrop');
+  const close = document.getElementById('drawerClose');
+  const navLogout = document.getElementById('navLogout');
+  const open = ()=>{ side?.classList.add('show'); back?.classList.add('show'); document.body.classList.add('no-scroll'); };
+  const shut = ()=>{ side?.classList.remove('show'); back?.classList.remove('show'); document.body.classList.remove('no-scroll'); };
+  btn?.addEventListener('click', open);
+  back?.addEventListener('click', shut);
+  close?.addEventListener('click', shut);
+  navLogout?.addEventListener('click', async (e)=>{
+    e.preventDefault(); shut();
+    try{ await signOut(auth); }catch(_){}
+    showAuth(true);
+  });
+  document.addEventListener('keydown', (e)=>{ if(e.key==='Escape' && side?.classList.contains('show')) shut(); });
+})();
+/* Orders Log — simple fetch (no composite index required) */
+/* === Orders Log (Bestellverlauf) — Filters + Infinite Scroll (safe, no composite idx required) === */
+(() => {
+  const logModal = document.getElementById('logModal');
+  const logClose = document.getElementById('logClose');
+  const logList  = document.getElementById('logList');
+  const logSumPrice = document.getElementById('logSumPrice');
+  const logSumFee   = document.getElementById('logSumFee');
+  const navLog      = document.getElementById('navLog');
+  const logFrom = document.getElementById('logFrom');
+  const logTo   = document.getElementById('logTo');
+  const logProvider = document.getElementById('logProvider');
+  const logReset = document.getElementById('logReset');
+  const logScroll = document.getElementById('logScroll');
+  const PAGE_SIZE = 50;
+  let LOG_LAST = null;
+  let LOG_BUSY = false;
+  let RID = null;
+  const SEEN = new Set();
+  let NO_MORE = false;
+  const ALL = [];
+  const money = (n)=> (Number(n||0)).toLocaleString("de-DE",{minimumFractionDigits:2,maximumFractionDigits:2})+"€";
+  const dateISO = (d)=> d ? d.toLocaleString('de-DE') : '—';
+  const platStr = (p)=> Array.isArray(p)? p.join(' / ') : (p||'—');
+  const getRID = ()=> (typeof RESTAURANT_ID!=='undefined' && RESTAURANT_ID) ? RESTAURANT_ID : (auth.currentUser?.uid || null);
+  navLog && navLog.addEventListener('click', async (e)=>{
+    e.preventDefault();
+    await openLog();
+  });
+  async function openLog(){
+    RID = getRID();
+    if(!RID){ alert('Bitte zuerst anmelden.'); return; }
+    resetState();  function resetState(){
+    LOG_LAST=null; LOG_BUSY=false; ALL.length=0;
+    SEEN.clear();
+    NO_MORE=false;
+    if(logList) logList.innerHTML = '';
+    if(logFrom) logFrom.value='';
+    if(logTo)   logTo.value='';
+    if(logProvider) logProvider.value='';
+  }
+    logModal?.classList.add('show');
+    try{
+      const qs = await getDocs(query(collection(db,'orders'), where('restaurant.id','==', RID)));
+      let sumP=0, sumL=0;
+      qs.forEach(d=>{
+        const o=d.data()||{}; if(String(o.status||'')==='Abgebrochen') return;
+        const p=Number(o.price||0), l=Number(o.deliveryFee||0);
+        if(Number.isFinite(p)) sumP+=p; if(Number.isFinite(l)) sumL+=l;
+      });
+      if(logSumPrice) logSumPrice.textContent = money(sumP);
+      if(logSumFee)   logSumFee.textContent   = money(sumL);
+    }catch(e){ /* ignore */ }
+    await loadMore();
+    bindScroll();
+  }
+  function resetState(){
+    LOG_LAST=null; LOG_BUSY=false; ALL.length=0;
+    if(logList) logList.innerHTML = '';
+    if(logFrom) logFrom.value='';
+    if(logTo)   logTo.value='';
+    if(logProvider) logProvider.value='';
+  }
+  function bindScroll(){
+    if(!logScroll || logScroll.__bound) return;
+    logScroll.__bound = true;
+    logScroll.addEventListener('scroll', async ()=>{
+      if (NO_MORE) return;
+      const nearBottom = (logScroll.scrollTop + logScroll.clientHeight) >= (logScroll.scrollHeight - 120);
+      if(nearBottom) await loadMore();
+    });
+  }
+  async function loadMore(){
+    if (LOG_BUSY || !RID || NO_MORE) return;
+    LOG_BUSY = true;
+    try{
+      const snap = await runPageQuery(RID, LOG_LAST);
+      if (!snap.empty) {
+        const docs = snap.docs;
+        for (const ds of docs) {
+          const id = ds.id;
+          if (SEEN.has(id)) continue;
+          SEEN.add(id);
+          ALL.push({ id, o: ds.data() || {} });
+        }
+        if (snap.size < PAGE_SIZE) {
+          NO_MORE = true;
+        } else {
+          LOG_LAST = docs[docs.length - 1];
+        }
+        render();
+      } else {
+        NO_MORE = true;
+      }
+    } catch (e) {
+      try{
+        const snap2 = await getDocs(query(
+          collection(db,'orders'),
+          where('restaurant.id','==', RID),
+          limit(PAGE_SIZE)
+        ));
+        let pushed = 0;
+        snap2.forEach(ds=>{
+          const id = ds.id;
+          if (SEEN.has(id)) return;
+          SEEN.add(id);
+          ALL.push({ id, o: ds.data() || {} });
+          pushed++;
+        });
+        render();
+        NO_MORE = true;
+      }catch(e2){
+        if(!logList.innerHTML.trim()){
+          logList.innerHTML = `<div class="small" style="opacity:.8">— Keine Aufträge —</div>`;
+        }
+        NO_MORE = true;
+      }
+
+    } finally {
+      LOG_BUSY = false;
+    }
+  }
+  function runPageQuery(rid, lastSnap){
+    let q = query(
+      collection(db,'orders'),
+      where('restaurant.id','==', rid),
+      orderBy('updatedAt','desc'),
+      limit(PAGE_SIZE)
+    );
+    if(lastSnap){
+      q = query(
+        collection(db,'orders'),
+        where('restaurant.id','==', rid),
+        orderBy('updatedAt','desc'),
+        startAfter(lastSnap),
+        limit(PAGE_SIZE)
+      );
+    }
+    return getDocs(q);
+  }
+  function applyFilters(items){
+    const fromVal = logFrom?.value ? new Date(logFrom.value) : null;
+    const toVal   = logTo?.value   ? new Date(logTo.value)   : null;
+    const prov    = (logProvider?.value || '').trim().toLowerCase();
+    return items.filter(({o})=>{
+      const t = (o.updatedAt?.toDate?.() || o.createdAt?.toDate?.() || null);
+      if(fromVal && t && t < startOfDay(fromVal)) return false;
+      if(toVal && t && t > endOfDay(toVal)) return false;
+      if(prov){
+        const p = platStr(o.platform).toLowerCase();
+        if(!p.includes(prov)) return false;
+      }
+      return true;
+    });
+  }
+  function startOfDay(d){ const x=new Date(d); x.setHours(0,0,0,0); return x; }
+  function endOfDay(d){ const x=new Date(d); x.setHours(23,59,59,999); return x; }
+  function render(){
+    if(!logList) return;
+    const filtered = applyFilters(ALL);
+    if(!filtered.length){
+      logList.innerHTML = `<div class="small" style="opacity:.8">— Keine Aufträge —</div>`;
+      return;
+    }
+    logList.innerHTML = filtered.map(({id,o})=>{
+      const nr   = (o.nr!=null ? `#${o.nr}` : '');
+      const rest = o.restaurant?.name || '—';
+      const plat = platStr(o.platform);
+      const qty  = Number(o.qty||0) || 0;
+      const price = money(Number(o.price||0));
+      const fee   = money(Number(o.deliveryFee||0));
+      const st    = o.status || '—';
+      const dt    = (o.updatedAt?.toDate?.() || o.createdAt?.toDate?.() || null);
+      const dtStr = dateISO(dt);
+      return `
+        <div class="log-row">
+          <div class="log-id">${id} ${nr}</div>
+          <div>${rest} · ${plat}<div class="small" style="opacity:.8">${dtStr}</div></div>
+          <div class="log-tag">${st}</div>
+          <div>Qty ${qty}</div>
+          <div>${price}</div>
+          <div>${fee}</div>
+        </div>
+      `;
+    }).join('');
+  }
+  [logFrom, logTo, logProvider].forEach(el=>{
+    el && el.addEventListener('change', ()=> render());
+  });
+  logReset && logReset.addEventListener('click', ()=>{
+    if(logFrom) logFrom.value='';
+    if(logTo)   logTo.value='';
+    if(logProvider) logProvider.value='';
+    render();
+  });
+  logClose && logClose.addEventListener('click', ()=> logModal.classList.remove('show'));
+  logModal && logModal.addEventListener('click',(e)=>{ if(e.target===logModal) logModal.classList.remove('show'); });
+})();
+/* === Print & PDF — robust via hidden <iframe> === */
+(() => {
+  const logModal = document.getElementById('logModal');
+  const btnPrint = document.getElementById('logPrint');
+  const btnPDF   = document.getElementById('logPDF');
+  const btnCSV   = document.getElementById('logCSV');
+  if (!logModal) return;
+  const PRINT_CSS = `
+  <style>
+    :root{ color-scheme: light; }
+    html,body{
+      margin:0; padding:0; background:#fff; color:#111;
+      font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      display:flex; justify-content:center;
+    }
+    .box{
+      width:980px; max-width:100%;
+      margin:0 auto !important;
+      padding:12px;
+      background:#fff; color:#111;
+    }
+    .log-actions{ display:none !important; }
+    .log-list{ display:flex; flex-direction:column; gap:6px; margin-top:8px }
+    .log-row{
+      display:grid; grid-template-columns:auto 1fr auto auto auto;
+      gap:8px; align-items:center;
+      border:1px solid #e5e7eb; border-radius:10px; padding:8px; background:#fff;
+    }
+    .log-id{ font-family: ui-monospace, Menlo, monospace; font-size:12px; opacity:.9 }
+    .log-tag{ font-size:11px; padding:3px 8px; border-radius:999px; background:#eef2ff; border:1px solid #e5e7eb }
+    .chip{ display:inline-block; font-size:12px; padding:6px 10px; border-radius:999px; background:#f3f4f6; border:1px solid #e5e7eb; margin-right:6px; }
+    @page{ size:A4; margin:12mm; }
+  </style>
+`;
+  function buildPrintHTML(){
+    const box = logModal.querySelector('.box');
+    if(!box){
+      return `<!doctype html><html><head><meta charset="utf-8"><title>Bestellverlauf</title>${PRINT_CSS}</head><body><div style="padding:16px">— Keine Daten —</div></body></html>`;
+    }
+    const clone = box.cloneNode(true);
+    clone.querySelectorAll('#logClose').forEach(el=>el.remove());
+    return `<!doctype html><html><head><meta charset="utf-8"><title>Bestellverlauf</title>${PRINT_CSS}</head><body>${clone.outerHTML}</body></html>`;
+  }
+  function printViaHiddenIframe(html){
+    const iframe = document.createElement('iframe');
+    iframe.style.position='fixed';
+    iframe.style.right='0'; iframe.style.bottom='0';
+    iframe.style.width='0'; iframe.style.height='0';
+    iframe.style.border='0';
+    document.body.appendChild(iframe);
+    const doc = iframe.contentWindow.document;
+    doc.open(); doc.write(html); doc.close();
+    const go = () => {
+      setTimeout(() => {
+        try{
+          iframe.contentWindow.focus();
+          iframe.contentWindow.print();
+        }catch(_){}
+        setTimeout(() => { try{ iframe.remove(); }catch(_){ } }, 500);
+      }, 200);
+    };
+    if ('complete' === iframe.contentDocument.readyState) go();
+    else iframe.onload = go;
+  }
+  btnPrint?.addEventListener('click', (e)=>{
+    e.preventDefault();
+    const html = buildPrintHTML();
+    printViaHiddenIframe(html);
+  });
+  btnPDF?.addEventListener('click', (e)=>{
+    e.preventDefault();
+    const html = buildPrintHTML();
+    printViaHiddenIframe(html);
+  });
+btnCSV?.addEventListener('click', async (e)=>{
+  e.preventDefault();
+  try{
+    const rid = auth.currentUser?.uid || window.RESTAURANT_ID;
+    if(!rid){ alert('Bitte zuerst anmelden.'); return; }
+    const snap = await getDocs(query(collection(db,'orders'), where('restaurant.id','==', rid), limit(100)));
+    const rows = [];
+    rows.push(['OrderID','Nr','Restaurant','Platform','Status','Price','DeliveryFee','DateTime']);
+    snap.forEach(ds=>{
+      const o = ds.data() || {};
+      const id = ds.id;
+      const nr = (o.nr != null ? o.nr : '');
+      const rest = o.restaurant?.name || '';
+      const plat = Array.isArray(o.platform) ? o.platform.join(' / ') : (o.platform || '');
+      const status = o.status || '';
+      const price = Number(o.price||0).toFixed(2);
+      const fee   = Number(o.deliveryFee||0).toFixed(2);
+      const dtMs  = (o.updatedAt?.toMillis?.() ?? o.createdAt?.toMillis?.() ?? 0);
+      const dtStr = dtMs ? new Date(dtMs).toISOString() : '';
+      rows.push([id, nr, rest, plat, status, price, fee, dtStr]);
+    });
+    const csv = rows.map(r => r.map(v => `"${String(v).replace(/"/g,'""')}"`).join(',')).join('\r\n');
+    const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `bestellverlauf_${new Date().toISOString().slice(0,10)}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); }, 500);
+  }catch(err){
+    console.error('CSV export error', err);
+    alert('CSV-Export fehlgeschlagen.');
+  }
+});
+})();
+</script>
+</body>
+</html>
