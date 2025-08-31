@@ -580,7 +580,12 @@ function setOnline(flag){
   onlineToggle.classList.toggle("on", online);
   statText.textContent = online? "Online":"Offline";
   localStorage.setItem(ONLINE_PREF_KEY, online?'1':'0');
-  if(online){ startPresence(); attachOrders(); attachInbox(); } else { stopPresence(); detachOrders(); detachInbox(); stopIncomingAlert(); }
+  if(online){ startPresence();
+driverLiveStart();   // ← السطر الجديد
+
+// عندما يتحول إلى Offline:
+stopPresence();
+driverLiveStop(); }
 }
 
 /* ===== Presence + GPS (RTDB) ===== */
@@ -619,6 +624,41 @@ function startWatch(){
   );
 }
 function stopWatch(){ if(watchId!=null){ try{ navigator.geolocation.clearWatch(watchId); }catch(_){ } watchId=null; } }
+/* === Addon: Live driver location (non-invasive) === */
+let LIVE_WATCH_ID = null, LIVE_LAST_SENT = 0;
+
+function driverLiveStart(){
+  try{
+    const uid = auth?.currentUser?.uid; if(!uid || !('geolocation' in navigator)) return;
+    if (LIVE_WATCH_ID !== null) return;
+    const locRef = rRef(rtdb, `drivers_locations/${uid}`);
+    LIVE_WATCH_ID = navigator.geolocation.watchPosition(
+      p => {
+        const c = p.coords || {}; const now = Date.now();
+        if (now - LIVE_LAST_SENT < 4000) return;
+        LIVE_LAST_SENT = now;
+        rUpdate(locRef, {
+          lat:+Number(c.latitude).toFixed(6),
+          lng:+Number(c.longitude).toFixed(6),
+          accuracy: Number.isFinite(c.accuracy)? c.accuracy : null,
+          speed:    Number.isFinite(c.speed)?    c.speed    : null,
+          heading:  Number.isFinite(c.heading)?  c.heading  : null,
+          ts: now, ver:'driver-web-v7'
+        }).catch(err=>console.error('RTDB update(loc) failed', err));
+      },
+      err => console.warn('GPS', err),
+      { enableHighAccuracy:true, maximumAge:1000, timeout:10000 }
+    );
+  }catch(e){ console.error('driverLiveStart error', e); }
+}
+
+function driverLiveStop(){
+  try{
+    if (LIVE_WATCH_ID !== null) { navigator.geolocation.clearWatch(LIVE_WATCH_ID); LIVE_WATCH_ID = null; }
+  }catch(_){}
+}
+
+
 /* ===== Orders ===== */
 let unsubOrders=null, unsubInbox=null;
 function detachOrders(){ unsubOrders?.(); unsubOrders=null; ordersInfo.textContent="—"; listEl.innerHTML=""; }
