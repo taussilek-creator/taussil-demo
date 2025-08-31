@@ -1012,7 +1012,31 @@ function haversine(a,b){
   return 2*R*Math.asin(Math.sqrt(s));
 }
 let restGeocoded=false;
-function updateMapAndDistance(lat, lng){
+function updateMapAndDistance(dLat,dLng){
+  const distEl = document.getElementById('tripDistance');
+  const map = window.__map; if(!map) return;
+  if(window.__restPos){
+    window.__restMarker = window.__restMarker || new google.maps.Marker({map, label:'R'});
+    window.__restMarker.setPosition(window.__restPos);
+  }
+  if(!restGeocoded && hiddenDefaults.Restaurant_Adresse){
+    const geocoder = new google.maps.Geocoder();
+    geocoder.geocode({address:hiddenDefaults.Restaurant_Adresse}, (res,status)=>{
+      if(status==='OK' && res[0]){
+        const p=res[0].geometry.location;
+        window.__restPos={lat:p.lat(), lng:p.lng()};
+        restGeocoded=true;
+        ls.set(LS_REST_POS, window.__restPos);
+        map.setCenter(window.__restPos);
+        computeRouteAndETA({lat:dLat, lng:dLng});
+        window.__restMarker = window.__restMarker || new google.maps.Marker({map, label:'R'});
+        window.__restMarker.setPosition(window.__restPos);
+      }
+    });
+  }
+  window.__driverMarker = window.__driverMarker || new google.maps.Marker({map, label:'D'});
+  window.__driverMarker.setPosition({lat:dLat,lng:dLng});
+  function updateMapAndDistance(lat, lng){
   if(!window.__map || !window.google?.maps) return;
 
   lat = Number(lat); lng = Number(lng);
@@ -1036,6 +1060,8 @@ function updateMapAndDistance(lat, lng){
   }
 }
 
+  computeRouteAndETA({lat:dLat, lng:dLng});
+}
 /* === Realtime tracking + Directions/ETA === */
 let lastRouteTs = 0;
 let lastETARoundedSec = null;
