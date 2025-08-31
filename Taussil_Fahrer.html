@@ -619,45 +619,50 @@ function startWatch(){
   );
 }
 function stopWatch(){ if(watchId!=null){ try{ navigator.geolocation.clearWatch(watchId); }catch(_){ } watchId=null; } }
-/* === Addon: Live driver location (non-invasive) === */
-let LIVE_WATCH_ID = null, LIVE_LAST_SENT = 0, LIVE_LAST_LL = null, LIVE_HB = null;
+/* === Addon: Live driver location v2 (non-invasive) === */
+let LIVE_WATCH_ID=null, LIVE_LAST_LL=null, LIVE_LAST_SENT=0, LIVE_HB=null;
 
 function driverLiveStart(){
   try{
     const uid = auth?.currentUser?.uid; if(!uid || !('geolocation' in navigator)) return;
-    if (LIVE_WATCH_ID !== null) return;
-
     const locRef = rRef(rtdb, `drivers_locations/${uid}`);
 
-    // 1) طلقة أولى لموقع حالي
+    // طلقة أولى دقيقة
     navigator.geolocation.getCurrentPosition(p=>{
-      const { latitude, longitude } = p.coords || {};
-      LIVE_LAST_LL = { lat:+Number(latitude).toFixed(6), lng:+Number(longitude).toFixed(6) };
-      rUpdate(locRef, { ...LIVE_LAST_LL, ts: Date.now(), ver:'driver-kick' }).catch(()=>{});
+      const { latitude, longitude, accuracy } = p.coords || {};
+      if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return;
+      const lat = +Number(latitude).toFixed(6);
+      const lng = +Number(longitude).toFixed(6);
+      LIVE_LAST_LL = { lat, lng };
+      rUpdate(locRef, { lat, lng, accuracy: Number.isFinite(accuracy)? accuracy:null, ts: Date.now(), ver:'kick' }).catch(()=>{});
     }, ()=>{}, { enableHighAccuracy:true, timeout:10000 });
 
-    // 2) متابعة مباشرة بالحركة
-    LIVE_WATCH_ID = navigator.geolocation.watchPosition(p=>{
-      const c = p.coords || {}; const now = Date.now();
-      const lat = +Number(c.latitude).toFixed(6);
-      const lng = +Number(c.longitude).toFixed(6);
-      LIVE_LAST_LL = { lat, lng };
-      if (now - LIVE_LAST_SENT < 4000) return;
-      LIVE_LAST_SENT = now;
-      rUpdate(locRef, {
-        lat, lng,
-        accuracy: Number.isFinite(c.accuracy)? c.accuracy : null,
-        speed:    Number.isFinite(c.speed)?    c.speed    : null,
-        heading:  Number.isFinite(c.heading)?  c.heading  : null,
-        ts: now, ver:'driver-watch'
-      }).catch(()=>{});
-    }, err=>console.warn('GPS', err), { enableHighAccuracy:true, maximumAge:1000, timeout:10000 });
+    // متابعة مباشرة بالحركة (قد تتوقف بالخلفية على بعض الأجهزة)
+    if (LIVE_WATCH_ID===null){
+      LIVE_WATCH_ID = navigator.geolocation.watchPosition(p=>{
+        const c = p.coords || {}; const now = Date.now();
+        if (!Number.isFinite(c.latitude) || !Number.isFinite(c.longitude)) return;
+        if (c.accuracy && c.accuracy > 80) return; // تجاهل قراءات غير دقيقة (>80m)
+        const lat = +Number(c.latitude).toFixed(6);
+        const lng = +Number(c.longitude).toFixed(6);
+        LIVE_LAST_LL = { lat, lng };
+        if (now - LIVE_LAST_SENT < 4000) return;   // حد أقصى كل ≥4 ثوانٍ
+        LIVE_LAST_SENT = now;
+        rUpdate(locRef, {
+          lat, lng,
+          accuracy: Number.isFinite(c.accuracy)? c.accuracy : null,
+          speed:    Number.isFinite(c.speed)?    c.speed    : null,
+          heading:  Number.isFinite(c.heading)?  c.heading  : null,
+          ts: now, ver:'watch'
+        }).catch(()=>{});
+      }, err=>console.warn('GPS', err), { enableHighAccuracy:true, maximumAge:0, timeout:10000 });
+    }
 
-    // 3) نبضة كل 15s تدفع آخر نقطة حتى لو ما تحرك
+    // نبض كل 15s يدفع آخر نقطة حتى لو التبويب بالخلفية
     if (!LIVE_HB){
       LIVE_HB = setInterval(()=>{
         if(!LIVE_LAST_LL) return;
-        rUpdate(locRef, { ...LIVE_LAST_LL, ts: Date.now(), ver:'driver-hb' }).catch(()=>{});
+        rUpdate(locRef, { ...LIVE_LAST_LL, ts: Date.now(), ver:'hb' }).catch(()=>{});
       }, 15000);
     }
   }catch(e){ console.error('driverLiveStart error', e); }
@@ -665,10 +670,13 @@ function driverLiveStart(){
 
 function driverLiveStop(){
   try{
-    if (LIVE_WATCH_ID !== null){ navigator.geolocation.clearWatch(LIVE_WATCH_ID); LIVE_WATCH_ID = null; }
-    if (LIVE_HB){ clearInterval(LIVE_HB); LIVE_HB = null; }
+    if (LIVE_WATCH_ID!==null){ navigator.geolocation.clearWatch(LIVE_WATCH_ID); LIVE_WATCH_ID=null; }
+    if (LIVE_HB){ clearInterval(LIVE_HB); LIVE_HB=null; }
   }catch(_){}
 }
+
+// أعِد تشغيل التتبّع عند رجوع التبويب للمقدمة (Safari/Android قد يوقفه بالخلفية)
+document.addEventListener('visibilitychange', ()=>{ if (!document.hidden) driverLiveStart(); });
 
 /* ===== Orders ===== */
 let unsubOrders=null, unsubInbox=null;
