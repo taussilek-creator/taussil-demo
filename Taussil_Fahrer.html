@@ -584,72 +584,41 @@ function setOnline(flag){
 }
 
 /* ===== Presence + GPS (RTDB) ===== */
-/* ===== Presence + GPS (RTDB) ===== */
-let hbTimer = null;
-
-// ⬇️ أضف هذين إن لم يكونا موجودين أصلاً
-let watchId = null;
-let lastSentAt = 0;
-
+let hbTimer = null; // مؤقت النبضات
 function startPresence(){
-  const uid = auth.currentUser?.uid; if(!uid) return;
   const pRef = ref(rtdb, `drivers_presence/${uid}`);
-  rUpdate(pRef, { online:true, desired:true, ts: Date.now(), ver:'driver-web-v7' }).catch(()=>{});
+  rUpdate(pRef,{ online:true, desired:true, ts: Date.now(), ver:'driver-web-v7' }).catch(()=>{});
   try{ onDisconnect(pRef).update({ lastDisconnectAt: rServerTs() }); }catch(_){}
-  // نبض كل 15 ثانية
+  // ✨ ابدأ heartbeat كل 15 ثانية
   if(hbTimer) clearInterval(hbTimer);
   hbTimer = setInterval(()=>{
-    rUpdate(pRef, { online:true, ts: Date.now(), ver:'driver-web-v7' }).catch(()=>{});
-  }, 15000);
-  startWatch(); // تشغيل تتبّع الموقع
+    rUpdate(pRef,{ online:true, ts: Date.now(), ver:'driver-web-v7' }).catch(()=>{});
+  },15000);
+  startWatch();
 }
-
 function stopPresence(){
-  const uid = auth.currentUser?.uid; if(!uid) return;
   if(hbTimer){ clearInterval(hbTimer); hbTimer=null; }
-  try{ rUpdate(ref(rtdb, `drivers_presence/${uid}`), { online:false, desired:false, ts: Date.now() }); }catch(_){}
-  stopWatch(); // إيقاف تتبّع الموقع
+  try{ rUpdate(ref(rtdb,`drivers_presence/${uid}`), { online:false, desired:false, ts: Date.now() }); }catch(_){}
+  stopWatch();
 }
-
 function startWatch(){
-  const uid = auth.currentUser?.uid; if(!uid) return;
-  if(!('geolocation' in navigator)) return;
-  if(watchId != null) return;
-
-  const locRef = ref(rtdb, `drivers_locations/${uid}`); // المسار الذي تقرأه المطاعم/الأدمن
-
+  if(!("geolocation" in navigator)){ return; }
+  if(watchId!=null) return;
   watchId = navigator.geolocation.watchPosition(
     pos=>{
-      const { latitude:lat, longitude:lng, accuracy, speed, heading } = pos.coords;
-      const now = Date.now();
-      if(now - lastSentAt >= 4000){ // كل ≥4 ثوانٍ
-        rUpdate(locRef, {
-          lat: +lat.toFixed(6),
-          lng: +lng.toFixed(6),
-          accuracy: Number.isFinite(accuracy)? accuracy : null,
-          speed:    Number.isFinite(speed)?    speed    : null,
-          heading:  Number.isFinite(heading)?  heading  : null,
-          ts: now,
-          ver: 'driver-web-v7'
-        })
-        .then(()=>console.log('[LOC] write ->', lat, lng))
-        .catch(err=>console.error('RTDB update(loc) failed', err));
-        lastSentAt = now;
+      const { latitude:lat, longitude:lng, accuracy, speed } = pos.coords;
+      lastLL={lat,lng};
+      const now=Date.now();
+      if(now-lastSentAt>=4000){
+        rUpdate(ref(rtdb,`drivers_locations/${uid}`), { lat,lng, accuracy: Number.isFinite(accuracy)?accuracy:null, updatedAt: now }).catch(()=>{});
+        lastSentAt=now;
       }
     },
-    err=>console.warn('GPS', err),
+    _=>{},
     { enableHighAccuracy:true, maximumAge:1000, timeout:10000 }
   );
 }
-
-function stopWatch(){
-  if(watchId != null){
-    try{ navigator.geolocation.clearWatch(watchId); }catch(_){}
-    watchId = null;
-  }
-}
-
-
+function stopWatch(){ if(watchId!=null){ try{ navigator.geolocation.clearWatch(watchId); }catch(_){ } watchId=null; } }
 /* ===== Orders ===== */
 let unsubOrders=null, unsubInbox=null;
 function detachOrders(){ unsubOrders?.(); unsubOrders=null; ordersInfo.textContent="—"; listEl.innerHTML=""; }
