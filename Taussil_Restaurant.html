@@ -1012,40 +1012,30 @@ function haversine(a,b){
   return 2*R*Math.asin(Math.sqrt(s));
 }
 let restGeocoded=false;
-function updateMapAndDistance(dLat,dLng){
-  const distEl = document.getElementById('tripDistance');
-  const map = window.__map; if(!map) return;
-  if(window.__restPos){
-    window.__restMarker = window.__restMarker || new google.maps.Marker({map, label:'R'});
-    window.__restMarker.setPosition(window.__restPos);
+function updateMapAndDistance(lat, lng){
+  if(!window.__map || !window.google?.maps) return;
+
+  lat = Number(lat); lng = Number(lng);
+  if(!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+
+  if(!DRIVER_MARKER){
+    DRIVER_MARKER = new google.maps.Marker({ map: window.__map, label:'D' });
   }
-  if(!restGeocoded && hiddenDefaults.Restaurant_Adresse){
-    const geocoder = new google.maps.Geocoder();
-    geocoder.geocode({address:hiddenDefaults.Restaurant_Adresse}, (res,status)=>{
-      if(status==='OK' && res[0]){
-        const p=res[0].geometry.location;
-        window.__restPos={lat:p.lat(), lng:p.lng()};
-        restGeocoded=true;
-        ls.set(LS_REST_POS, window.__restPos);
-        map.setCenter(window.__restPos);
-        computeRouteAndETA({lat:dLat, lng:dLng});
-        window.__restMarker = window.__restMarker || new google.maps.Marker({map, label:'R'});
-        window.__restMarker.setPosition(window.__restPos);
-      }
-    });
+  DRIVER_MARKER.setPosition({ lat, lng });
+
+  if(!DID_FIT){
+    DID_FIT = true;
+    if(window.__restPos){
+      const b = new google.maps.LatLngBounds();
+      b.extend(window.__restPos); b.extend({lat, lng});
+      window.__map.fitBounds(b);
+    }else{
+      window.__map.setCenter({lat, lng});
+      if(!window.__map.getZoom() || window.__map.getZoom()<14) window.__map.setZoom(14);
+    }
   }
-  window.__driverMarker = window.__driverMarker || new google.maps.Marker({map, label:'D'});
-  window.__driverMarker.setPosition({lat:dLat,lng:dLng});
-  if(window.__restPos){
-    const d = haversine(window.__restPos, {lat:dLat,lng:dLng});
-    if(distEl) distEl.textContent = (d||0).toFixed(2)+' km';
-    const bounds=new google.maps.LatLngBounds();
-    bounds.extend(new google.maps.LatLng(window.__restPos.lat, window.__restPos.lng));
-    bounds.extend(new google.maps.LatLng(dLat, dLng));
-    map.fitBounds(bounds, {top:60,bottom:60,left:60,right:60});
-  }
-  computeRouteAndETA({lat:dLat, lng:dLng});
 }
+
 /* === Realtime tracking + Directions/ETA === */
 let lastRouteTs = 0;
 let lastETARoundedSec = null;
@@ -1077,6 +1067,8 @@ function ensureDirections(){
   return true;
 }
 /* === ETM Live (to pickup): لا نعيد ضبط الهدف عند كل تحديث — نحدده مرة واحدة ونضيف Buffer === */
+let DRIVER_MARKER = null;
+  let DID_FIT = false;
 function computeRouteAndETA(driverPos){
   if(!window.__restPos || !ensureDirections()) return;
   const now = Date.now();
