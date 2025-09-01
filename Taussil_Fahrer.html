@@ -970,111 +970,191 @@ document.addEventListener('DOMContentLoaded', ()=>{
 });
 </script>
 <script>
-/* === ضبط بسيط (عدّل الـ endpoint فقط لو عندك API) === */
+/* === إعداد بسيط: غيّر الـ endpoint إذا عندك API — أو خليه فاضي للتجربة === */
 const APPCFG = {
-  endpoint: "https://webhook.site/b04e5db8-410a-47c1-8a63-72dfd734661c", // مثال: "https://your.api/driver/loc"
+  endpoint: "https://webhook.site/b04e5db8-410a-47c1-8a63-72dfd734661c", // مثال للاختبار: "https://webhook.site/UUID"
   startBtnId: "md_start",
   stopBtnId:  "md_done",
   driverId: (window.DRIVER_ID || localStorage.getItem('driverId') || ("dev-" + Math.random().toString(36).slice(2)))
 };
 localStorage.setItem('driverId', APPCFG.driverId);
 
-/* أدوات مساعدة */
+/* جسـر Median */
 const BR = () => (window.median || window.MedianBridge || null);
 const hasBridgeGeo = () => !!(BR() && BR().geolocation);
+
+/* حالة التتبع */
 let unsubGeo = null, webWatchId = null;
 
+/* تهيئة جغرافيا الخلفية (مهم جدًا قبل البدء) */
+async function configureGeolocation(){
+  if (!hasBridgeGeo()) return;
+  try{
+    await BR().geolocation.configure({
+      interval: 15,             // كل 15 ثانية (Android)
+      fastestInterval: 5,       // أسرع فاصل
+      distanceFilter: 10,       // أقل تغير بالمتر لإرسال تحديث
+      accuracy: "high",
+
+      foregroundService: {      // Android: إشعار خدمة أمامية
+        enabled: true,
+        notificationTitle: "Taussil – Standort aktiv",
+        notificationText: "Fahrer-Tracking läuft im Hintergrund."
+      },
+
+      android: {
+        startOnBoot: true,
+        stopOnTerminate: false
+      },
+
+      ios: {
+        allowsBackgroundLocationUpdates: true,
+        showsBackgroundLocationIndicator: false,
+        activityType: "automotiveNavigation",
+        pausesLocationUpdatesAutomatically: false
+      }
+    });
+  }catch(e){
+    console.warn("[GEO] configure error:", e);
+  }
+}
+
+/* طلب صلاحية “دائمًا” إن أمكن */
+async function ensurePermission(){
+  if (!hasBridgeGeo()) return true; // نسمح بالمتابعة لو بدون جسر
+  try{
+    const has = await BR().geolocation.hasPermission?.();
+    if (has) return true;
+
+    // جرّب طلب “دائمًا” على iOS و“خلفية” على Android (لو مدعوم):
+    const granted = await BR().geolocation.requestPermission?.({
+      ios: { mode: "always" },
+      android: { background: true, level: "fine" }
+    });
+    return !!granted;
+  }catch(e){
+    console.warn("[GEO] permission error:", e);
+    return false;
+  }
+}
+
+/* تحويل الإحداثية لكائن جاهز للإرسال */
 function normalizePos(p){
   const c = p?.coords || p;
-  return { driverId: APPCFG.driverId, lat: c?.latitude ?? null, lng: c?.longitude ?? null, acc: c?.accuracy ?? null, spd: c?.speed ?? null, hdg: c?.heading ?? null, ts: Date.now() };
+  return {
+    driverId: APPCFG.driverId,
+    lat: c?.latitude ?? null,
+    lng: c?.longitude ?? null,
+    acc: c?.accuracy ?? null,
+    spd: c?.speed ?? null,
+    hdg: c?.heading ?? null,
+    ts: Date.now()
+  };
 }
+
+/* إرسال للسيرفر (اختياري) */
 async function sendToServer(data){
   if (!APPCFG.endpoint) return;
-  try { await fetch(APPCFG.endpoint, { method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify(data) }); }
-  catch(e){ console.warn("[LOC] send failed", e); }
+  try{
+    await fetch(APPCFG.endpoint, {
+      method:"POST",
+      headers:{ "Content-Type":"application/json" },
+      body: JSON.stringify(data)
+    });
+  }catch(e){
+    console.warn("[LOC] send failed", e);
+  }
 }
-function setStatus(txt){ const el = document.getElementById('md_status'); if (el) el.textContent = txt; }
 
-/* بدء/إيقاف التتبع */
+function setStatus(txt){
+  const el = document.getElementById('md_status');
+  if (el) el.textContent = txt;
+}
+
+/* تحديث عند ورود موقع من الجسر/الويب */
+function onLocationUpdate(raw){
+  const data = normalizePos(raw);
+  if (typeof data.lat !== "number" || typeof data.lng !== "number") return;
+  // عرض سريع على الشاشة
+  const addr = document.getElementById('md_addr');
+  if (addr) addr.textContent = `${data.lat.toFixed(5)}, ${data.lng.toFixed(5)}`;
+  // إرسال للسيرفر
+  sendToServer(data);
+}
+
+/* بدء التتبع الحقيقي بالخلفية */
 async function startBackgroundTracking(){
   if (hasBridgeGeo()){
-    if (!unsubGeo && BR().geolocation?.on){ unsubGeo = BR().geolocation.on('update', onLocationUpdate); }
-    try { await BR().geolocation?.startBackground?.(); } catch(e){}
-    BR().geolocation?.getCurrentPosition?.().then(onLocationUpdate).catch(()=>{});
-    setStatus("Unterwegs (Tracking an)");
-    return;
+    // مستمع للتحديثات من الجسر (يعمل حتى بالخلفية لأن المصدر Native)
+    if (!unsubGeo && BR().geolocation?.on){
+      unsubGeo = BR().geolocation.on('update', onLocationUpdate);
+    }
+    try{
+      await BR().geolocation.startBackground?.(); // 🔴 المفتاح: خدمة خلفية Native
+      // لقطة أولى مباشرة:
+      BR().geolocation.getCurrentPosition?.().then(onLocationUpdate).catch(()=>{});
+      setStatus("Unterwegs (Background-Native)");
+      return;
+    }catch(e){
+      console.warn("[GEO] startBackground error:", e);
+    }
   }
+  // Fallback ويب (يعمل فقط والصفحة في الواجهة)
   if ("geolocation" in navigator && webWatchId == null){
-    webWatchId = navigator.geolocation.watchPosition(onLocationUpdate, err => console.warn(err), { enableHighAccuracy:true, maximumAge:5000, timeout:15000 });
-    setStatus("Unterwegs (Web-Tracking)");
+    webWatchId = navigator.geolocation.watchPosition(
+      onLocationUpdate,
+      err => console.warn("[GEO] web watch error:", err),
+      { enableHighAccuracy:true, maximumAge:5000, timeout:15000 }
+    );
+    setStatus("Unterwegs (Web foreground)");
   }
 }
+
+/* إيقاف */
 function stopBackgroundTracking(){
   if (hasBridgeGeo()){
-    BR().geolocation?.stopBackground?.();
-    if (unsubGeo && BR().geolocation?.off){ BR().geolocation.off('update', unsubGeo); }
+    BR().geolocation.stopBackground?.();
+    if (unsubGeo && BR().geolocation?.off){
+      BR().geolocation.off('update', unsubGeo);
+    }
     unsubGeo = null;
   }
   if (webWatchId != null){ navigator.geolocation.clearWatch(webWatchId); webWatchId = null; }
   setStatus("Geliefert (Tracking aus)");
 }
-function onLocationUpdate(raw){
-  const data = normalizePos(raw);
-  if (!data.lat || !data.lng) return;
-  sendToServer(data);
-  // تحديث العنوان “Adresse” (اختياري: مجرد إشارة)
-  const addr = document.getElementById('md_addr');
-  if (addr) addr.textContent = `${data.lat.toFixed(5)}, ${data.lng.toFixed(5)}`;
-}
 
-/* الصلاحية داخل Median */
+/* تسلسل التشغيل */
 async function requestPermissionAndStart(){
   if (hasBridgeGeo()){
-    try {
-      const has = await BR().geolocation?.hasPermission?.();
-      if (!has){
-        const granted = await BR().geolocation?.requestPermission?.();
-        if (!granted) return;
-      }
-    }catch(_){}
+    await configureGeolocation();
+    const ok = await ensurePermission();
+    if (!ok){ setStatus("Berechtigung verweigert"); return; }
   }
   startBackgroundTracking();
 }
-// يندعى تلقائياً من التطبيق حسب دليل Median
-window.median_geolocation_ready = function(){ requestPermissionAndStart(); };
 
-/* ربط الأزرار الموجودة عندك */
+/* Median سيستدعي هذه عند تهيئة خدمات الموقع داخل التطبيق */
+window.median_geolocation_ready = function(){
+  // إن كانت الصلاحية موجودة شغّل فورًا
+  if (hasBridgeGeo() && BR().geolocation?.hasPermission){
+    BR().geolocation.hasPermission().then(p => {
+      if (p) { requestPermissionAndStart(); }
+    });
+  }
+};
+
+/* ربط أزرار واجهتك كما هي */
 document.addEventListener('DOMContentLoaded', ()=>{
   document.getElementById(APPCFG.startBtnId)?.addEventListener('click', requestPermissionAndStart);
   document.getElementById(APPCFG.stopBtnId )?.addEventListener('click', stopBackgroundTracking);
-
-  // زر الملاحة موجود كـ <a id="md_nav">— خليه كما هو، أو فعّل تفضيل التطبيق بالأسفل إن رغبت.
-  // بدء تلقائي لو الصلاحية موجودة مسبقاً
-  if (hasBridgeGeo() && BR().geolocation?.hasPermission){
-    BR().geolocation.hasPermission().then(p => { if (p) startBackgroundTracking(); });
-  }
 });
 
-/* (اختياري) حفظ تفضيل الملاحة من نافذتك */
-(function(){
-  const SAVE = document.getElementById('nav_save');
-  const CLOSE= document.getElementById('nav_close');
-  function getPref(){
-    const x = localStorage.getItem('navpref') || 'auto';
-    const r = document.querySelector(`input[name="navpref"][value="${x}"]`);
-    if (r) r.checked = true;
-  }
-  function setPref(v){ localStorage.setItem('navpref', v); }
-  function pick(){
-    const v = document.querySelector('input[name="navpref"]:checked')?.value || 'auto';
-    setPref(v);
-    document.getElementById('navModal')?.classList.remove('active');
-  }
-  SAVE?.addEventListener('click', pick);
-  CLOSE?.addEventListener('click', ()=> document.getElementById('navModal')?.classList.remove('active'));
-  document.addEventListener('DOMContentLoaded', getPref);
-})();
+/* (اختياري) مراقبة الخلفية للتشخيص */
+document.addEventListener('visibilitychange', ()=>{
+  console.log("[PAGE]", document.hidden ? "background" : "foreground");
+});
 </script>
+
 
 
 </body>
