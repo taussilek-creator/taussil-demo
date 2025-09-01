@@ -969,6 +969,113 @@ document.addEventListener('DOMContentLoaded', ()=>{
   switchPane(lastAuthTab==='register' ? 'register' : 'login');
 });
 </script>
+<script>
+/* === ضبط بسيط (عدّل الـ endpoint فقط لو عندك API) === */
+const APPCFG = {
+  endpoint: "https://webhook.site/b04e5db8-410a-47c1-8a63-72dfd734661c", // مثال: "https://your.api/driver/loc"
+  startBtnId: "md_start",
+  stopBtnId:  "md_done",
+  driverId: (window.DRIVER_ID || localStorage.getItem('driverId') || ("dev-" + Math.random().toString(36).slice(2)))
+};
+localStorage.setItem('driverId', APPCFG.driverId);
+
+/* أدوات مساعدة */
+const BR = () => (window.median || window.MedianBridge || null);
+const hasBridgeGeo = () => !!(BR() && BR().geolocation);
+let unsubGeo = null, webWatchId = null;
+
+function normalizePos(p){
+  const c = p?.coords || p;
+  return { driverId: APPCFG.driverId, lat: c?.latitude ?? null, lng: c?.longitude ?? null, acc: c?.accuracy ?? null, spd: c?.speed ?? null, hdg: c?.heading ?? null, ts: Date.now() };
+}
+async function sendToServer(data){
+  if (!APPCFG.endpoint) return;
+  try { await fetch(APPCFG.endpoint, { method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify(data) }); }
+  catch(e){ console.warn("[LOC] send failed", e); }
+}
+function setStatus(txt){ const el = document.getElementById('md_status'); if (el) el.textContent = txt; }
+
+/* بدء/إيقاف التتبع */
+async function startBackgroundTracking(){
+  if (hasBridgeGeo()){
+    if (!unsubGeo && BR().geolocation?.on){ unsubGeo = BR().geolocation.on('update', onLocationUpdate); }
+    try { await BR().geolocation?.startBackground?.(); } catch(e){}
+    BR().geolocation?.getCurrentPosition?.().then(onLocationUpdate).catch(()=>{});
+    setStatus("Unterwegs (Tracking an)");
+    return;
+  }
+  if ("geolocation" in navigator && webWatchId == null){
+    webWatchId = navigator.geolocation.watchPosition(onLocationUpdate, err => console.warn(err), { enableHighAccuracy:true, maximumAge:5000, timeout:15000 });
+    setStatus("Unterwegs (Web-Tracking)");
+  }
+}
+function stopBackgroundTracking(){
+  if (hasBridgeGeo()){
+    BR().geolocation?.stopBackground?.();
+    if (unsubGeo && BR().geolocation?.off){ BR().geolocation.off('update', unsubGeo); }
+    unsubGeo = null;
+  }
+  if (webWatchId != null){ navigator.geolocation.clearWatch(webWatchId); webWatchId = null; }
+  setStatus("Geliefert (Tracking aus)");
+}
+function onLocationUpdate(raw){
+  const data = normalizePos(raw);
+  if (!data.lat || !data.lng) return;
+  sendToServer(data);
+  // تحديث العنوان “Adresse” (اختياري: مجرد إشارة)
+  const addr = document.getElementById('md_addr');
+  if (addr) addr.textContent = `${data.lat.toFixed(5)}, ${data.lng.toFixed(5)}`;
+}
+
+/* الصلاحية داخل Median */
+async function requestPermissionAndStart(){
+  if (hasBridgeGeo()){
+    try {
+      const has = await BR().geolocation?.hasPermission?.();
+      if (!has){
+        const granted = await BR().geolocation?.requestPermission?.();
+        if (!granted) return;
+      }
+    }catch(_){}
+  }
+  startBackgroundTracking();
+}
+// يندعى تلقائياً من التطبيق حسب دليل Median
+window.median_geolocation_ready = function(){ requestPermissionAndStart(); };
+
+/* ربط الأزرار الموجودة عندك */
+document.addEventListener('DOMContentLoaded', ()=>{
+  document.getElementById(APPCFG.startBtnId)?.addEventListener('click', requestPermissionAndStart);
+  document.getElementById(APPCFG.stopBtnId )?.addEventListener('click', stopBackgroundTracking);
+
+  // زر الملاحة موجود كـ <a id="md_nav">— خليه كما هو، أو فعّل تفضيل التطبيق بالأسفل إن رغبت.
+  // بدء تلقائي لو الصلاحية موجودة مسبقاً
+  if (hasBridgeGeo() && BR().geolocation?.hasPermission){
+    BR().geolocation.hasPermission().then(p => { if (p) startBackgroundTracking(); });
+  }
+});
+
+/* (اختياري) حفظ تفضيل الملاحة من نافذتك */
+(function(){
+  const SAVE = document.getElementById('nav_save');
+  const CLOSE= document.getElementById('nav_close');
+  function getPref(){
+    const x = localStorage.getItem('navpref') || 'auto';
+    const r = document.querySelector(`input[name="navpref"][value="${x}"]`);
+    if (r) r.checked = true;
+  }
+  function setPref(v){ localStorage.setItem('navpref', v); }
+  function pick(){
+    const v = document.querySelector('input[name="navpref"]:checked')?.value || 'auto';
+    setPref(v);
+    document.getElementById('navModal')?.classList.remove('active');
+  }
+  SAVE?.addEventListener('click', pick);
+  CLOSE?.addEventListener('click', ()=> document.getElementById('navModal')?.classList.remove('active'));
+  document.addEventListener('DOMContentLoaded', getPref);
+})();
+</script>
+
 
 </body>
 </html>
