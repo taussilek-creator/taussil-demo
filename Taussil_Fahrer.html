@@ -970,9 +970,9 @@ document.addEventListener('DOMContentLoaded', ()=>{
 });
 </script>
 <script>
-/* === إعداد بسيط: غيّر الـ endpoint إذا عندك API — أو خليه فاضي للتجربة === */
+/* إعداد */
 const APPCFG = {
-  endpoint: "https://webhook.site/b04e5db8-410a-47c1-8a63-72dfd734661c", // مثال للاختبار: "https://webhook.site/UUID"
+  endpoint: "https://webhook.site/b04e5db8-410a-47c1-8a63-72dfd734661c", // ← ضع ويبهوكك/السيرفر هنا
   startBtnId: "md_start",
   stopBtnId:  "md_done",
   driverId: (window.DRIVER_ID || localStorage.getItem('driverId') || ("dev-" + Math.random().toString(36).slice(2)))
@@ -983,62 +983,21 @@ localStorage.setItem('driverId', APPCFG.driverId);
 const BR = () => (window.median || window.MedianBridge || null);
 const hasBridgeGeo = () => !!(BR() && BR().geolocation);
 
-/* حالة التتبع */
-let unsubGeo = null, webWatchId = null;
+/* حالة */
+let unsubGeo = null, webWatchId = null, bgTimer = null;
 
-/* تهيئة جغرافيا الخلفية (مهم جدًا قبل البدء) */
-async function configureGeolocation(){
-  if (!hasBridgeGeo()) return;
-  try{
-    await BR().geolocation.configure({
-      interval: 15,             // كل 15 ثانية (Android)
-      fastestInterval: 5,       // أسرع فاصل
-      distanceFilter: 10,       // أقل تغير بالمتر لإرسال تحديث
-      accuracy: "high",
-
-      foregroundService: {      // Android: إشعار خدمة أمامية
-        enabled: true,
-        notificationTitle: "Taussil – Standort aktiv",
-        notificationText: "Fahrer-Tracking läuft im Hintergrund."
-      },
-
-      android: {
-        startOnBoot: true,
-        stopOnTerminate: false
-      },
-
-      ios: {
-        allowsBackgroundLocationUpdates: true,
-        showsBackgroundLocationIndicator: false,
-        activityType: "automotiveNavigation",
-        pausesLocationUpdatesAutomatically: false
-      }
+/* إرسال للسيرفر */
+async function sendToServer(data){
+  if (!APPCFG.endpoint) return;
+  try {
+    await fetch(APPCFG.endpoint, {
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body: JSON.stringify(data)
     });
-  }catch(e){
-    console.warn("[GEO] configure error:", e);
-  }
+  } catch(e){ console.warn("[LOC] send failed", e); }
 }
-
-/* طلب صلاحية “دائمًا” إن أمكن */
-async function ensurePermission(){
-  if (!hasBridgeGeo()) return true; // نسمح بالمتابعة لو بدون جسر
-  try{
-    const has = await BR().geolocation.hasPermission?.();
-    if (has) return true;
-
-    // جرّب طلب “دائمًا” على iOS و“خلفية” على Android (لو مدعوم):
-    const granted = await BR().geolocation.requestPermission?.({
-      ios: { mode: "always" },
-      android: { background: true, level: "fine" }
-    });
-    return !!granted;
-  }catch(e){
-    console.warn("[GEO] permission error:", e);
-    return false;
-  }
-}
-
-/* تحويل الإحداثية لكائن جاهز للإرسال */
+function setStatus(txt){ const el = document.getElementById('md_status'); if (el) el.textContent = txt; }
 function normalizePos(p){
   const c = p?.coords || p;
   return {
@@ -1052,61 +1011,126 @@ function normalizePos(p){
   };
 }
 
-/* إرسال للسيرفر (اختياري) */
-async function sendToServer(data){
-  if (!APPCFG.endpoint) return;
+/* 1) تهيئة خدمة الموقع (Native) بفواصل قصيرة */
+async function configureGeolocation(){
+  if (!hasBridgeGeo()) return;
   try{
-    await fetch(APPCFG.endpoint, {
-      method:"POST",
-      headers:{ "Content-Type":"application/json" },
-      body: JSON.stringify(data)
+    await BR().geolocation.configure({
+      interval: 4,               // هدفنا 4 ثوان (Android) — النظام قد يبطّئ بالخلفية
+      fastestInterval: 2,
+      distanceFilter: 5,         // أرسل عند تحرّك ≥ 5 م
+      accuracy: "high",
+      foregroundService: {
+        enabled: true,
+        notificationTitle: "Taussil – Standort aktiv",
+        notificationText: "Fahrer-Tracking läuft im Hintergrund."
+      },
+      android: {
+        startOnBoot: true,
+        stopOnTerminate: false
+      },
+      ios: {
+        allowsBackgroundLocationUpdates: true,
+        showsBackgroundLocationIndicator: false,
+        activityType: "automotiveNavigation",
+        pausesLocationUpdatesAutomatically: false
+      }
     });
-  }catch(e){
-    console.warn("[LOC] send failed", e);
-  }
+
+    /* 1.a) لو جسر ميديان عنده مزية مزامنة أصلية للـHTTP (Auto-sync)، جرّب نفعّلها (اختياري/محمي) */
+    if (BR().geolocation.setHttpConfig){ // بعض الإصدارات قد تدعم هالكول
+      BR().geolocation.setHttpConfig({
+        url: APPCFG.endpoint,
+        method: "POST",
+        headers: { "Content-Type":"application/json" },
+        autoSync: true  // ← خليه يرسل من الـNative حتى لو JS نايم
+      });
+    }
+  }catch(e){ console.warn("[GEO] configure error:", e); }
 }
 
-function setStatus(txt){
-  const el = document.getElementById('md_status');
-  if (el) el.textContent = txt;
+/* 2) صلاحيات Always/Background */
+async function ensurePermission(){
+  if (!hasBridgeGeo()) return true;
+  try{
+    const ok = await BR().geolocation.hasPermission?.();
+    if (ok) return true;
+    const granted = await BR().geolocation.requestPermission?.({
+      ios: { mode: "always" },
+      android: { background: true, level: "fine" }
+    });
+    return !!granted;
+  }catch(e){ console.warn("[GEO] permission error:", e); return false; }
 }
 
-/* تحديث عند ورود موقع من الجسر/الويب */
+/* 3) استماع للتحديثات (لما JS صاحي) + طلب لقطة وإرسال */
 function onLocationUpdate(raw){
   const data = normalizePos(raw);
   if (typeof data.lat !== "number" || typeof data.lng !== "number") return;
-  // عرض سريع على الشاشة
   const addr = document.getElementById('md_addr');
   if (addr) addr.textContent = `${data.lat.toFixed(5)}, ${data.lng.toFixed(5)}`;
-  // إرسال للسيرفر
   sendToServer(data);
 }
 
-/* بدء التتبع الحقيقي بالخلفية */
+/* 4) تشغيل خدمة الخلفية Native */
 async function startBackgroundTracking(){
   if (hasBridgeGeo()){
-    // مستمع للتحديثات من الجسر (يعمل حتى بالخلفية لأن المصدر Native)
     if (!unsubGeo && BR().geolocation?.on){
       unsubGeo = BR().geolocation.on('update', onLocationUpdate);
     }
     try{
-      await BR().geolocation.startBackground?.(); // 🔴 المفتاح: خدمة خلفية Native
-      // لقطة أولى مباشرة:
+      await BR().geolocation.startBackground?.(); // تشغيل خدمة الموقع بالخلفية (Native)
+      // لقطة أولى:
       BR().geolocation.getCurrentPosition?.().then(onLocationUpdate).catch(()=>{});
-      setStatus("Unterwegs (Background-Native)");
-      return;
-    }catch(e){
-      console.warn("[GEO] startBackground error:", e);
-    }
-  }
-  // Fallback ويب (يعمل فقط والصفحة في الواجهة)
-  if ("geolocation" in navigator && webWatchId == null){
+      setStatus("Unterwegs (Native)");
+    }catch(e){ console.warn("[GEO] startBackground error:", e); }
+  } else if ("geolocation" in navigator && webWatchId == null){
+    // Fallback الويب — يعمل فقط والواجهة مفتوحة
     webWatchId = navigator.geolocation.watchPosition(
       onLocationUpdate,
       err => console.warn("[GEO] web watch error:", err),
-      { enableHighAccuracy:true, maximumAge:5000, timeout:15000 }
+      { enableHighAccuracy:true, maximumAge:3000, timeout:10000 }
     );
-    setStatus("Unterwegs (Web foreground)");
+    setStatus("Unterwegs (Web)");
+  }
+
+  /* 5) (اختياري/ملاذ أخير) إبقاء نبض JS ببداية/إيقاف خدمة صوتية بالخلفية */
+  if (BR()?.audio?.startBackground && BR()?.audio?.stopBackground){
+    document.addEventListener('visibilitychange', async ()=>{
+      try{
+        if (document.hidden){
+          await BR().audio.startBackground(); // يطلب صلاحية الخلفية للصوت
+          if (!bgTimer){
+            // خذ لقطة كل 10 ثواني كـ “Heartbeat”
+            bgTimer = setInterval(async ()=>{
+              if (hasBridgeGeo() && BR().geolocation?.getCurrentPosition){
+                try {
+                  const p = await BR().geolocation.getCurrentPosition();
+                  onLocationUpdate(p);
+                } catch(_){}
+              }
+            }, 10000);
+          }
+        } else {
+          clearInterval(bgTimer); bgTimer = null;
+          await BR().audio.stopBackground();
+        }
+      }catch(e){ console.warn("[AUDIO] bg err:", e); }
+    });
+  }
+
+  /* 6) إن كان عندك BackgroundFetch في الجسر، استعمله لتيقّظ دوري */
+  if (BR()?.backgroundFetch?.configure){
+    BR().backgroundFetch.configure({ minimumFetchInterval: 15 }, async ()=>{
+      try{
+        if (hasBridgeGeo() && BR().geolocation?.getCurrentPosition){
+          const p = await BR().geolocation.getCurrentPosition();
+          onLocationUpdate(p);
+        }
+      }finally{
+        BR().backgroundFetch.finish?.();
+      }
+    });
   }
 }
 
@@ -1114,12 +1138,11 @@ async function startBackgroundTracking(){
 function stopBackgroundTracking(){
   if (hasBridgeGeo()){
     BR().geolocation.stopBackground?.();
-    if (unsubGeo && BR().geolocation?.off){
-      BR().geolocation.off('update', unsubGeo);
-    }
+    if (unsubGeo && BR().geolocation?.off){ BR().geolocation.off('update', unsubGeo); }
     unsubGeo = null;
   }
   if (webWatchId != null){ navigator.geolocation.clearWatch(webWatchId); webWatchId = null; }
+  if (bgTimer){ clearInterval(bgTimer); bgTimer = null; }
   setStatus("Geliefert (Tracking aus)");
 }
 
@@ -1133,27 +1156,20 @@ async function requestPermissionAndStart(){
   startBackgroundTracking();
 }
 
-/* Median سيستدعي هذه عند تهيئة خدمات الموقع داخل التطبيق */
+/* Median يناديها لما يجهّز خدمات الموقع داخل التطبيق */
 window.median_geolocation_ready = function(){
-  // إن كانت الصلاحية موجودة شغّل فورًا
   if (hasBridgeGeo() && BR().geolocation?.hasPermission){
-    BR().geolocation.hasPermission().then(p => {
-      if (p) { requestPermissionAndStart(); }
-    });
+    BR().geolocation.hasPermission().then(p => { if (p) requestPermissionAndStart(); });
   }
 };
 
-/* ربط أزرار واجهتك كما هي */
+/* ربط الأزرار (IDs كما هي عندك) */
 document.addEventListener('DOMContentLoaded', ()=>{
   document.getElementById(APPCFG.startBtnId)?.addEventListener('click', requestPermissionAndStart);
   document.getElementById(APPCFG.stopBtnId )?.addEventListener('click', stopBackgroundTracking);
 });
-
-/* (اختياري) مراقبة الخلفية للتشخيص */
-document.addEventListener('visibilitychange', ()=>{
-  console.log("[PAGE]", document.hidden ? "background" : "foreground");
-});
 </script>
+
 
 
 
