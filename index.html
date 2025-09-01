@@ -1,18 +1,794 @@
 <!doctype html>
-<html lang="de" dir="rtl">
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Taussil — Demo</title>
-<style>
-  body{font-family:system-ui;margin:40px}
-  h1{margin-bottom:16px}
-  .grid{display:grid;gap:14px;max-width:420px}
-  a{display:block;padding:14px 16px;border:1px solid #ddd;border-radius:12px;text-decoration:none}
-</style>
-<h1>Auswahl</h1>
-<div class="grid">
-  <a href="./Taussil_Restaurant.html">Restaurant</a>
-  <a href="./Taussil_Fahrer.html">Fahrer</a>
-  <a href="./Taussil_Admin.html">Admin</a>
-</div>
+<html lang="de" dir="ltr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Taussil — Landing</title>
+  <style>
+    :root{ --bg:#ffffff; --accent:#22211D; --text:#22211D; --muted:#6b6b6b; --card:#f7f7f7; --ring: rgba(34,33,29,.12); --shadow: 0 6px 18px rgba(0,0,0,.08); --radius:18px; }
+    html,body{height:100%}
+    body{margin:0;background:var(--bg);color:var(--text);font:16px/1.6 system-ui,-apple-system,Segoe UI,Roboto,"Noto Kufi Arabic",sans-serif}
+    a{color:inherit;text-decoration:none}
+    .container{max-width:1100px;margin:0 auto;padding:20px}
+    header{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:10px 0}
+    .logoWrap{display:flex;align-items:center;gap:12px}
+    .logo{width:44px;height:44px;border-radius:12px;background:#eee;display:grid;place-items:center;box-shadow:var(--shadow)}
+    .brand{font-weight:700;letter-spacing:.3px}
+
+    .tools{display:flex;gap:10px;align-items:center}
+    .lang select{padding:8px 12px;border-radius:12px;border:1px solid #e7e7e7;cursor:pointer}
+
+    .btn{display:inline-flex;align-items:center;justify-content:center;gap:10px;padding:12px 16px;border-radius:14px;border:1px solid #e7e7e7;background:#fff;box-shadow:var(--shadow);transition:.2s ease;cursor:pointer;font-weight:600}
+    .btn:active{transform:scale(.98)}
+    .btn-primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+
+    .hero{display:grid;grid-template-columns:1.2fr .8fr;gap:18px;align-items:center;padding:18px 0}
+    .hero h1{margin:0 0 8px;font-size:clamp(24px,4vw,34px)}
+    .hero p{margin:0;color:var(--muted)}
+    .ctaRow{display:flex;gap:10px;align-items:center;margin-top:14px}
+
+    /* Cards */
+    *,*::before,*::after{box-sizing:border-box}
+    .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px;margin-top:20px}
+    .card{border-radius:var(--radius);background:#fff;box-shadow:var(--shadow);border:1px solid #e5e5e5;display:flex;flex-direction:column;overflow:hidden}
+    .card-body{padding:16px;flex:1}
+    .card h3{margin:0 0 6px}
+    .card p{margin:0;color:var(--muted)}
+    .card-footer{padding:12px;border-top:1px solid #eee;background:#fff;display:flex;flex-direction:column;gap:10px}
+    .card-footer a{display:block;width:100%;text-align:center;padding:12px 14px;border-radius:12px;border:1px solid #e7e7e7;background:#fff;font-weight:600}
+    .card-footer a.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+    .card:hover{transform:translateY(-2px); box-shadow:0 10px 24px rgba(0,0,0,.12)}
+
+    /* Costs */
+    section.costs{margin:28px 0}
+    .pricingExpl{margin:14px 0 10px;background:#fff;border:1px solid #eee;border-radius:12px;padding:12px;box-shadow:0 4px 12px rgba(0,0,0,.04)}
+    .pricingExpl h3{margin:0 0 6px;font-size:16px}
+    .pricingExpl p{margin:0;color:var(--muted)}
+    .costGrid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+    .costItem{background:#fff;border:1px solid #eee;border-radius:14px;padding:14px;box-shadow:var(--shadow)}
+    .costItem h4{margin:0 0 8px;font-size:14px;color:var(--muted)}
+    .costItem .v{font-weight:700}
+    .calc{margin-top:14px;display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+    .calc input{padding:10px 12px;border-radius:12px;border:1px solid #ddd; min-width:140px}
+    .calc .total{margin-inline-start:auto;font-weight:800}
+    .note{color:var(--muted);font-size:13px;margin-top:6px}
+
+    /* Testimonials slider + form */
+    .testimonials{margin:40px 0}
+    .t-slider{display:flex;align-items:center;gap:10px}
+    .t-viewport{overflow:hidden;flex:1}
+    .testimonialGrid{display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(250px,1fr))}
+    .testimonialCard{background:#fff;border:1px solid #eee;border-radius:12px;padding:16px;box-shadow:var(--shadow)}
+    .testimonialCard p{margin:0 6px 0 0}
+    .t-arrow{min-width:40px;height:40px;border-radius:50%;border:1px solid #e5e5e5;background:#fff;box-shadow:var(--shadow);display:grid;place-items:center;cursor:pointer}
+    .t-arrow:active{transform:scale(.96)}
+    .stars{display:inline-flex;gap:2px;align-items:center}
+    .star{font-size:18px;line-height:1;color:#f5b301}
+    .star.dim{opacity:.25}
+
+    .t-form{margin-top:16px;background:#fff;border:1px solid #eee;border-radius:12px;padding:12px;box-shadow:0 4px 12px rgba(0,0,0,.04)}
+    .t-form h3{margin:0 0 8px;font-size:16px}
+    .t-form .row{display:grid;grid-template-columns:1fr;gap:10px}
+    .t-form input,.t-form textarea{width:100%;padding:10px 12px;border:1px solid #ddd;border-radius:10px}
+    .t-form .starsRow{display:flex;gap:6px}
+    .t-form .rate{font-size:20px;cursor:pointer;color:#bbb}
+    .t-form .rate.active{color:#f5b301}
+    .t-hint{margin-top:6px;font-size:12px;color:var(--muted)}
+    .visually-hidden{position:absolute!important;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+
+    /* Modal */
+    .modal{position:fixed;inset:0;display:none;place-items:center;background:rgba(0,0,0,.35)}
+    .modal.active{display:grid}
+    .sheet{background:#fff;border-radius:18px;box-shadow:var(--shadow);width:min(420px,92vw);padding:18px}
+    .sheet h3{margin:0 0 8px}
+    .storeBtns{display:flex;gap:10px}
+    .storeBtns a{flex:1;display:flex;align-items:center;justify-content:center;padding:12px;border-radius:12px;border:1px solid #e7e7e7;font-weight:700}
+    .storeBtns a.android{background:var(--accent);color:#fff;border-color:var(--accent)}
+    .storeBtns a.ios{opacity:.5;cursor:not-allowed}
+
+    footer{margin:26px 0;color:var(--muted);font-size:14px}
+
+    @media (max-width: 900px){ .hero{grid-template-columns:1fr} .costGrid{grid-template-columns:repeat(2,1fr)} }
+    @media (max-width: 540px){ .cards{grid-template-columns:1fr} .costGrid{grid-template-columns:1fr} }
+	/* ===== Design Uplift — paste at the END of your <style> ===== */
+
+/* ألوان/قِيَم إضافية خفيفة */
+:root{
+  --accent-2:#58564f;
+  --bg-tint:#f7f7f6;
+}
+
+/* خلفية ناعمة عامة بدون تغيير المساحات */
+body{
+  background:
+    radial-gradient(80% 40% at 10% -20%, #f3f3f1 0%, transparent 60%),
+    radial-gradient(70% 35% at 110% 0%, #f6f6f5 0%, transparent 60%),
+    var(--bg);
+}
+
+/* هيدر شبه زجاجي ثابت */
+header{
+  position: sticky; top: 0; z-index: 100;
+  background: rgba(255,255,255,.72);
+  backdrop-filter: saturate(1.2) blur(8px);
+  border-bottom: 1px solid #ececec;
+}
+
+/* الشعار */
+.logo{
+  border:1px solid #ececec;
+  background: linear-gradient(180deg,#fff,#f6f6f6);
+}
+
+/* أزرار بتفاعل أنيق */
+.btn{
+  transition: box-shadow .25s cubic-bezier(.2,.8,.2,1), transform .12s ease, background .25s;
+  border:1px solid #e7e7e7;
+}
+.btn:hover{ transform: translateY(-1px); box-shadow: 0 10px 24px rgba(0,0,0,.10); }
+.btn:focus-visible{ outline:none; box-shadow: 0 0 0 3px var(--ring), 0 6px 18px rgba(0,0,0,.10); }
+.btn-primary{
+  background: linear-gradient(135deg, var(--accent), #3a3934);
+  border-color: var(--accent);
+}
+
+/* شارة الهيرو */
+.chip{
+  display:inline-flex; align-items:center; gap:8px;
+  padding:10px 12px; border-radius:999px;
+  background:#fff; border:1px dashed #e5e5e5;
+  box-shadow: 0 4px 12px rgba(0,0,0,.04);
+}
+
+/* لوحة الهيرو ككرت كبير خفيف */
+.hero{
+  border:1px solid #eee; border-radius:20px; padding:22px;
+  background: linear-gradient(180deg,#fff,#fafafa);
+  box-shadow: 0 8px 28px rgba(0,0,0,.06);
+}
+
+/* بطاقات الخدمات — نفس المقاسات مع ملمس حديث */
+.card{
+  background: linear-gradient(180deg,#fff,#fbfbfb);
+  border:1px solid #e9e9e9;
+}
+.card:hover{
+  box-shadow: 0 14px 28px rgba(0,0,0,.12), 0 0 0 6px var(--ring);
+}
+.card-body{ padding:18px; }
+.card-footer{ background:#fff; border-top:1px solid #efefef; }
+
+/* ترويسة الأقسام بخط تحتي متدرّج */
+.costs h2,
+.testimonials h2{
+  position:relative; display:inline-block; padding-bottom:6px;
+}
+.costs h2::after,
+.testimonials h2::after{
+  content:""; position:absolute; inset-inline:0; bottom:0; height:3px; border-radius:3px;
+  background: linear-gradient(90deg, var(--accent), #8d8a83);
+}
+
+/* سكِن القسمين (بدون تغيير جريد/قياسات) */
+.costs,
+.testimonials{
+  position:relative;
+  padding:16px; border-radius:20px;
+  background: linear-gradient(180deg,#fff,#f9f9f9);
+  border:1px solid #eee;
+  box-shadow: 0 8px 24px rgba(0,0,0,.05);
+}
+
+/* صندوق الشرح والتكاليف */
+.pricingExpl{
+  border:1px solid #eee;
+  background: linear-gradient(180deg,#fff,#fafafa);
+}
+.costItem{
+  background: linear-gradient(180deg,#fff,#fafafa);
+  border-color:#eee;
+  box-shadow: 0 6px 20px rgba(0,0,0,.05);
+}
+.calc input{
+  background:#fff; border-color:#e5e5e5;
+}
+
+/* السلايدر */
+.t-arrow{
+  transition: .2s ease;
+}
+.t-arrow:hover{ transform: translateY(-1px); box-shadow: 0 8px 16px rgba(0,0,0,.10); }
+.testimonialCard{
+  background: linear-gradient(180deg,#fff,#fbfbfb);
+  border:1px solid #eee;
+  box-shadow: 0 6px 18px rgba(0,0,0,.06);
+}
+.stars .star{ text-shadow: 0 1px 0 rgba(0,0,0,.06); }
+
+/* الفوتر */
+footer{ border-top:1px solid #eee; }
+
+/* تجميل اختيار اللغة بدون تغيير العنصر نفسه */
+.lang select{
+  appearance:none; -webkit-appearance:none; -moz-appearance:none;
+  background:#fff url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16"><path d="M4 6l4 4 4-4" stroke="%236b6b6b" stroke-width="1.5" fill="none" stroke-linecap="round"/></svg>') no-repeat right 12px center;
+  padding-right:34px; box-shadow: var(--shadow); border:1px solid #e7e7e7;
+}
+
+/* دعم RTL تلقائي (بدون تغيير التخطيط) */
+[dir="rtl"] .chip{ direction: rtl; }
+:root{
+  /* غيّر المسار لملفك */
+  --wm: url("hintergrund.png");
+  --wm-opacity: .25;         /* ≈ 25% */
+}
+body::before{
+  content:"";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background-image: var(--wm);
+  background-size: cover;
+  background-position: center;
+  opacity: var(--wm-opacity);
+  mix-blend-mode: multiply;  /* يقلّل الوهج ويحافظ على التباين */
+  filter: saturate(.9) contrast(1.05);
+}
+/* تأكد أن المحتوى فوق العلامة المائية */
+.container, header, section, footer { position: relative; z-index: 1; }
+
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div class="logoWrap">
+        <img src="3000x3000.png" alt="Taussil Logo" class="logo">
+        <div>
+          <div class="brand">Taussil Lieferservice</div>
+          <div style="font-size:12px;color:var(--muted)" id="t-sub">dein Lieferpartner</div>
+        </div>
+      </div>
+      <div class="tools">
+        <div class="lang">
+          <select id="langSelect" aria-label="Language">
+            <option value="de">DE</option>
+            <option value="en">EN</option>
+            <option value="ar">AR</option>
+            <option value="tr">TR</option>
+          </select>
+        </div>
+        <button id="appBtn" class="btn btn-primary">
+          <img src="driver.png" alt="" style="width:20px;height:20px">
+          <span id="t-app">Fahrer-App</span>
+        </button>
+      </div>
+    </header>
+
+    <section class="hero">
+      <div>
+        <h1 id="t-hero-h">Wähle deinen Service & starte</h1>
+        <p id="t-hero-p">Restaurant-Ansicht für Bestellungen & Live-Tracking. Fahrer-Ansicht zum Losfahren.</p>
+        <div class="ctaRow">
+          <a class="btn" href="#costs" id="t-cta-costs">Kosten</a>
+          <a class="btn" href="#services" id="t-cta-start">Jetzt starten</a>
+        </div>
+      </div>
+      <div class="chip" id="t-chip">Pilotmodus — schnell & modern</div>
+    </section>
+
+    <section id="services" class="cards">
+      <article class="card">
+        <div class="card-body">
+          <h3 id="t-card-rest-h">Restaurant</h3>
+          <p id="t-card-rest-p">Bestellungen empfangen & erstellen, Fahrer disponieren, Status & Zahlungen steuern.</p>
+        </div>
+        <div class="card-footer">
+          <a class="primary" href="./Taussil_Restaurant.html" id="t-enter-rest">Zur Oberfläche</a>
+        </div>
+      </article>
+
+      <article class="card">
+        <div class="card-body">
+          <h3 id="t-card-fahr-h">Fahrer</h3>
+          <p id="t-card-fahr-p">Tour starten, Live-Tracking, Zustellung abschließen & Nachweis erfassen.</p>
+        </div>
+        <div class="card-footer">
+          <a class="primary" href="./Taussil_Fahrer.html" id="t-enter-fahr">Zur Oberfläche</a>
+        </div>
+      </article>
+    </section>
+
+    <section id="costs" class="costs">
+      <h2 style="margin:22px 0 10px" id="t-costs-h">Lieferkosten</h2>
+
+      <div class="pricingExpl">
+        <h3 id="t-expl-h">Wie berechnen wir?</h3>
+        <p id="t-expl-p">
+          Bis 5 km: Bestellungen ≤20 € kosten pauschal 3,50 €. Bei 20–25 €:
+          3,50 € + 0,10 €/km. Über 25 €: 14 % des Bestellwerts + 0,10 €/km.
+          Über 5 km kommen 0,40 €/km hinzu. Distanzaufschläge: &gt;15 km +0,50 €/km,
+          &gt;20 km zusätzlich +1,10 €/km.
+        </p>
+      </div>
+
+      <div class="costGrid" id="costGrid" data-base="3.50" data-included-km="2" data-per-km="1.20" data-wait-per-5="0.80">
+        <div class="costItem"><h4 id="t-c-base">Grundgebühr</h4><div class="v"><span id="cBase">3.50</span> €</div></div>
+        <div class="costItem"><h4 id="t-c-inc">Inklusive km</h4><div class="v"><span id="cInc">2</span> km</div></div>
+        <div class="costItem"><h4 id="t-c-per">Preis / km</h4><div class="v"><span id="cPer">1.20</span> €</div></div>
+        <div class="costItem"><h4 id="t-c-wait">Warten (je 5 Min)</h4><div class="v"><span id="cWait">0.80</span> €</div></div>
+      </div>
+      <div class="calc">
+        <label id="t-in-km">Distanz (km)
+          <input type="number" step="0.1" min="0" id="inKm" value="3.5">
+        </label>
+        <label id="t-in-amt">Betrag (€)
+          <input type="number" step="0.01" min="0" id="inAmt" value="0">
+        </label>
+        <label id="t-in-wait">Wartezeit (Min)
+          <input type="number" step="1" min="0" id="inWait" value="0">
+        </label>
+        <button id="calcBtn" class="btn btn-primary">OK</button>
+        <div class="total"><span id="t-total-lbl">Gesamt (geschätzt):</span> <span id="total">—</span> €</div>
+      </div>
+
+      <div style="margin-top:18px;text-align:center">
+        <a href="./Taussil_Restaurant.html" class="btn btn-primary" style="font-size:18px;padding:14px 20px" id="t-cta-after-costs">
+          Jetzt registrieren und Preise sichern
+        </a>
+      </div>
+    </section>
+
+    <!-- Testimonials -->
+    <section class="testimonials">
+      <h2 style="margin-bottom:16px;text-align:center" id="t-test-h">Was unsere Partner sagen</h2>
+
+      <div class="t-slider">
+        <button class="t-arrow" id="t-prev" aria-label="Prev">‹</button>
+        <div class="t-viewport">
+          <div id="t-cards" class="testimonialGrid"></div>
+        </div>
+        <button class="t-arrow" id="t-next" aria-label="Next">›</button>
+      </div>
+
+      <!-- Add review form -->
+      <form id="t-form" class="t-form" novalidate>
+        <h3 id="t-add-h">Bewertung hinzufügen</h3>
+        <div class="row">
+          <div>
+            <div id="t-rating-legend" style="margin-bottom:6px;font-weight:600">Ihre Bewertung</div>
+            <div class="starsRow" id="starsInput" aria-label="Rate from 1 to 5">
+              <span class="rate" data-v="1">★</span>
+              <span class="rate" data-v="2">★</span>
+              <span class="rate" data-v="3">★</span>
+              <span class="rate" data-v="4">★</span>
+              <span class="rate" data-v="5">★</span>
+              <input type="hidden" id="ratingVal" value="0" />
+            </div>
+          </div>
+          <input id="t-name" type="text" placeholder="Restaurant / Name (optional)">
+          <textarea id="t-text" rows="3" placeholder="Ihr Kommentar…" required></textarea>
+          <button type="submit" id="t-submit" class="btn btn-primary">Absenden</button>
+          <div class="t-hint" id="t-form-hint">Nur Kommentare und Sterne. Keine E-Mail benötigt.</div>
+        </div>
+      </form>
+    </section>
+
+    <footer>
+      <div>© <span id="y"></span> Taussil.</div>
+      <div style="margin-top:12px;text-align:center;font-size:13px;color:var(--muted)" id="t-trust">
+        ✅ DSGVO-konform | 🔒 Sichere Zahlungen | 🇩🇪 Made in Germany
+      </div>
+    </footer>
+  </div>
+
+  <!-- Modal: Driver App Stores -->
+  <div id="appModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="appTitle">
+    <div class="sheet">
+      <h3 id="appTitle">Fahrer-App</h3>
+      <p style="margin:0 0 10px;color:var(--muted)" id="t-app-sub">Android verfügbar — iOS bald.</p>
+      <div class="storeBtns">
+        <a id="androidLink" class="android" 
+           href="https://firebasestorage.googleapis.com/v0/b/taussil-lieferservice-8bbe9.firebasestorage.app/o/app-release.apk?alt=media&token=d6f1d66b-f536-41d7-b2ed-48bd54272a2c" 
+           target="_blank" rel="noopener">
+           Android
+        </a>
+        <a class="ios" href="javascript:void(0)" title="Bald">iOS (bald)</a>
+      </div>
+      <div style="text-align:center;margin-top:10px">
+        <button id="closeModal" class="btn" data-i18n="close">Schließen</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- UI + i18n + costs (no testimonials logic here) -->
+  <script>
+    // Footer year
+    document.addEventListener('DOMContentLoaded', ()=> {
+      const y = document.getElementById('y');
+      if (y) y.textContent = new Date().getFullYear();
+    });
+
+    // Modal wiring
+    (function(){
+      const appBtn = document.getElementById('appBtn');
+      const modal = document.getElementById('appModal');
+      const closeModal = document.getElementById('closeModal');
+      appBtn?.addEventListener('click', ()=> modal?.classList.add('active'));
+      closeModal?.addEventListener('click', ()=> modal?.classList.remove('active'));
+      modal?.addEventListener('click', (e)=>{ if(e.target === modal) modal.classList.remove('active'); });
+    })();
+
+    // Costs logic (pricing formula)
+    (function(){
+      const el = document.getElementById('costGrid');
+      if(!el) return;
+      const base = +el.dataset.base; const inc = +el.dataset.includedKm;
+      const per  = +el.dataset.perKm; const wait = +el.dataset.waitPer5;
+      const cBase = document.getElementById('cBase');
+      const cInc  = document.getElementById('cInc');
+      const cPer  = document.getElementById('cPer');
+      const cWait = document.getElementById('cWait');
+      cBase && (cBase.textContent = base.toFixed(2));
+      cInc  && (cInc.textContent  = inc.toFixed(0));
+      cPer  && (cPer.textContent  = per.toFixed(2));
+      cWait && (cWait.textContent = wait.toFixed(2));
+
+      function computeTotal(amount, km){
+        amount = Math.max(0, +amount || 0);
+        km     = Math.max(0, +km || 0);
+
+        let basePart;
+        if (amount <= 20 && km <= 5) {
+          basePart = 3.5;
+        } else if (amount > 20 && amount <= 25 && km <= 5) {
+          basePart = 3.5 + (0.10 * km);
+        } else if (amount > 25 && km <= 5) {
+          basePart = (amount * 0.14) + (0.10 * km);
+        } else if (amount <= 20 && km > 5) {
+          basePart = 3.5 + (0.50 * (km - 5));
+        } else if (amount > 20 && amount <= 25 && km > 5) {
+          basePart = (3.5 + (0.10 * km)) + (0.40 * (km - 5));
+        } else if (amount > 25 && km > 5) {
+          basePart = ((amount * 0.14) + (0.10 * km)) + (0.40 * (km - 5));
+        } else {
+          basePart = 0;
+        }
+
+        let surcharge = 0;
+        if (km > 20) {
+          surcharge = (0.50 * (20 - 15)) + (1.10 * (km - 20));
+        } else if (km > 15) {
+          surcharge = 0.50 * (km - 15);
+        }
+
+        return basePart + surcharge;
+      }
+
+      const btn = document.getElementById('calcBtn');
+      btn?.addEventListener('click', ()=>{
+        const km  = Math.max(0, +document.getElementById('inKm')?.value  || 0);
+        const amt = Math.max(0, +document.getElementById('inAmt')?.value || 0);
+        const total = computeTotal(amt, km);
+        const out = document.getElementById('total');
+        out && (out.textContent = total.toFixed(2));
+      });
+    })();
+
+    // Card press feedback
+    document.querySelectorAll('.card').forEach(c=>{
+      c.addEventListener('mousedown', ()=> c.style.boxShadow = '0 0 0 6px var(--ring)');
+      ['mouseup','mouseleave'].forEach(ev=> c.addEventListener(ev, ()=> c.style.boxShadow = 'var(--shadow)'));
+    });
+
+    // ===== i18n (DE/EN/AR/TR) =====
+    const dict = {
+      de: {
+        sub:'dein Lieferpartner', app:'Fahrer-App',
+        heroH:'Wähle deinen Service & starte',
+        heroP:'Restaurant-Ansicht für Bestellungen & Live-Tracking. Fahrer-Ansicht zum Losfahren.',
+        ctaCosts:'Kosten', ctaStart:'Jetzt starten', chip:'Pilotmodus — schnell & modern',
+        restH:'Restaurant',
+        restP:'Bestellungen empfangen & erstellen, Fahrer disponieren, Status & Zahlungen steuern.',
+        enterRest:'Zur Oberfläche',
+        fahrH:'Fahrer',
+        fahrP:'Tour starten, Live-Tracking, Zustellung abschließen & Nachweis erfassen.',
+        enterFahr:'Zur Oberfläche',
+        costsH:'Lieferkosten', cBase:'Grundgebühr', cInc:'Inklusive km', cPer:'Preis / km', cWait:'Warten (je 5 Min)',
+        inKm:'Distanz (km)', inAmt:'Betrag (€)', inWait:'Wartezeit (Min)',
+        totalLbl:'Gesamt (geschätzt):',
+        appSub:'Android verfügbar — iOS bald.',
+        close:'Schließen',
+        note:'Preismodell: bis 5 km → ≤20€: 3,50€ fix; 20–25€: 3,50€ + 0,10€/km; >25€: 14% vom Betrag + 0,10€/km. Über 5 km: +0,40€/km. Distanzaufschläge: >15 km +0,50€/km; >20 km zusätzlich +1,10€/km.',
+        explH:'Wie berechnen wir?',
+        explP:'Bis 5 km: Bestellungen ≤20 € kosten pauschal 3,50 €. Bei 20–25 €: 3,50 € + 0,10 €/km. Über 25 €: 14 % des Bestellwerts + 0,10 €/km. Über 5 km kommen 0,40 €/km hinzu. Distanzaufschläge: >15 km +0,50 €/km, >20 km zusätzlich +1,10 €/km.',
+        ctaAfterCosts:'Jetzt registrieren und Preise sichern',
+        testH:'Was unsere Partner sagen',
+        addReviewH:'Bewertung hinzufügen',
+        ratingLabel:'Ihre Bewertung',
+        namePh:'Restaurant / Name (optional)',
+        commentPh:'Ihr Kommentar…',
+        submitReview:'Absenden',
+        reviewHint:'Nur Kommentare und Sterne. Keine E-Mail benötigt.',
+        trust:'✅ DSGVO-konform | 🔒 Sichere Zahlungen | 🇩🇪 Made in Germany'
+      },
+      en: {
+        sub:'your delivery partner', app:'Driver app',
+        heroH:'Pick your service & go',
+        heroP:'Restaurant view for orders & live tracking. Driver view to get moving.',
+        ctaCosts:'Costs', ctaStart:'Start now', chip:'Pilot mode — fast & modern',
+        restH:'Restaurant',
+        restP:'Receive & create orders, dispatch drivers, manage status & payments.',
+        enterRest:'Enter',
+        fahrH:'Driver',
+        fahrP:'Start trip, live tracking, complete delivery & capture proof.',
+        enterFahr:'Enter',
+        costsH:'Delivery costs', cBase:'Base fee', cInc:'Included km', cPer:'Per km', cWait:'Waiting (per 5 min)',
+        inKm:'Distance (km)', inAmt:'Order amount (€)', inWait:'Waiting (min)',
+        totalLbl:'Estimated total:',
+        appSub:'Android available — iOS soon.',
+        close:'Close',
+        note:'Pricing: up to 5 km → ≤€20: €3.50 flat; €20–25: €3.50 + €0.10/km; >€25: 14% of order + €0.10/km. Beyond 5 km: +€0.40/km. Distance surcharges: >15 km +€0.50/km; >20 km extra +€1.10/km.',
+        explH:'How is the price calculated?',
+        explP:'Up to 5 km: orders ≤€20 cost a flat €3.50. For €20–25: €3.50 + €0.10/km. Above €25: 14% of order value + €0.10/km. Beyond 5 km add €0.40/km. Distance surcharges: >15 km +€0.50/km; >20 km an extra +€1.10/km.',
+        ctaAfterCosts:'Register now and lock in these prices',
+        testH:'What our partners say',
+        addReviewH:'Add your review',
+        ratingLabel:'Your rating',
+        namePh:'Restaurant / Name (optional)',
+        commentPh:'Your comment…',
+        submitReview:'Submit',
+        reviewHint:'Only comment & stars. No email needed.',
+        trust:'✅ GDPR compliant | 🔒 Secure payments | 🇩🇪 Made in Germany'
+      },
+      ar: {
+        sub:'شريكك في التوصيل', app:'تطبيق السائق',
+        heroH:'اختر خدمتك وابدأ',
+        heroP:'واجهة المطعم للطلبات والتتبّع الحي. واجهة السائق للانطلاق.',
+        ctaCosts:'التكاليف', ctaStart:'ابدأ الآن', chip:'وضع تجريبي — سريع وحديث',
+        restH:'المطعم',
+        restP:'استقبال وإنشاء الطلبات، توزيع السائقين، إدارة الحالة والمدفوعات.',
+        enterRest:'الدخول',
+        fahrH:'السائق',
+        fahrP:'بدء الرحلة، تتبّع مباشر، إغلاق التسليم وتوثيق الإثبات.',
+        enterFahr:'الدخول',
+        costsH:'تفاصيل تكاليف التوصيل', cBase:'الرسوم الأساسية', cInc:'كم/مجاني داخل', cPer:'سعر لكل كم', cWait:'الانتظار (كل 5 د)',
+        inKm:'المسافة (كم)', inAmt:'قيمة الطلب (€)', inWait:'الانتظار (دقائق)',
+        totalLbl:'الإجمالي التقريبي:',
+        appSub:'أندرويد متاح — iOS قريبًا.',
+        close:'إغلاق',
+        note:'نموذج التسعير: حتى 5 كم → ≤20€: 3.50€ ثابتة؛ 20–25€: 3.50€ + ‎0.10€/كم؛ >25€: ‎14% من قيمة الطلب + ‎0.10€/كم. بعد 5 كم: ‎+0.40€/كم. شرائح المسافة: >15 كم ‎+0.50€/كم؛ >20 كم ‎+1.10€/كم إضافية.',
+        explH:'كيف نحسب السعر؟',
+        explP:'حتى 5 كم: الطلبات ≤20€ تكلف 3.50€ ثابتة. من 20–25€: 3.50€ + ‎0.10€/كم. أكثر من 25€: ‎14% من قيمة الطلب + ‎0.10€/كم. بعد 5 كم يُضاف ‎0.40€/كم. شرائح المسافة: ‎>15 كم ‎+0.50€/كم؛ ‎>20 كم ‎+1.10€/كم إضافية.',
+        ctaAfterCosts:'سجّل الآن واحصل على هذه الأسعار',
+        testH:'ماذا يقول شركاؤنا',
+        addReviewH:'أضف تقييمك',
+        ratingLabel:'تقييمك',
+        namePh:'اسم المطعم / الاسم (اختياري)',
+        commentPh:'أدخل تعليقك…',
+        submitReview:'إرسال',
+        reviewHint:'تعليق وتقييم فقط. لا نحتاج بريدًا إلكترونيًا.',
+        trust:'✅ متوافق مع GDPR | 🔒 مدفوعات آمنة | 🇩🇪 صنع في ألمانيا'
+      },
+      tr: {
+        sub:'teslimat ortağın', app:'Sürücü uygulaması',
+        heroH:'Hizmetini seç ve başla',
+        heroP:'Sipariş ve canlı takip için restoran görünümü. Sürücü görünümü ile yola çık.',
+        ctaCosts:'Maliyetler', ctaStart:'Şimdi başla', chip:'Pilot mod — hızlı ve modern',
+        restH:'Restoran',
+        restP:'Sipariş al/oluştur, sürücüleri planla, durum ve ödemeleri yönet.',
+        enterRest:'Arayüze gir',
+        fahrH:'Sürücü',
+        fahrP:'Yola çık, canlı takip, teslimatı bitir ve kanıtı kaydet.',
+        enterFahr:'Arayüze gir',
+        costsH:'Teslimat maliyetleri', cBase:'Taban ücret', cInc:'Dahil km', cPer:'Km başına', cWait:'Bekleme (her 5 dk)',
+        inKm:'Mesafe (km)', inAmt:'Sipariş tutarı (€)', inWait:'Bekleme (dk)',
+        totalLbl:'Tahmini toplam:',
+        appSub:'Android mevcut — iOS yakında.',
+        close:'Kapat',
+        note:"Fiyatlandırma: 5 km'ye kadar → ≤20€: 3,50€ sabit; 20–25€: 3,50€ + 0,10€/km; >25€: siparişin %14'ü + 0,10€/km. 5 km üzeri: +0,40€/km. Mesafe ek ücretleri: >15 km +0,50€/km; >20 km ilave +1,10€/km.",
+        explH:'Fiyat nasıl hesaplanır?',
+        explP:"5 km'ye kadar: ≤20€ siparişler için sabit 3,50€. 20–25€: 3,50€ + 0,10€/km. 25€ üzeri: sipariş tutarının %14'ü + 0,10€/km. 5 km üzeri +0,40€/km eklenir. Mesafe ek ücretleri: >15 km +0,50€/km; >20 km ilave +1,10€/km.",
+        ctaAfterCosts:'Hemen kaydolun ve bu fiyatları garantileyin',
+        testH:'Ortaklarımız ne diyor',
+        addReviewH:'Değerlendirme ekle',
+        ratingLabel:'Puanınız',
+        namePh:'Restoran / İsim (opsiyonel)',
+        commentPh:'Yorumunuz…',
+        submitReview:'Gönder',
+        reviewHint:'Sadece yorum ve yıldız. E-posta gerekmez.',
+        trust:'✅ GDPR uyumlu | 🔒 Güvenli ödemeler | 🇩🇪 Almanya üretimi'
+      }
+    };
+
+    function setLang(k){
+      const d = dict[k] || dict.de;
+      document.documentElement.lang = k;
+      document.documentElement.dir = (k==='ar') ? 'rtl' : 'ltr';
+
+      const setTxt = (id, val)=>{ const el = document.getElementById(id); if(el) el.textContent = val; };
+      setTxt('t-sub', d.sub);
+      setTxt('t-app', d.app);
+      setTxt('t-hero-h', d.heroH);
+      setTxt('t-hero-p', d.heroP);
+      setTxt('t-cta-costs', d.ctaCosts);
+      setTxt('t-cta-start', d.ctaStart);
+      setTxt('t-chip', d.chip);
+
+      setTxt('t-card-rest-h', d.restH);
+      setTxt('t-card-rest-p', d.restP);
+      setTxt('t-enter-rest', d.enterRest);
+      setTxt('t-card-fahr-h', d.fahrH);
+      setTxt('t-card-fahr-p', d.fahrP);
+      setTxt('t-enter-fahr', d.enterFahr);
+
+      setTxt('t-costs-h', d.costsH);
+      setTxt('t-expl-h', d.explH);
+      setTxt('t-expl-p', d.explP);
+      setTxt('t-c-base', d.cBase);
+      setTxt('t-c-inc', d.cInc);
+      setTxt('t-c-per', d.cPer);
+      setTxt('t-c-wait', d.cWait);
+      const kmLbl = document.getElementById('t-in-km');   if (kmLbl && kmLbl.firstChild) kmLbl.firstChild.nodeValue = d.inKm + ' ';
+      const amtLbl = document.getElementById('t-in-amt'); if (amtLbl && amtLbl.firstChild) amtLbl.firstChild.nodeValue = d.inAmt + ' ';
+      const waitLbl= document.getElementById('t-in-wait');if (waitLbl&& waitLbl.firstChild) waitLbl.firstChild.nodeValue = d.inWait + ' ';
+      setTxt('t-total-lbl', d.totalLbl);
+      setTxt('t-app-sub', d.appSub);
+      setTxt('closeModal', d.close);
+      setTxt('t-note', d.note);
+      setTxt('t-cta-after-costs', d.ctaAfterCosts);
+
+      setTxt('t-test-h', d.testH);
+      setTxt('t-add-h', d.addReviewH);
+      setTxt('t-rating-legend', d.ratingLabel);
+      const nameEl = document.getElementById('t-name'); if (nameEl) nameEl.placeholder = d.namePh;
+      const textEl = document.getElementById('t-text'); if (textEl) textEl.placeholder = d.commentPh;
+      setTxt('t-submit', d.submitReview);
+      setTxt('t-form-hint', d.reviewHint);
+      setTxt('t-trust', d.trust);
+
+      const sel = document.getElementById('langSelect'); if (sel && sel.value!==k) sel.value = k;
+      localStorage.setItem('lang', k);
+
+      // أعلم سكربت التستيمونيال (الموديول) لتحديث الاشتراك
+      if (window.onLangChanged) try{ window.onLangChanged(); }catch(_){}
+    }
+
+    document.addEventListener('DOMContentLoaded', ()=>{
+      document.getElementById('langSelect')?.addEventListener('change', e => setLang(e.target.value));
+      const saved = localStorage.getItem('lang') || 'de';
+      const sel = document.getElementById('langSelect'); if (sel) sel.value = saved;
+      setLang(saved);
+    });
+  </script>
+
+  <!-- Firestore-only testimonials (approved==true). No local fallback. -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js";
+    import {
+      getFirestore, collection, query, where, orderBy, limit,
+      onSnapshot, addDoc, serverTimestamp
+    } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js";
+
+    // ضع إعدادات مشروعك (احتفظ بالأصل إن لزم):
+    const firebaseConfig = {
+      apiKey: "AIzaSyD0g9T3amjuPodsLS6ZQkHYWrzV1UrX_QI",
+      authDomain: "taussil-lieferservice-8bbe9.firebaseapp.com",
+      projectId: "taussil-lieferservice-8bbe9"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db  = getFirestore(app);
+
+    // Utilities
+    const $  = s => document.querySelector(s);
+    const $$ = s => Array.from(document.querySelectorAll(s));
+    const esc = s => String(s).replace(/[&<>\"']/g, m=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;', "'":'&#39;' }[m]));
+
+    // Slider state
+    const slider = { list: [], index: 0, perView: 2, unsub:null };
+    function starRow(r){
+      let h = '<div class="stars">';
+      for(let i=1;i<=5;i++) h += `<span class="star${i<=r?'':' dim'}">★</span>`;
+      return h + '</div>';
+    }
+    function computePerView(){ slider.perView = (window.innerWidth <= 540) ? 1 : 2; }
+    function renderSlider(){
+      const cont = $('#t-cards'); if(!cont) return;
+      computePerView();
+      cont.innerHTML = '';
+      if(slider.list.length === 0){
+        cont.innerHTML = `<div class="testimonialCard"><p>— لا توجد تعليقات معتمدة بعد —</p></div>`;
+        return;
+      }
+      slider.index = (slider.index + slider.list.length) % slider.list.length;
+      for(let i=0; i<slider.perView; i++){
+        const it = slider.list[(slider.index + i) % slider.list.length];
+        const card = document.createElement('div');
+        card.className = 'testimonialCard';
+        card.innerHTML = `
+          <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px">
+            <p style="flex:1">${esc(it.text)}</p>
+            ${starRow(Math.max(1, Math.min(5, +it.rating || 0)))}
+          </div>
+          <div style="margin-top:8px;font-weight:600">${esc(it.author || '—')}</div>
+        `;
+        cont.appendChild(card);
+      }
+    }
+    $('#t-prev')?.addEventListener('click', ()=>{
+      if (slider.list.length===0) return;
+      slider.index = (slider.index - slider.perView + slider.list.length) % slider.list.length;
+      renderSlider();
+    });
+    $('#t-next')?.addEventListener('click', ()=>{
+      if (slider.list.length===0) return;
+      slider.index = (slider.index + slider.perView) % slider.list.length;
+      renderSlider();
+    });
+    window.addEventListener('resize', renderSlider);
+
+    function currentLang(){ return (document.documentElement.lang || 'de').toLowerCase(); }
+
+    function startListen(){
+      try{ slider.unsub && slider.unsub(); }catch(_){}
+      const lang = currentLang();
+      const q = query(
+        collection(db,'testimonials'),
+        where('lang','==', lang),
+        where('approved','==', true),
+        orderBy('createdAt','desc'),
+        limit(30)
+      );
+      slider.unsub = onSnapshot(q, snap=>{
+        slider.list = snap.docs.map(d => ({ id:d.id, ...d.data() }));
+        slider.index = 0; renderSlider();
+      }, err=>{
+        console.error('[Testimonials] listen error:', err);
+        slider.list = []; renderSlider();
+      });
+    }
+
+    // Add Review: يرسل approved:false — لن يظهر حتى الاعتماد من الكونسول
+    (function setupAdd(){
+      const stars = $$('#starsInput .rate');
+      const ratingVal = $('#ratingVal');
+      const form = $('#t-form');
+      const nameEl = $('#t-name');
+      const textEl = $('#t-text');
+
+      function paint(n){ stars.forEach(s => s.classList.toggle('active', +s.dataset.v <= n)); }
+      stars.forEach(s => s.addEventListener('click', ()=>{ ratingVal.value = s.dataset.v; paint(+ratingVal.value); }));
+
+      form?.addEventListener('submit', async (e)=>{
+        e.preventDefault();
+        const txt = (textEl?.value || '').trim();
+        const r   = Math.max(1, Math.min(5, +ratingVal?.value || 0));
+        if(!txt){ textEl?.focus(); return; }
+        try{
+          await addDoc(collection(db,'testimonials'), {
+            text: String(txt).slice(0,500),
+            author: String((nameEl?.value || '')).slice(0,80),
+            rating: Number(r),
+            lang: currentLang(),
+            createdAt: serverTimestamp(),
+            approved: false
+          });
+          form.reset(); ratingVal.value = 0; paint(0);
+          alert('تم إرسال تعليقك للمراجعة. سيظهر بعد الاعتماد.');
+        }catch(err){
+          console.error('Review add error:', err);
+          alert('تعذر الإرسال. تحقق من صلاحيات Firestore rules أو فعّل تسجيل الدخول.');
+        }
+      });
+    })();
+
+    // expose language hook
+    window.onLangChanged = startListen;
+
+    // init
+    document.addEventListener('DOMContentLoaded', startListen);
+  </script>
+</body>
 </html>
