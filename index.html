@@ -85,6 +85,15 @@
     .storeBtns a{flex:1;display:flex;align-items:center;justify-content:center;padding:12px;border-radius:12px;border:1px solid #e7e7e7;font-weight:700}
     .storeBtns a.android{background:var(--accent);color:#fff;border-color:var(--accent)}
     .storeBtns a.ios{opacity:.5;cursor:not-allowed}
+.modal{                 /* نفس تعريفك الحالي */
+  position:fixed;
+  inset:0;
+  display:none;
+  place-items:center;
+  background:rgba(0,0,0,.35);
+  z-index:10000;        /* ← هذا السطر يكفي ليطلع فوق كل العناصر */
+}
+.modal.active{ display:grid; }
 
     footer{margin:26px 0;color:var(--muted);font-size:14px}
 
@@ -236,7 +245,7 @@ body::before{
   filter: saturate(.9) contrast(1.05);
 }
 /* تأكد أن المحتوى فوق العلامة المائية */
-.container, header, section, footer { position: relative; z-index: 1; }
+.container, header, section, footer { position: relative; z-index: 1;  }
 
   </style>
 </head>
