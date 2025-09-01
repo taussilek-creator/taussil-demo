@@ -970,171 +970,166 @@ document.addEventListener('DOMContentLoaded', ()=>{
 });
 </script>
 <script>
-/* إعداد */
-const APPCFG = {
-  endpoint: "https://webhook.site/b04e5db8-410a-47c1-8a63-72dfd734661c", // ← ضع ويبهوكك/السيرفر هنا
-  startBtnId: "md_start",
-  stopBtnId:  "md_done",
-  driverId: (window.DRIVER_ID || localStorage.getItem('driverId') || ("dev-" + Math.random().toString(36).slice(2)))
+/* =========================
+   إعداد Firebase (REST فقط)
+   ========================= */
+const FB = {
+  apiKey: "AIzaSyD0g9T3amjuPodsLS6ZQkHYWrzV1UrX_QI",               // ✅ حط Web API Key تبع مشروعك
+  rtdbUrl: "https://taussil-lieferservice-8bbe9-default-rtdb.europe-west1.firebasedatabase.app", // ✅ نفس databaseURL
+  idToken: null,
+  refreshToken: null,
+  uid: null,
+  expiresAt: 0
 };
-localStorage.setItem('driverId', APPCFG.driverId);
 
-/* جسـر Median */
+const AUTH_KEY = "taussil:fbAuth:v1";
+function saveAuth(){
+  localStorage.setItem(AUTH_KEY, JSON.stringify({
+    idToken: FB.idToken, refreshToken: FB.refreshToken, uid: FB.uid, expiresAt: FB.expiresAt
+  }));
+}
+function loadAuth(){
+  try{
+    const x = JSON.parse(localStorage.getItem(AUTH_KEY)||"{}");
+    if (x.idToken && x.refreshToken && x.uid && x.expiresAt){
+      FB.idToken = x.idToken; FB.refreshToken = x.refreshToken; FB.uid = x.uid; FB.expiresAt = x.expiresAt;
+    }
+  }catch(_){}
+}
+
+async function fbAnonSignIn(){
+  const url = `https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${FB.apiKey}`;
+  const res = await fetch(url, {method:"POST", headers:{ "Content-Type":"application/json" }, body:"{}"});
+  if (!res.ok) throw new Error("signUp failed");
+  const d = await res.json();
+  FB.idToken = d.idToken;
+  FB.refreshToken = d.refreshToken;
+  FB.uid = d.localId;
+  FB.expiresAt = Date.now() + (Number(d.expiresIn||3600)-60)*1000; // ناقص دقيقة احتياط
+  saveAuth();
+}
+
+async function fbRefresh(){
+  const url = `https://securetoken.googleapis.com/v1/token?key=${FB.apiKey}`;
+  const body = new URLSearchParams({ grant_type:"refresh_token", refresh_token: FB.refreshToken });
+  const res = await fetch(url, { method:"POST", headers:{ "Content-Type":"application/x-www-form-urlencoded" }, body });
+  if (!res.ok) throw new Error("refresh failed");
+  const d = await res.json();
+  FB.idToken = d.id_token;
+  FB.refreshToken = d.refresh_token;
+  FB.uid = d.user_id;
+  FB.expiresAt = Date.now() + (Number(d.expires_in||3600)-60)*1000;
+  saveAuth();
+}
+
+async function ensureAuth(){
+  loadAuth();
+  if (!FB.idToken || !FB.refreshToken || !FB.uid){
+    await fbAnonSignIn();
+  } else if (Date.now() > FB.expiresAt){
+    await fbRefresh();
+  }
+  return FB.uid;
+}
+
+/* =========================
+   الإرسال إلى RTDB عبر REST
+   ========================= */
+async function writeLocationToRTDB(data){
+  await ensureAuth();
+  const base = `${FB.rtdbUrl}/drivers/${FB.uid}`;
+  // آخر موقع
+  await fetch(`${base}/last.json?auth=${FB.idToken}`, {
+    method:"PUT", headers:{ "Content-Type":"application/json" }, body: JSON.stringify({
+      lat: data.lat, lng: data.lng, acc: data.acc ?? null, spd: data.spd ?? null, hdg: data.hdg ?? null, ts: data.ts
+    })
+  }).catch(()=>{});
+  // نقطة مسار
+  await fetch(`${base}/track.json?auth=${FB.idToken}`, {
+    method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify({ lat: data.lat, lng: data.lng, ts: data.ts })
+  }).catch(()=>{});
+}
+
+/* =========================
+   Median Bridge + التتبع
+   ========================= */
 const BR = () => (window.median || window.MedianBridge || null);
 const hasBridgeGeo = () => !!(BR() && BR().geolocation);
 
-/* حالة */
-let unsubGeo = null, webWatchId = null, bgTimer = null;
+const APPCFG = {
+  startBtnId: "md_start",
+  stopBtnId:  "md_done"
+};
 
-/* إرسال للسيرفر */
-async function sendToServer(data){
-  if (!APPCFG.endpoint) return;
-  try {
-    await fetch(APPCFG.endpoint, {
-      method:"POST",
-      headers:{"Content-Type":"application/json"},
-      body: JSON.stringify(data)
-    });
-  } catch(e){ console.warn("[LOC] send failed", e); }
-}
+let unsubGeo = null, webWatchId = null;
+
 function setStatus(txt){ const el = document.getElementById('md_status'); if (el) el.textContent = txt; }
+function showLatLng(lat,lng){
+  const el = document.getElementById('md_addr'); if (el) el.textContent = `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+}
 function normalizePos(p){
-  const c = p?.coords || p;
+  const c = p?.coords || p || {};
   return {
-    driverId: APPCFG.driverId,
-    lat: c?.latitude ?? null,
-    lng: c?.longitude ?? null,
-    acc: c?.accuracy ?? null,
-    spd: c?.speed ?? null,
-    hdg: c?.heading ?? null,
+    lat: c.latitude ?? null,
+    lng: c.longitude ?? null,
+    acc: c.accuracy ?? null,
+    spd: c.speed ?? null,
+    hdg: c.heading ?? null,
     ts: Date.now()
   };
 }
 
-/* 1) تهيئة خدمة الموقع (Native) بفواصل قصيرة */
 async function configureGeolocation(){
   if (!hasBridgeGeo()) return;
   try{
     await BR().geolocation.configure({
-      interval: 4,               // هدفنا 4 ثوان (Android) — النظام قد يبطّئ بالخلفية
-      fastestInterval: 2,
-      distanceFilter: 5,         // أرسل عند تحرّك ≥ 5 م
-      accuracy: "high",
-      foregroundService: {
-        enabled: true,
-        notificationTitle: "Taussil – Standort aktiv",
-        notificationText: "Fahrer-Tracking läuft im Hintergrund."
-      },
-      android: {
-        startOnBoot: true,
-        stopOnTerminate: false
-      },
-      ios: {
-        allowsBackgroundLocationUpdates: true,
-        showsBackgroundLocationIndicator: false,
-        activityType: "automotiveNavigation",
-        pausesLocationUpdatesAutomatically: false
-      }
+      interval: 4, fastestInterval: 2, distanceFilter: 0, accuracy: "high",
+      foregroundService: { enabled:true, notificationTitle:"Taussil – Standort aktiv", notificationText:"Fahrer-Tracking läuft im Hintergrund." },
+      android: { startOnBoot:true, stopOnTerminate:false },
+      ios: { allowsBackgroundLocationUpdates:true, showsBackgroundLocationIndicator:false, activityType:"automotiveNavigation", pausesLocationUpdatesAutomatically:false }
     });
-
-    /* 1.a) لو جسر ميديان عنده مزية مزامنة أصلية للـHTTP (Auto-sync)، جرّب نفعّلها (اختياري/محمي) */
-    if (BR().geolocation.setHttpConfig){ // بعض الإصدارات قد تدعم هالكول
-      BR().geolocation.setHttpConfig({
-        url: APPCFG.endpoint,
-        method: "POST",
-        headers: { "Content-Type":"application/json" },
-        autoSync: true  // ← خليه يرسل من الـNative حتى لو JS نايم
-      });
-    }
-  }catch(e){ console.warn("[GEO] configure error:", e); }
+  }catch(e){ console.warn("[GEO] configure:", e); }
 }
 
-/* 2) صلاحيات Always/Background */
 async function ensurePermission(){
   if (!hasBridgeGeo()) return true;
   try{
-    const ok = await BR().geolocation.hasPermission?.();
-    if (ok) return true;
-    const granted = await BR().geolocation.requestPermission?.({
-      ios: { mode: "always" },
-      android: { background: true, level: "fine" }
-    });
-    return !!granted;
-  }catch(e){ console.warn("[GEO] permission error:", e); return false; }
+    if (await BR().geolocation.hasPermission?.()) return true;
+    const ok = await BR().geolocation.requestPermission?.({ ios:{mode:"always"}, android:{ background:true, level:"fine" } });
+    return !!ok;
+  }catch(e){ console.warn("[GEO] perm:", e); return false; }
 }
 
-/* 3) استماع للتحديثات (لما JS صاحي) + طلب لقطة وإرسال */
-function onLocationUpdate(raw){
-  const data = normalizePos(raw);
-  if (typeof data.lat !== "number" || typeof data.lng !== "number") return;
-  const addr = document.getElementById('md_addr');
-  if (addr) addr.textContent = `${data.lat.toFixed(5)}, ${data.lng.toFixed(5)}`;
-  sendToServer(data);
+async function onLocationUpdate(raw){
+  const d = normalizePos(raw);
+  if (typeof d.lat !== "number" || typeof d.lng !== "number") return;
+  showLatLng(d.lat, d.lng);
+  // ✳️ نكتب مباشرة للـ RTDB عبر REST
+  writeLocationToRTDB(d);
 }
 
-/* 4) تشغيل خدمة الخلفية Native */
 async function startBackgroundTracking(){
+  // تأكد من التهيئة + الدخول (مهم قبل أول إرسال)
+  try { await ensureAuth(); } catch(e){ console.warn("[AUTH]", e); }
+
   if (hasBridgeGeo()){
     if (!unsubGeo && BR().geolocation?.on){
       unsubGeo = BR().geolocation.on('update', onLocationUpdate);
     }
     try{
-      await BR().geolocation.startBackground?.(); // تشغيل خدمة الموقع بالخلفية (Native)
-      // لقطة أولى:
+      await BR().geolocation.startBackground?.();
       BR().geolocation.getCurrentPosition?.().then(onLocationUpdate).catch(()=>{});
-      setStatus("Unterwegs (Native)");
-    }catch(e){ console.warn("[GEO] startBackground error:", e); }
-  } else if ("geolocation" in navigator && webWatchId == null){
-    // Fallback الويب — يعمل فقط والواجهة مفتوحة
-    webWatchId = navigator.geolocation.watchPosition(
-      onLocationUpdate,
-      err => console.warn("[GEO] web watch error:", err),
-      { enableHighAccuracy:true, maximumAge:3000, timeout:10000 }
-    );
-    setStatus("Unterwegs (Web)");
+      setStatus("Unterwegs (Background-Native)");
+      return;
+    }catch(e){ console.warn("[GEO] startBackground:", e); }
   }
-
-  /* 5) (اختياري/ملاذ أخير) إبقاء نبض JS ببداية/إيقاف خدمة صوتية بالخلفية */
-  if (BR()?.audio?.startBackground && BR()?.audio?.stopBackground){
-    document.addEventListener('visibilitychange', async ()=>{
-      try{
-        if (document.hidden){
-          await BR().audio.startBackground(); // يطلب صلاحية الخلفية للصوت
-          if (!bgTimer){
-            // خذ لقطة كل 10 ثواني كـ “Heartbeat”
-            bgTimer = setInterval(async ()=>{
-              if (hasBridgeGeo() && BR().geolocation?.getCurrentPosition){
-                try {
-                  const p = await BR().geolocation.getCurrentPosition();
-                  onLocationUpdate(p);
-                } catch(_){}
-              }
-            }, 10000);
-          }
-        } else {
-          clearInterval(bgTimer); bgTimer = null;
-          await BR().audio.stopBackground();
-        }
-      }catch(e){ console.warn("[AUDIO] bg err:", e); }
-    });
-  }
-
-  /* 6) إن كان عندك BackgroundFetch في الجسر، استعمله لتيقّظ دوري */
-  if (BR()?.backgroundFetch?.configure){
-    BR().backgroundFetch.configure({ minimumFetchInterval: 15 }, async ()=>{
-      try{
-        if (hasBridgeGeo() && BR().geolocation?.getCurrentPosition){
-          const p = await BR().geolocation.getCurrentPosition();
-          onLocationUpdate(p);
-        }
-      }finally{
-        BR().backgroundFetch.finish?.();
-      }
-    });
+  // Fallback ويب (فقط بالواجهة)
+  if ("geolocation" in navigator && webWatchId == null){
+    webWatchId = navigator.geolocation.watchPosition(onLocationUpdate, err=>console.warn("[GEO] web:", err), { enableHighAccuracy:true, maximumAge:3000, timeout:10000 });
+    setStatus("Unterwegs (Web foreground)");
   }
 }
 
-/* إيقاف */
 function stopBackgroundTracking(){
   if (hasBridgeGeo()){
     BR().geolocation.stopBackground?.();
@@ -1142,36 +1137,28 @@ function stopBackgroundTracking(){
     unsubGeo = null;
   }
   if (webWatchId != null){ navigator.geolocation.clearWatch(webWatchId); webWatchId = null; }
-  if (bgTimer){ clearInterval(bgTimer); bgTimer = null; }
   setStatus("Geliefert (Tracking aus)");
 }
 
-/* تسلسل التشغيل */
-async function requestPermissionAndStart(){
-  if (hasBridgeGeo()){
-    await configureGeolocation();
-    const ok = await ensurePermission();
-    if (!ok){ setStatus("Berechtigung verweigert"); return; }
-  }
-  startBackgroundTracking();
-}
-
-/* Median يناديها لما يجهّز خدمات الموقع داخل التطبيق */
-window.median_geolocation_ready = function(){
+/* Median يناديها عند تهيئة خدمات الموقع داخل التطبيق */
+window.median_geolocation_ready = async function(){
+  await configureGeolocation();
   if (hasBridgeGeo() && BR().geolocation?.hasPermission){
-    BR().geolocation.hasPermission().then(p => { if (p) requestPermissionAndStart(); });
+    const p = await BR().geolocation.hasPermission();
+    if (p) startBackgroundTracking();
   }
 };
 
-/* ربط الأزرار (IDs كما هي عندك) */
+/* ربط الأزرار */
 document.addEventListener('DOMContentLoaded', ()=>{
-  document.getElementById(APPCFG.startBtnId)?.addEventListener('click', requestPermissionAndStart);
+  document.getElementById(APPCFG.startBtnId)?.addEventListener('click', async ()=>{
+    const ok = await ensurePermission();
+    if (!ok){ setStatus("Berechtigung verweigert"); return; }
+    await configureGeolocation();
+    startBackgroundTracking();
+  });
   document.getElementById(APPCFG.stopBtnId )?.addEventListener('click', stopBackgroundTracking);
 });
 </script>
-
-
-
-
 </body>
 </html>
