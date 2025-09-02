@@ -970,23 +970,28 @@ document.addEventListener('DOMContentLoaded', ()=>{
 });
 </script>
 <script>
-/* =================== إعدادات عامة =================== */
+/* =========================
+   تتبّع موقع السائق بالخلفية
+   بدون Webhook — فقط RTDB (REST)
+   ========================= */
+
 const APPCFG = {
-  endpoint: "", // اختياري: Webhook أو API خارجي. خليه فاضي لو ما عندك
   startBtnId: "md_start",
   stopBtnId:  "md_done",
-  driverId: localStorage.getItem('driverId') || ("dev-" + Math.random().toString(36).slice(2)) // سيتم استبداله بـ auth.uid بعد تسجيل الدخول
+  driverId: localStorage.getItem('driverId') || ("dev-"+Math.random().toString(36).slice(2))
 };
 localStorage.setItem('driverId', APPCFG.driverId);
 
+/* جسر Median */
 const BR = () => (window.median || window.MedianBridge || null);
 const hasBridgeGeo = () => !!(BR() && BR().geolocation);
 
 let unsubGeo = null, webWatchId = null;
-let lastWriteTs = 0; // ثروتل لتقليل الكتابة على RTDB
+let lastWriteTs = 0;
 
-/* =================== Firebase (Compat CDN) =================== */
-(function firebaseBoot(){
+/* ===== Firebase Auth (Compat via CDN) + REST للـ RTDB ===== */
+const FBREST = (function(){
+  // عدّل فقط إذا تغيّر عندك أي حقل من المشروع:
   const firebaseConfig = {
     apiKey: "AIzaSyD0g9T3amjuPodsLS6ZQkHYWrzV1UrX_QI",
     authDomain: "taussil-lieferservice-8bbe9.firebaseapp.com",
@@ -998,51 +1003,117 @@ let lastWriteTs = 0; // ثروتل لتقليل الكتابة على RTDB
     measurementId: "G-3GK649MPWQ"
   };
 
+  let dbUrl = firebaseConfig.databaseURL.replace(/\/$/,'');
+  let token = null, expMs = 0;
+
   function load(src){
-    return new Promise((res,rej)=>{ const s=document.createElement('script'); s.src=src; s.onload=res; s.onerror=()=>rej(new Error("load fail "+src)); document.head.appendChild(s); });
+    return new Promise((res,rej)=>{
+      const s=document.createElement('script'); s.src=src;
+      s.onload=()=>res(); s.onerror=()=>rej(new Error("load fail "+src));
+      document.head.appendChild(s);
+    });
+  }
+  function jwtExpMs(t){
+    try{ return JSON.parse(atob(t.split('.')[1])).exp*1000; }catch(_){ return 0; }
   }
 
-  (async()=>{
+  async function boot(){
     if(!(window.firebase && firebase.apps)){
       await load("https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js");
       await load("https://www.gstatic.com/firebasejs/10.12.5/firebase-auth-compat.js");
-      await load("https://www.gstatic.com/firebasejs/10.12.5/firebase-database-compat.js");
     }
     if(!firebase.apps.length){ firebase.initializeApp(firebaseConfig); }
-    window.rtdb = firebase.database();
     const auth = firebase.auth();
 
-    auth.onAuthStateChanged(async user=>{
-      if(!user){
-        try{ await auth.signInAnonymously(); }catch(e){ console.warn("[FB] anon sign-in failed", e); }
-        return;
-      }
-      // استخدم uid كـ driverId — لازم يتطابق مع قواعد RTDB
-      APPCFG.driverId = user.uid;
-      localStorage.setItem('driverId', APPCFG.driverId);
-
-      // presence
-      try{
-        const presRef = rtdb.ref('drivers_presence/'+APPCFG.driverId);
-        presRef.set({ online:true, t: firebase.database.ServerValue.TIMESTAMP });
-        presRef.onDisconnect().set({ online:false, t: firebase.database.ServerValue.TIMESTAMP });
-      }catch(e){ console.warn("[FB] presence error", e); }
+    await new Promise(async (resolve)=>{
+      auth.onAuthStateChanged(async (user)=>{
+        if(!user){
+          try{ await auth.signInAnonymously(); }catch(e){ console.warn("[FB] anon sign-in failed", e); }
+          return;
+        }
+        // استخدم uid كـ driverId ليمرّ على قواعد RTDB
+        APPCFG.driverId = user.uid;
+        localStorage.setItem('driverId', APPCFG.driverId);
+        await refreshToken(true);
+        resolve();
+      });
     });
-  })();
+  }
+
+  async function refreshToken(force){
+    try{
+      const u = firebase.auth().currentUser;
+      if(!u) return false;
+      const t = await u.getIdToken(!!force);
+      token = t; expMs = jwtExpMs(t);
+      return true;
+    }catch(e){
+      console.warn("[FB] token refresh error", e);
+      return false;
+    }
+  }
+
+  async function ensureToken(){
+    const now = Date.now();
+    if (!token || now > expMs - 60000){ // جدّد قبل دقيقة من الانتهاء
+      await refreshToken(now > expMs);
+    }
+    return !!token;
+  }
+
+  async function patchDriversLocation(payload){
+    if (!await ensureToken()) return false;
+    const url = `${dbUrl}/drivers_locations/${APPCFG.driverId}.json?auth=${encodeURIComponent(token)}`;
+    // أضف ختم توقيت من السيرفر:
+    const body = Object.assign({}, payload, { updatedAt: { ".sv":"timestamp" } });
+    const res = await fetch(url, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body)
+    });
+    if (res.status === 401){
+      if (await refreshToken(true)) return patchDriversLocation(payload);
+      return false;
+    }
+    if (!res.ok){
+      console.warn("[RTDB REST] write failed", res.status, await res.text().catch(()=>"-"));
+    }
+    return res.ok;
+  }
+
+  // (اختياري) نبضة حضور presence:
+  async function setPresence(){
+    if (!await ensureToken()) return false;
+    const url = `${dbUrl}/drivers_presence/${APPCFG.driverId}.json?auth=${encodeURIComponent(token)}`;
+    const body = { lastSeen: { ".sv":"timestamp" } };
+    await fetch(url, { method:"PATCH", headers:{ "Content-Type":"application/json" }, body: JSON.stringify(body) }).catch(()=>{});
+    return true;
+  }
+
+  return { boot, patchDriversLocation, setPresence };
 })();
 
-/* =================== Geo إعداد =================== */
+/* ===== إعداد الجيو في Median ===== */
 async function configureGeolocation(){
   if (!hasBridgeGeo()) return;
   try{
     await BR().geolocation.configure({
-      interval: 4,            // ثواني
+      interval: 4,              // كل 4 ثواني
       fastestInterval: 3,
-      distanceFilter: 5,      // بالمتر
+      distanceFilter: 0,        // لا تشترط مسافة دنيا
       accuracy: "high",
-      foregroundService:{ enabled:true, notificationTitle:"Taussil – Standort aktiv", notificationText:"Fahrer-Tracking läuft im Hintergrund." },
-      android:{ startOnBoot:true, stopOnTerminate:false },
-      ios:{ allowsBackgroundLocationUpdates:true, showsBackgroundLocationIndicator:false, activityType:"automotiveNavigation", pausesLocationUpdatesAutomatically:false }
+      foregroundService: {
+        enabled: true,
+        notificationTitle: "Taussil – Standort aktiv",
+        notificationText: "Fahrer-Tracking läuft im Hintergrund."
+      },
+      android: { startOnBoot: true, stopOnTerminate: false },
+      ios: {
+        allowsBackgroundLocationUpdates: true,
+        showsBackgroundLocationIndicator: false,
+        activityType: "automotiveNavigation",
+        pausesLocationUpdatesAutomatically: false
+      }
     });
   }catch(e){ console.warn("[GEO] configure error:", e); }
 }
@@ -1052,50 +1123,39 @@ async function ensurePermission(){
   try{
     const has = await BR().geolocation.hasPermission?.();
     if (has) return true;
-    const granted = await BR().geolocation.requestPermission?.({ ios:{mode:"always"}, android:{ background:true, level:"fine" } });
-    return !!granted;
-  }catch(e){ console.warn("[GEO] permission error:", e); return false; }
+    const ok = await BR().geolocation.requestPermission?.({
+      ios: { mode: "always" },
+      android: { background: true, level: "fine" }
+    });
+    return !!ok;
+  }catch(e){ console.warn("[GEO] perm error:", e); return false; }
 }
 
-/* =================== إرسال خارجي (اختياري) =================== */
-async function sendToServer(data){
-  if (!APPCFG.endpoint) return;
-  try{
-    await fetch(APPCFG.endpoint, { method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify(data) });
-  }catch(e){ console.warn("[LOC] send failed", e); }
-}
-
-/* =================== التحديث المشترك =================== */
+/* ===== واجهات مساعدة ===== */
 function setStatus(txt){ const el=document.getElementById('md_status'); if(el) el.textContent=txt; }
 function normalizePos(p){ const c=p?.coords||p; return { lat:c?.latitude??null, lng:c?.longitude??null, acc:c?.accuracy??null, spd:c?.speed??null, hdg:c?.heading??null, ts:Date.now() }; }
 
-function onLocationUpdate(raw){
+/* التحديث عند كل موقع */
+async function onLocationUpdate(raw){
   const d = normalizePos(raw);
-  if (typeof d.lat!=="number" || typeof d.lng!=="number") return;
+  if (typeof d.lat !== "number" || typeof d.lng !== "number") return;
 
   // عرض سريع
   const addr = document.getElementById('md_addr');
   if (addr) addr.textContent = `${d.lat.toFixed(5)}, ${d.lng.toFixed(5)}`;
 
-  // إرسال webhook (اختياري)
-  sendToServer({ driverId: APPCFG.driverId, ...d });
-
-  // كتابة RTDB (حتى بالخلفية لأن الحدث جاء من Native)
-  try{
-    if (window.rtdb && window.firebase && APPCFG.driverId){
-      const now = Date.now();
-      if (now - lastWriteTs >= 3500){ // كل ~3.5 ثانية
-        lastWriteTs = now;
-        rtdb.ref('drivers_locations/'+APPCFG.driverId).update({
-          lat: d.lat, lng: d.lng, acc: d.acc, spd: d.spd, hdg: d.hdg,
-          ts: d.ts, updatedAt: firebase.database.ServerValue.TIMESTAMP
-        });
-      }
-    }
-  }catch(e){ console.warn("[RTDB] write error", e); }
+  // كتابة RTDB عبر REST (شغّال حتى بالخلفية)
+  const now = Date.now();
+  if (now - lastWriteTs >= 3500){
+    lastWriteTs = now;
+    FBREST.patchDriversLocation({
+      lat:d.lat, lng:d.lng, acc:d.acc, spd:d.spd, hdg:d.hdg, ts:d.ts
+    }).catch(()=>{});
+    FBREST.setPresence().catch(()=>{});
+  }
 }
 
-/* =================== بدء/إيقاف =================== */
+/* بدء/إيقاف */
 async function startBackgroundTracking(){
   if (hasBridgeGeo()){
     if (!unsubGeo && BR().geolocation?.on){
@@ -1108,45 +1168,47 @@ async function startBackgroundTracking(){
       return;
     }catch(e){ console.warn("[GEO] startBackground error:", e); }
   }
-  // Fallback ويب (فقط بالواجهة)
-  if ("geolocation" in navigator && webWatchId==null){
-    webWatchId = navigator.geolocation.watchPosition(onLocationUpdate, err=>console.warn("[GEO] web watch error:", err), { enableHighAccuracy:true, maximumAge:5000, timeout:15000 });
+  // Fallback ويب (يعمل فقط والصفحة بالواجهة)
+  if ("geolocation" in navigator && webWatchId == null){
+    webWatchId = navigator.geolocation.watchPosition(
+      onLocationUpdate,
+      err => console.warn("[GEO] web watch error:", err),
+      { enableHighAccuracy:true, maximumAge:2000, timeout:10000 }
+    );
     setStatus("Unterwegs (Web foreground)");
   }
 }
-
 function stopBackgroundTracking(){
   if (hasBridgeGeo()){
     BR().geolocation.stopBackground?.();
     if (unsubGeo && BR().geolocation?.off){ BR().geolocation.off('update', unsubGeo); }
     unsubGeo = null;
   }
-  if (webWatchId!=null){ navigator.geolocation.clearWatch(webWatchId); webWatchId=null; }
+  if (webWatchId != null){ navigator.geolocation.clearWatch(webWatchId); webWatchId = null; }
   setStatus("Geliefert (Tracking aus)");
 }
 
 /* تسلسل التشغيل */
-async function requestPermissionAndStart(){
+window.median_geolocation_ready = async function(){
+  await FBREST.boot();                  // Anonymous + token
   if (hasBridgeGeo()){
     await configureGeolocation();
     const ok = await ensurePermission();
-    if (!ok){ setStatus("Berechtigung verweigert"); return; }
-  }
-  startBackgroundTracking();
-}
-
-/* Median يناديها عندما تُجهّز خدمات الموقع */
-window.median_geolocation_ready = function(){
-  if (hasBridgeGeo() && BR().geolocation?.hasPermission){
-    BR().geolocation.hasPermission().then(p=>{ if(p){ requestPermissionAndStart(); } });
+    if (ok) startBackgroundTracking();
   }
 };
 
-/* ربط أزرار واجهتك */
 document.addEventListener('DOMContentLoaded', ()=>{
-  document.getElementById(APPCFG.startBtnId)?.addEventListener('click', requestPermissionAndStart);
+  document.getElementById(APPCFG.startBtnId)?.addEventListener('click', async ()=>{
+    await FBREST.boot();
+    if (hasBridgeGeo()){
+      await configureGeolocation();
+      const ok = await ensurePermission();
+      if (!ok) return;
+    }
+    startBackgroundTracking();
+  });
   document.getElementById(APPCFG.stopBtnId )?.addEventListener('click', stopBackgroundTracking);
-  document.addEventListener('visibilitychange', ()=> console.log("[PAGE]", document.hidden?"background":"foreground"));
 });
 </script>
 </body>
