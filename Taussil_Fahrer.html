@@ -189,6 +189,14 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
     <div class="kv"><div class="small">Restaurant</div><div class="small" id="md_rest">—</div></div>
     <div class="kv"><div class="small">Adresse</div><div class="small" id="md_addr">—</div></div>
     <div class="kv"><div class="small">Qty</div><div class="small" id="md_qty">—</div></div>
+	<div class="kv">
+  <div class="small">Preis</div>
+  <div class="small">
+    <span id="md_price"></span>
+    <button id="btn_edit_price" class="btn btn-ghost">✎</button>
+  </div>
+</div>
+
     <div class="kv"><div class="small">Abholzeit</div><div class="small" id="md_pickup">—</div></div>
     <div class="row" style="margin-top:8px">
       <a id="md_nav" class="btn btn-cta" href="#" target="_blank" rel="noopener noreferrer">Navigation</a>
@@ -860,6 +868,32 @@ async function openDetail(id){
   const addr=(o.restaurant?.addressText || o.restaurant?.address_text || "").trim();
   md_addr.textContent=addr || '—';
   md_qty.textContent=Number(o.qty||0)||0;
+  // السعر الحالي
+md_price.textContent = o.price ? o.price + " €" : "–";
+
+// زر تعديل السعر
+btn_edit_price.onclick = async () => {
+  const current = o.price || 0;
+  const input = prompt("Neuen Preis eingeben (€):", current);
+  if (input === null) return;
+
+  const newPrice = parseFloat(input.replace(",", "."));
+  if (isNaN(newPrice) || newPrice < 0 || newPrice > 50) {
+    toast("Ungültiger Preis. Bitte Wert zwischen 0 und 50 eingeben.");
+    return;
+  }
+
+  try {
+    await updateDoc(doc(db, "orders_v2", id), { price: newPrice });
+    o.price = newPrice;
+    md_price.textContent = newPrice + " €";
+    toast("✔ Preis aktualisiert");
+  } catch (err) {
+    console.error("Fehler beim Aktualisieren:", err);
+    toast("Fehler beim Speichern");
+  }
+};
+
   md_pickup.textContent=o.pickupTime || "—";
   md_title.textContent=o.restaurant?.name||"Auftrag";
   md.classList.add("show");
