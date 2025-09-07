@@ -189,16 +189,21 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
     <div class="kv"><div class="small">Restaurant</div><div class="small" id="md_rest">—</div></div>
     <div class="kv"><div class="small">Adresse</div><div class="small" id="md_addr">—</div></div>
     <div class="kv"><div class="small">Qty</div><div class="small" id="md_qty">—</div></div>
-	<div class="kv">
+    <div class="kv"><div class="small">Abholzeit</div><div class="small" id="md_pickup">—</div></div>
+    <div class="row" style="margin-top:8px">
+	<!-- Preis row (editable) -->
+<div class="kv">
   <div class="small">Preis</div>
-  <div class="small">
-    <span id="md_price"></span>
-    <button id="btn_edit_price" class="btn btn-ghost">✎</button>
+  <div class="small" style="display:flex;align-items:center;gap:8px">
+    <span id="md_price_value">—</span>
+    <button id="md_price_edit"
+            style="height:28px;min-width:28px;padding:0 8px;border:1px solid rgba(255,255,255,.14);
+                   background:#13213a;color:#e6e9ef;border-radius:8px;cursor:pointer;font-size:12px">
+      Bearbeiten
+    </button>
   </div>
 </div>
 
-    <div class="kv"><div class="small">Abholzeit</div><div class="small" id="md_pickup">—</div></div>
-    <div class="row" style="margin-top:8px">
       <a id="md_nav" class="btn btn-cta" href="#" target="_blank" rel="noopener noreferrer">Navigation</a>
       <button id="md_start" class="btn btn-ghost">Start Fahrt</button>
       <button id="md_done"  class="btn btn-ghost">Geliefert</button>
@@ -219,6 +224,22 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
       <label class="small"><input type="radio" name="navpref" value="apple"> Apple Karten</label>
     </div>
     <button id="nav_save" class="btn btn-cta" style="margin-top:8px">Speichern</button>
+  </div>
+</div>
+<!-- Price Edit Modal -->
+<div id="priceModal" class="modal">
+  <div class="sheet" role="dialog" aria-modal="true" style="max-width:560px;margin:0 auto">
+    <div class="hdr">
+      <div class="title">Preis anpassen</div>
+      <button class="close" id="price_close">✕</button>
+    </div>
+    <div class="row" style="grid-template-columns:1fr">
+      <input id="price_input" class="input" inputmode="decimal" placeholder="0,00 €" aria-label="Neuer Preis in Euro">
+    </div>
+    <div class="row" style="grid-template-columns:1fr 1fr;margin-top:8px">
+      <button id="price_cancel" class="btn btn-ghost">Abbrechen</button>
+      <button id="price_save"   class="btn btn-cta">Speichern</button>
+    </div>
   </div>
 </div>
 
@@ -244,8 +265,10 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
 import { initializeApp, getApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import {
   getFirestore, collection, query, where, limit, onSnapshot, doc,
-  setDoc, updateDoc, getDoc, Timestamp, serverTimestamp
+  setDoc, updateDoc, getDoc, Timestamp, serverTimestamp,
+  runTransaction, increment
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
 import {
   getDatabase, ref, onDisconnect, update as rUpdate, onValue, serverTimestamp as rServerTs
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
@@ -380,26 +403,24 @@ function getOrderAmount(o){
 
 /* معادلة Liefergebühr التي أرسلتها (مقربة للسنت) */
 function calcDeliveryFeeEUR(betrag, km){
-  const b = Number(betrag||0);
-  const d = Math.max(0, Number(km||0));
-  let fee = 0;
+  const price = Math.max(0, Number(betrag || 0));
+  const d     = Math.max(0, Number(km || 0));
 
-  if (d <= 5) {
-    if (b <= 20)             fee = 3.5;
-    else if (b <= 25)        fee = 3.5 + (0.10 * d);
-    else                     fee = (b * 0.14) + (0.10 * d);
-  } else {
-    const over5 = d - 5;
-    if (b <= 20)             fee = 3.5 + (0.50 * over5);
-    else if (b <= 25)        fee = (3.5 + 0.10 * d) + (0.40 * over5);
-    else                     fee = ((b * 0.14) + (0.10 * d)) + (0.40 * over5);
-  }
+  // الجزء الثابت حسب السعر
+  const base = (price <= 25) ? 3.50 : (price * 0.14);
 
-  if (d > 20)       fee += (0.50 * (20 - 15)) + (1.10 * (d - 20));
-  else if (d > 15)  fee += 0.50 * (d - 15);
+  // شرائح المسافة (حاسبة هامشية)
+  // >2–7 كم: 0.50 €/كم (حتى 5 كم من هذه الشريحة)
+  const segA = Math.min(Math.max(d - 2, 0), 5) * 0.50;
+  // >7–12 كم: 0.80 €/كم (حتى 5 كم من هذه الشريحة)
+  const segB = Math.min(Math.max(d - 7, 0), 5) * 0.80;
+  // >12 كم: 1.00 €/كم (بلا حد أعلى)
+  const segC = Math.max(d - 12, 0) * 1.00;
 
-  return Math.round(fee * 100) / 100;
+  const fee = base + segA + segB + segC;
+  return Math.round(fee * 100) / 100; // تقريب إلى سنتين
 }
+
 
 /* ===== Helpers/UI ===== */
 const $=s=>document.querySelector(s);
@@ -858,6 +879,92 @@ async function acceptAssigned(id){ await patchOrder(id, { status:"Angenommen" })
 async function rejectAssigned(id){ await patchOrder(id, { status:"Abgebrochen" }); toast("Abgebrochen"); }
 
 /* ===== Detail sheet ===== */
+// === Price helpers & refs ===
+const md_price_value = document.getElementById('md_price_value');
+const md_price_edit  = document.getElementById('md_price_edit');
+
+const priceModal   = document.getElementById('priceModal');
+const price_close  = document.getElementById('price_close');
+const price_cancel = document.getElementById('price_cancel');
+const price_save   = document.getElementById('price_save');
+const price_input  = document.getElementById('price_input');
+
+let priceEditOrderId = null;
+let priceBusy = false;
+
+function formatEUR(val){
+  const n = Number(val||0);
+  try{ return new Intl.NumberFormat('de-DE',{style:'currency',currency:'EUR'}).format(n); }
+  catch{ return n.toFixed(2)+' €'; }
+}
+function parseEUR(raw){
+  if(!raw) return null;
+  const cleaned = String(raw).replace(/[^\d,.\-]/g,'').trim().replace(',', '.');
+  const num = Number(cleaned);
+  if(!isFinite(num) || num < 0) return null;
+  if(num > 500) return null;
+  return Math.round(num * 100) / 100;
+}
+function canEditPrice(o){
+  const assigned = (o?.driver?.id === uid);
+  const s = String(o?.status||'').toLowerCase();
+  const allowed = (s==='bearbeitung' || s==='unterwegs' || s==='angenommen' || s==='assigned' || s==='zugewiesen');
+  return assigned && allowed;
+}
+function openPriceModal(prefillEUR){
+  price_input.value = (typeof prefillEUR === 'number' ? prefillEUR.toFixed(2).replace('.', ',') : '');
+  priceModal.classList.add('show');
+  setTimeout(()=>{ price_input?.focus(); price_input?.select(); }, 0);
+}
+function closePriceModal(){ priceModal.classList.remove('show'); }
+price_close?.addEventListener('click', closePriceModal);
+price_cancel?.addEventListener('click', closePriceModal);
+priceModal?.addEventListener('click', (e)=>{ if(e.target===priceModal) closePriceModal(); });
+
+async function savePriceEUR(orderId, newPriceEUR){
+  if(priceBusy) return;
+  priceBusy = true; price_save.disabled = true;
+  try{
+    const refDoc = doc(db, 'orders', orderId);
+    await runTransaction(db, async (tx) => {
+      const snap = await tx.get(refDoc);
+      if(!snap.exists()) throw new Error('Order not found');
+      const data = snap.data() || {};
+      if(!canEditPrice(data)) throw new Error('Status/Berechtigung');
+
+      const prevEUR  = Number(data.price||0) || 0;
+      const prevCent = Number.isFinite(data.price_cents)? data.price_cents : Math.round(prevEUR*100);
+
+      tx.update(refDoc, {
+        price: newPriceEUR,
+        price_cents: Math.round(newPriceEUR*100),
+        price_prev_cents: prevCent,
+        price_change_count: increment(1),
+        price_updated_by: 'driver',
+        price_updated_at: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+    });
+    md_price_value.textContent = formatEUR(newPriceEUR);
+    toast('✔ Preis gespeichert');
+    closePriceModal();
+  }catch(e){
+    const msg = String(e?.message||e);
+    if(msg.includes('Status/Berechtigung')) toast('Status erlaubt keine Änderung / Keine Berechtigung');
+    else toast('Fehler beim Speichern');
+  }finally{
+    priceBusy = false; price_save.disabled = false;
+  }
+}
+
+// ربط زر الحفظ مرة واحدة
+price_save?.addEventListener('click', async ()=>{
+  const eur = parseEUR(price_input.value);
+  if(eur===null){ toast('Ungültiger Betrag (0–500 €)'); return; }
+  if(!priceEditOrderId){ toast('Kein Auftrag'); return; }
+  await savePriceEUR(priceEditOrderId, eur);
+});
+
 async function openDetail(id){
   const snap=await getDoc(doc(db,"orders", id)); if(!snap.exists()) return;
   const o=snap.data()||{};
@@ -868,34 +975,19 @@ async function openDetail(id){
   const addr=(o.restaurant?.addressText || o.restaurant?.address_text || "").trim();
   md_addr.textContent=addr || '—';
   md_qty.textContent=Number(o.qty||0)||0;
-  // السعر الحالي
-md_price.textContent = o.price ? o.price + " €" : "–";
-
-// زر تعديل السعر
-btn_edit_price.onclick = async () => {
-  const current = o.price || 0;
-  const input = prompt("Neuen Preis eingeben (€):", current);
-  if (input === null) return;
-
-  const newPrice = parseFloat(input.replace(",", "."));
-  if (isNaN(newPrice) || newPrice < 0 || newPrice > 50) {
-    toast("Ungültiger Preis. Bitte Wert zwischen 0 und 50 eingeben.");
-    return;
-  }
-
-  try {
-    await updateDoc(doc(db, "orders_v2", id), { price: newPrice });
-    o.price = newPrice;
-    md_price.textContent = newPrice + " €";
-    toast("✔ Preis aktualisiert");
-  } catch (err) {
-    console.error("Fehler beim Aktualisieren:", err);
-    toast("Fehler beim Speichern");
-  }
-};
-
   md_pickup.textContent=o.pickupTime || "—";
   md_title.textContent=o.restaurant?.name||"Auftrag";
+  const priceEUR = Number(o.price||0) || 0;
+md_price_value.textContent = formatEUR(priceEUR);
+md_price_edit.disabled = !canEditPrice(o);
+md_price_edit.title = md_price_edit.disabled ? 'Keine Berechtigung / الحالة لا تسمح' : 'Preis bearbeiten';
+priceEditOrderId = id;
+md_price_edit.onclick = (e)=>{
+  e.preventDefault();
+  if(md_price_edit.disabled) return;
+  openPriceModal(priceEUR);
+};
+
   md.classList.add("show");
   md_start.onclick=async (e)=>{
     e.preventDefault();
