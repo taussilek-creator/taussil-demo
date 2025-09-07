@@ -246,6 +246,8 @@ body::before{
 }
 /* تأكد أن المحتوى فوق العلامة المائية */
 .container, header, section, footer { position: relative; z-index: 1;  }
+/* إخفاء شبكة البطاقات أسفل الشرح */
+#costGrid{display:none !important;}
 
   </style>
 </head>
@@ -312,20 +314,24 @@ body::before{
     <section id="costs" class="costs">
       <h2 style="margin:22px 0 10px" id="t-costs-h">Lieferkosten</h2>
 
-      <div class="pricingExpl">
-        <h3 id="t-expl-h">Wie berechnen wir?</h3>
-        <p id="t-expl-p">
-          Bis 5 km: Bestellungen ≤20 € kosten pauschal 3,50 €. Bei 20–25 €:
-          3,50 € + 0,10 €/km. Über 25 €: 14 % des Bestellwerts + 0,10 €/km.
-          Über 5 km kommen 0,40 €/km hinzu. Distanzaufschläge: &gt;15 km +0,50 €/km,
-          &gt;20 km zusätzlich +1,10 €/km.
-        </p>
-      </div>
+      <ul style="margin:0;padding-left:18px">
+  <li>Bis 2 km: kein Distanzanteil.</li>
+  <li>Bestellwert ≤ 25 €: Grundpreis 3,50 €.</li>
+  <li>Bestellwert &gt; 25 €: 14 % des Bestellwerts.</li>
+  <li>Zzgl. Distanzanteil (nur für den übersteigenden Teil):
+    <ul>
+      <li>&gt; 2–7 km: 0,50 €/km</li>
+      <li>&gt; 7–12 km: 0,80 €/km</li>
+      <li>&gt; 12 km: 1,00 €/km</li>
+    </ul>
+  </li>
+</ul>
+
 
       <div class="costGrid" id="costGrid" data-base="3.50" data-included-km="2" data-per-km="1.20" data-wait-per-5="0.80">
-        <div class="costItem"><h4 id="t-c-base">Grundgebühr</h4><div class="v"><span id="cBase">3.50</span> €</div></div>
+        <div class="costItem"><h4 id="t-c-base">Grundgebühr</h4><div class="v"><span id="cBase">≤25: 3,50 • &gt;25: 14 %</span></div></div>
         <div class="costItem"><h4 id="t-c-inc">Inklusive km</h4><div class="v"><span id="cInc">2</span> km</div></div>
-        <div class="costItem"><h4 id="t-c-per">Preis / km</h4><div class="v"><span id="cPer">1.20</span> €</div></div>
+        <div class="costItem"><h4 id="t-c-per">Preis / km</h4><div class="v"><span id="cPer">&gt;2–7: 0,50 • &gt;7–12: 0,80 • &gt;12: 1,00</span> €</div></div>
         <div class="costItem"><h4 id="t-c-wait">Warten (je 5 Min)</h4><div class="v"><span id="cWait">0.80</span> €</div></div>
       </div>
       <div class="calc">
@@ -429,7 +435,7 @@ body::before{
       modal?.addEventListener('click', (e)=>{ if(e.target === modal) modal.classList.remove('active'); });
     })();
 
-    // Costs logic (pricing formula)
+    // Costs logic (pricing formula) — display-only tweaks for the grid values
     (function(){
       const el = document.getElementById('costGrid');
       if(!el) return;
@@ -439,11 +445,14 @@ body::before{
       const cInc  = document.getElementById('cInc');
       const cPer  = document.getElementById('cPer');
       const cWait = document.getElementById('cWait');
-      cBase && (cBase.textContent = base.toFixed(2));
-      cInc  && (cInc.textContent  = inc.toFixed(0));
-      cPer  && (cPer.textContent  = per.toFixed(2));
+
+      // عرض فقط (لا يمس المنطق): نُظهر السياسة الجديدة
+      cBase && (cBase.textContent = '≤25: 3,50 • >25: 14 %');
+      cInc  && (cInc.textContent  = '2');
+      cPer  && (cPer.textContent  = '>2–7: 0,50 • >7–12: 0,80 • >12: 1,00');
       cWait && (cWait.textContent = wait.toFixed(2));
 
+      // === المنطق القديم للحاسبة يبقى كما هو (حسب طلبك) ===
       function computeTotal(amount, km){
         amount = Math.max(0, +amount || 0);
         km     = Math.max(0, +km || 0);
@@ -509,9 +518,9 @@ body::before{
         totalLbl:'Gesamt (geschätzt):',
         appSub:'Android verfügbar — iOS bald.',
         close:'Schließen',
-        note:'Preismodell: bis 5 km → ≤20€: 3,50€ fix; 20–25€: 3,50€ + 0,10€/km; >25€: 14% vom Betrag + 0,10€/km. Über 5 km: +0,40€/km. Distanzaufschläge: >15 km +0,50€/km; >20 km zusätzlich +1,10€/km.',
+        note:'Bis 2 km kostenlos. ≤ 25 €: Grundpreis 3,50 €. > 25 €: 14 % des Bestellwerts. Distanzanteil: > 2–7 km 0,50 €/km, > 7–12 km 0,80 €/km, > 12 km 1,00 €/km.',
         explH:'Wie berechnen wir?',
-        explP:'Bis 5 km: Bestellungen ≤20 € kosten pauschal 3,50 €. Bei 20–25 €: 3,50 € + 0,10 €/km. Über 25 €: 14 % des Bestellwerts + 0,10 €/km. Über 5 km kommen 0,40 €/km hinzu. Distanzaufschläge: >15 km +0,50 €/km, >20 km zusätzlich +1,10 €/km.',
+        explP:'Bis 2 km kostenlos. Bestellwert ≤ 25 €: Grundpreis 3,50 €. Bestellwert > 25 €: 14 % des Bestellwerts. Zzgl. Distanzanteil: > 2–7 km 0,50 €/km, > 7–12 km 0,80 €/km, > 12 km 1,00 €/km.',
         ctaAfterCosts:'Jetzt registrieren und Preise sichern',
         testH:'Was unsere Partner sagen',
         addReviewH:'Bewertung hinzufügen',
@@ -538,9 +547,9 @@ body::before{
         totalLbl:'Estimated total:',
         appSub:'Android available — iOS soon.',
         close:'Close',
-        note:'Pricing: up to 5 km → ≤€20: €3.50 flat; €20–25: €3.50 + €0.10/km; >€25: 14% of order + €0.10/km. Beyond 5 km: +€0.40/km. Distance surcharges: >15 km +€0.50/km; >20 km extra +€1.10/km.',
+        note:'Up to 2 km free. ≤ €25: base €3.50. > €25: 14% of order value. Distance component: >2–7 km €0.50/km, >7–12 km €0.80/km, >12 km €1.00/km.',
         explH:'How is the price calculated?',
-        explP:'Up to 5 km: orders ≤€20 cost a flat €3.50. For €20–25: €3.50 + €0.10/km. Above €25: 14% of order value + €0.10/km. Beyond 5 km add €0.40/km. Distance surcharges: >15 km +€0.50/km; >20 km an extra +€1.10/km.',
+        explP:'Up to 2 km free. Order value ≤ €25: base €3.50. Order value > €25: 14% of order value. Plus distance component: >2–7 km €0.50/km, >7–12 km €0.80/km, >12 km €1.00/km.',
         ctaAfterCosts:'Register now and lock in these prices',
         testH:'What our partners say',
         addReviewH:'Add your review',
@@ -567,9 +576,9 @@ body::before{
         totalLbl:'الإجمالي التقريبي:',
         appSub:'أندرويد متاح — iOS قريبًا.',
         close:'إغلاق',
-        note:'نموذج التسعير: حتى 5 كم → ≤20€: 3.50€ ثابتة؛ 20–25€: 3.50€ + ‎0.10€/كم؛ >25€: ‎14% من قيمة الطلب + ‎0.10€/كم. بعد 5 كم: ‎+0.40€/كم. شرائح المسافة: >15 كم ‎+0.50€/كم؛ >20 كم ‎+1.10€/كم إضافية.',
+        note:'حتى 2 كم مجانًا. إن كان السعر ≤ 25€: رسم أساسي 3.50€. إن كان > 25€: ‎14% من قيمة الطلب. جزء المسافة: ‎>2–7 كم ‎0.50€/كم، ‎>7–12 كم ‎0.80€/كم، ‎>12 كم ‎1.00€/كم.',
         explH:'كيف نحسب السعر؟',
-        explP:'حتى 5 كم: الطلبات ≤20€ تكلف 3.50€ ثابتة. من 20–25€: 3.50€ + ‎0.10€/كم. أكثر من 25€: ‎14% من قيمة الطلب + ‎0.10€/كم. بعد 5 كم يُضاف ‎0.40€/كم. شرائح المسافة: ‎>15 كم ‎+0.50€/كم؛ ‎>20 كم ‎+1.10€/كم إضافية.',
+        explP:'حتى 2 كم مجانًا. قيمة الطلب ≤ 25€: رسم أساسي 3.50€. إذا كانت > 25€: ‎14% من قيمة الطلب. ويُضاف جزء المسافة: ‎>2–7 كم 0.50€/كم، ‎>7–12 كم 0.80€/كم، ‎>12 كم 1.00€/كم.',
         ctaAfterCosts:'سجّل الآن واحصل على هذه الأسعار',
         testH:'ماذا يقول شركاؤنا',
         addReviewH:'أضف تقييمك',
@@ -596,9 +605,9 @@ body::before{
         totalLbl:'Tahmini toplam:',
         appSub:'Android mevcut — iOS yakında.',
         close:'Kapat',
-        note:"Fiyatlandırma: 5 km'ye kadar → ≤20€: 3,50€ sabit; 20–25€: 3,50€ + 0,10€/km; >25€: siparişin %14'ü + 0,10€/km. 5 km üzeri: +0,40€/km. Mesafe ek ücretleri: >15 km +0,50€/km; >20 km ilave +1,10€/km.",
+        note:"İlk 2 km ücretsiz. ≤25€: taban €3,50. >25€: siparişin %14'ü. Mesafe bileşeni: >2–7 km €0,50/km, >7–12 km €0,80/km, >12 km €1,00/km.",
         explH:'Fiyat nasıl hesaplanır?',
-        explP:"5 km'ye kadar: ≤20€ siparişler için sabit 3,50€. 20–25€: 3,50€ + 0,10€/km. 25€ üzeri: sipariş tutarının %14'ü + 0,10€/km. 5 km üzeri +0,40€/km eklenir. Mesafe ek ücretleri: >15 km +0,50€/km; >20 km ilave +1,10€/km.",
+        explP:"İlk 2 km ücretsiz. Sipariş ≤25€ için taban €3,50. >25€ için siparişin %14'ü. Ayrıca mesafe payı: >2–7 km €0,50/km, >7–12 km €0,80/km, >12 km €1,00/km.",
         ctaAfterCosts:'Hemen kaydolun ve bu fiyatları garantileyin',
         testH:'Ortaklarımız ne diyor',
         addReviewH:'Değerlendirme ekle',
