@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
 <style>
-:root{ --bg:#f7f8fb; --card:#fff; --ink:#111; --muted:#6b7280; --cta:#33BBDF; --border:1px solid rgba(0,0,0,.08); --radius:14px; --shadow:0 8px 24px rgba(0,0,0,.10); --hit:44px; --gap:12px; }
+:root{ --bg:#f7f8fb; --card:#fff; --ink:#111; --muted:#6b7280; --cta:#33BBDF; --border:1px solid rgba(0,0,0,.08); --radius:12px; --shadow:0 8px 24px rgba(0,0,0,.10); --hit:44px; --gap:12px; }
 /* === Bindings: تفعيل التوكنز بأمان (fallback يحافظ على الشكل الحالي) === */
 
 /* قاعدة عامة */
@@ -295,10 +295,9 @@ input[type="number"]{-moz-appearance:textfield;text-align:center;font-variant-nu
     <div class="log-head">
       <h3 style="margin:0">Bestellverlauf</h3>
       <div class="log-actions">
-        <button id="logPrint" class="btn-mini">Drucken</button>
-        <button id="logPDF"   class="btn-mini">PDF</button>
-		  <button id="logCSV"   class="btn-mini">CSV</button>
-      </div>
+  <button id="logPDF" class="btn-mini">PDF / Drucken</button>
+</div>
+
     </div>
     <div class="log-sums">
 	<!-- ضع هذا داخل .box في أعلى محتوى السجل (بعد الشيبس/المجاميع) -->
@@ -1459,6 +1458,49 @@ showAuthSafe();
       logList.innerHTML = `<div class="small" style="opacity:.8">— Keine Aufträge —</div>`;
       return;
     }
+	  // === Export helper for PDF: build rows + totals (no driver info)
+  window.__restExportGetData = function(){
+    const filtered = applyFilters(ALL);
+    const rows = filtered.map(({id,o},i)=>{
+      const nr     = (o.nr!=null ? `#${o.nr}` : '');
+      const code   = id;
+      const plat   = Array.isArray(o.platform)? o.platform.join(' / ') : (o.platform||'—');
+      const qty    = Number(o.qty||0) || 0;
+      const price  = Number(o.price||0);
+      const fee    = Number(o.deliveryFee||0);
+      const status = o.status || '—';
+      const dt     = (o.updatedAt?.toDate?.() || o.createdAt?.toDate?.() || null);
+      const created= dt ? dt.toLocaleString('de-DE') : '—';
+      return { idx: i+1, code, nr, platform: plat, qty, price, fee, status, created };
+    });
+
+    const totals = rows.reduce((a,r)=>({
+      orders: a.orders + 1,
+      qty:    a.qty    + (r.qty||0),
+      price:  a.price  + (r.price||0),
+      fee:    a.fee    + (r.fee||0),
+    }), {orders:0, qty:0, price:0, fee:0});
+
+    const period = (() => {
+      const f = logFrom?.value || '';
+      const t = logTo?.value   || '';
+      if(!f && !t) return 'Alle';
+      const toDE = s => {
+        try { return new Date(s).toLocaleString('de-DE', {year:'numeric',month:'2-digit',day:'2-digit'}) }
+        catch{ return s||'—' }
+      };
+      return `${f?toDE(f):'…'} → ${t?toDE(t):'…'}`;
+    })();
+
+    return {
+      meta: {
+        restaurant: hiddenDefaults?.Restaurant_Name || '—',
+        period, status: 'All'
+      },
+      rows, totals
+    };
+  };
+
     logList.innerHTML = filtered.map(({id,o})=>{
       const nr   = (o.nr!=null ? `#${o.nr}` : '');
       const rest = o.restaurant?.name || '—';
@@ -1494,114 +1536,111 @@ showAuthSafe();
   logModal && logModal.addEventListener('click',(e)=>{ if(e.target===logModal) logModal.classList.remove('show'); });
 })();
 /* === Print & PDF — robust via hidden <iframe> === */
+/* === Print & PDF — Restaurant report-like table (single button) === */
 (() => {
   const logModal = document.getElementById('logModal');
-  const btnPrint = document.getElementById('logPrint');
   const btnPDF   = document.getElementById('logPDF');
-  const btnCSV   = document.getElementById('logCSV');
-  if (!logModal) return;
-  const PRINT_CSS = `
+  if (!logModal || !btnPDF) return;
+
+  const euro = n => (Number(n||0)).toLocaleString('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2}) + '€';
+
+  const CSS = `
   <style>
     :root{ color-scheme: light; }
-    html,body{
-      margin:0; padding:0; background:#fff; color:#111;
-      font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-      display:flex; justify-content:center;
-    }
-    .box{
-      width:980px; max-width:100%;
-      margin:0 auto !important;
-      padding:12px;
-      background:#fff; color:#111;
-    }
-    .log-actions{ display:none !important; }
-    .log-list{ display:flex; flex-direction:column; gap:6px; margin-top:8px }
-    .log-row{
-      display:grid; grid-template-columns:auto 1fr auto auto auto;
-      gap:8px; align-items:center;
-      border:1px solid #e5e7eb; border-radius:10px; padding:8px; background:#fff;
-    }
-    .log-id{ font-family: ui-monospace, Menlo, monospace; font-size:12px; opacity:.9 }
-    .log-tag{ font-size:11px; padding:3px 8px; border-radius:999px; background:#eef2ff; border:1px solid #e5e7eb }
-    .chip{ display:inline-block; font-size:12px; padding:6px 10px; border-radius:999px; background:#f3f4f6; border:1px solid #e5e7eb; margin-right:6px; }
+    html,body{ margin:0; padding:0; background:#fff; color:#111;
+      font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; }
+    .wrap{ width:1000px; max-width:100%; margin:0 auto; padding:14px; }
+    h2{ margin:0 0 8px 0 }
+    .meta{ font-size:12px; color:#555; margin-bottom:10px }
+    table{ width:90%; border-collapse:collapse; font-size:12px }
+    th,td{ border:1px solid #e5e7eb; padding:6px 8px; text-align:left; vertical-align:top; }
+    thead th{ background:#f8fafc; font-weight:800 }
+    tfoot td{ background:#f3f4f6; font-weight:800 }
+    .num{ text-align:right; font-variant-numeric: tabular-nums; }
+    .small{ font-size:11px; color:#666 }
     @page{ size:A4; margin:12mm; }
-  </style>
-`;
-  function buildPrintHTML(){
-    const box = logModal.querySelector('.box');
-    if(!box){
-      return `<!doctype html><html><head><meta charset="utf-8"><title>Bestellverlauf</title>${PRINT_CSS}</head><body><div style="padding:16px">— Keine Daten —</div></body></html>`;
-    }
-    const clone = box.cloneNode(true);
-    clone.querySelectorAll('#logClose').forEach(el=>el.remove());
-    return `<!doctype html><html><head><meta charset="utf-8"><title>Bestellverlauf</title>${PRINT_CSS}</head><body>${clone.outerHTML}</body></html>`;
+  </style>`;
+
+  function buildHTML(){
+    const data = window.__restExportGetData ? window.__restExportGetData() : null;
+    const rows = data?.rows || [];
+    const meta = data?.meta || {restaurant:'—', period:'—', status:'All'};
+    const tot  = data?.totals || {orders:0, qty:0, price:0, fee:0};
+
+    const head = `
+      <tr>
+        <th style="width:56px">Nr/Code</th>
+        <th style="width:120px">OrderId</th>
+        <th>Platform</th>
+        <th style="width:58px" class="num">Qty</th>
+        <th style="width:80px" class="num">Price €</th>
+        <th style="width:88px" class="num">Del.Fee €</th>
+        <th style="width:92px">Status</th>
+        <th style="width:150px">Created</th>
+      </tr>`;
+
+    const body = rows.map(r=>`
+      <tr>
+        <td>${'#'+r.idx}</td>
+        <td class="small">${r.code}</td>
+        <td>${r.platform||'—'}</td>
+        <td class="num">${r.qty||0}</td>
+        <td class="num">${euro(r.price||0)}</td>
+        <td class="num">${euro(r.fee||0)}</td>
+        <td>${r.status||'—'}</td>
+        <td>${r.created||'—'}</td>
+      </tr>
+    `).join('');
+
+    const foot = `
+      <tr>
+        <td colspan="3">Totals</td>
+        <td class="num">${tot.qty}</td>
+        <td class="num">${euro(tot.price)}</td>
+        <td class="num">${euro(tot.fee)}</td>
+        <td colspan="2" class="num">Orders: ${tot.orders}</td>
+      </tr>`;
+
+    return `<!doctype html>
+<html><head><meta charset="utf-8"><title>Abrechnungsbericht</title>${CSS}</head>
+<body>
+  <div class="wrap">
+    <h2>Abrechnungsbericht</h2>
+    <div class="meta">
+      Restaurant: <b>${meta.restaurant}</b> &nbsp;•&nbsp;
+      Period: <b>${meta.period}</b> &nbsp;•&nbsp;
+      Status: <b>${meta.status}</b> &nbsp;•&nbsp;
+      Rows: <b>${rows.length}</b>
+    </div>
+    <table>
+      <thead>${head}</thead>
+      <tbody>${body || `<tr><td colspan="8">— Keine Daten —</td></tr>`}</tbody>
+      <tfoot>${foot}</tfoot>
+    </table>
+  </div>
+</body></html>`;
   }
-  function printViaHiddenIframe(html){
-    const iframe = document.createElement('iframe');
-    iframe.style.position='fixed';
-    iframe.style.right='0'; iframe.style.bottom='0';
-    iframe.style.width='0'; iframe.style.height='0';
-    iframe.style.border='0';
-    document.body.appendChild(iframe);
-    const doc = iframe.contentWindow.document;
-    doc.open(); doc.write(html); doc.close();
+
+  function printInHiddenIframe(html){
+    const ifr = document.createElement('iframe');
+    ifr.style.position='fixed'; ifr.style.width='0'; ifr.style.height='0'; ifr.style.border='0';
+    document.body.appendChild(ifr);
+    const d = ifr.contentWindow.document;
+    d.open(); d.write(html); d.close();
     const go = () => {
-      setTimeout(() => {
-        try{
-          iframe.contentWindow.focus();
-          iframe.contentWindow.print();
-        }catch(_){}
-        setTimeout(() => { try{ iframe.remove(); }catch(_){ } }, 500);
-      }, 200);
+      setTimeout(()=>{ try{ ifr.contentWindow.focus(); ifr.contentWindow.print(); }catch(_){} 
+        setTimeout(()=>{ try{ ifr.remove(); }catch(_){ } }, 400); }, 180);
     };
-    if ('complete' === iframe.contentDocument.readyState) go();
-    else iframe.onload = go;
+    if (ifr.contentDocument.readyState === 'complete') go(); else ifr.onload = go;
   }
-  btnPrint?.addEventListener('click', (e)=>{
+
+  btnPDF.addEventListener('click', (e)=>{
     e.preventDefault();
-    const html = buildPrintHTML();
-    printViaHiddenIframe(html);
+    const html = buildHTML();
+    printInHiddenIframe(html); // يطبع، والمستخدم يختار "Save as PDF" إذا أراد
   });
-  btnPDF?.addEventListener('click', (e)=>{
-    e.preventDefault();
-    const html = buildPrintHTML();
-    printViaHiddenIframe(html);
-  });
-btnCSV?.addEventListener('click', async (e)=>{
-  e.preventDefault();
-  try{
-    const rid = auth.currentUser?.uid || window.RESTAURANT_ID;
-    if(!rid){ alert('Bitte zuerst anmelden.'); return; }
-    const snap = await getDocs(query(collection(db,'orders'), where('restaurant.id','==', rid), limit(100)));
-    const rows = [];
-    rows.push(['OrderID','Nr','Restaurant','Platform','Status','Price','DeliveryFee','DateTime']);
-    snap.forEach(ds=>{
-      const o = ds.data() || {};
-      const id = ds.id;
-      const nr = (o.nr != null ? o.nr : '');
-      const rest = o.restaurant?.name || '';
-      const plat = Array.isArray(o.platform) ? o.platform.join(' / ') : (o.platform || '');
-      const status = o.status || '';
-      const price = Number(o.price||0).toFixed(2);
-      const fee   = Number(o.deliveryFee||0).toFixed(2);
-      const dtMs  = (o.updatedAt?.toMillis?.() ?? o.createdAt?.toMillis?.() ?? 0);
-      const dtStr = dtMs ? new Date(dtMs).toISOString() : '';
-      rows.push([id, nr, rest, plat, status, price, fee, dtStr]);
-    });
-    const csv = rows.map(r => r.map(v => `"${String(v).replace(/"/g,'""')}"`).join(',')).join('\r\n');
-    const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = `bestellverlauf_${new Date().toISOString().slice(0,10)}.csv`;
-    document.body.appendChild(a);
-    a.click();
-    setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); }, 500);
-  }catch(err){
-    console.error('CSV export error', err);
-    alert('CSV-Export fehlgeschlagen.');
-  }
-});
 })();
+
 </script>
 </body>
 </html>
