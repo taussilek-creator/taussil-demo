@@ -454,6 +454,61 @@ body{ font-size: var(--ui-font-base); }
     </div>
   </div>
 </div>
+<!-- ========= Export Modal ========= -->
+<div id="export-modal" class="modal">
+  <div class="box">
+    <div class="row" style="justify-content:space-between">
+      <strong>Export – Billing Report</strong>
+      <button id="export-close" class="btn secondary">Schließen</button>
+    </div>
+
+    <div class="grid cols-2" style="margin-top:10px">
+      <div>
+        <div class="small">Restaurant</div>
+        <select id="export-restaurant" style="width:100%;height:38px;border:1px solid #e5e7eb;border-radius:10px">
+          <option value="">All</option>
+        </select>
+      </div>
+      <div>
+        <div class="small">Status</div>
+        <select id="export-status" multiple size="6" style="width:100%;height:100%;border:1px solid #e5e7eb;border-radius:10px">
+          <option>Bearbeitung</option>
+          <option>Zugewiesen</option>
+          <option>Angenommen</option>
+          <option>Unterwegs</option>
+          <option>Geliefert</option>
+          <option>Abgebrochen</option>
+        </select>
+      </div>
+      <div>
+        <div class="small">From</div>
+        <input id="export-from" type="date" style="width:100%;height:38px;border:1px solid #e5e7eb;border-radius:10px">
+      </div>
+      <div>
+        <div class="small">To (inclusive)</div>
+        <input id="export-to" type="date" style="width:100%;height:38px;border:1px solid #e5e7eb;border-radius:10px">
+      </div>
+    </div>
+
+    <div style="margin-top:10px">
+      <div class="small" style="margin-bottom:6px">Columns</div>
+      <div id="export-cols" class="row" style="flex-wrap:wrap;gap:8px">
+        <!-- يتم حقن الأعمدة افتراضيًا من JS -->
+      </div>
+    </div>
+
+    <div class="row" style="justify-content:flex-end;margin-top:12px;gap:8px">
+      <button id="export-run-csv" class="btn">⬇️ CSV</button>
+      <button id="export-run-pdf" class="btn secondary">🖨️ PDF</button>
+	  <!-- ضع هذا الزر بجانب أزرار CSV / PDF داخل المودال -->
+<button id="export-run-xlsx" class="btn">📄 Excel</button>
+<button id="export-run-gsheet" class="btn secondary">🟢 Google Sheet</button>
+
+
+    </div>
+    <div id="export-msg" class="small" style="margin-top:8px;color:#6b7280"></div>
+  </div>
+</div>
 
 <!-- ========= Sounds (ضع ملفاتك الفعلية هنا) ========= -->
 <audio id="snd-restaurant" src="neu1.mp3" preload="auto"></audio>
@@ -474,8 +529,10 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import {
   getFirestore, collection, query, where, orderBy, limit, onSnapshot,
-  doc, getDoc, setDoc, updateDoc, serverTimestamp, deleteDoc
+  doc, getDoc, setDoc, updateDoc, serverTimestamp, deleteDoc,
+  getDocs, Timestamp
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
 import {
   getDatabase, ref as rRef, onValue, update as rUpdate
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
@@ -578,6 +635,12 @@ const initialsOf = (nameOrEmail='')=>{
   }
   return (parts[0][0] + (parts[1]?.[0]||'')).toUpperCase();
 };
+function getRestaurantDisplayName(rid){
+  if(!rid) return 'All';
+  const all = [...(restaurants||[]), ...(restaurantUsersApproved||[])];
+  const row = all.find(r => r.id === rid);
+  return row?.name || rid; // fallback لو ما انوجد
+}
 
 /* ===== Sounds (no 404, proper mute) ===== */
 const sounds = {
@@ -1489,14 +1552,32 @@ async function deleteSelectedOrders(){
 function ensurePrintStyles(){
   if (document.getElementById('taussil-print-css')) return;
   const css = `
-#print-report{ display:none; padding:24px; font:13px/1.45 system-ui, -apple-system, Segoe UI, Roboto, sans-serif; color:#111827; }
-#print-report h1{ font-size:18px; margin:0 0 10px; }
-#print-report .meta{ font-size:12px; color:#6b7280; margin-bottom:12px; }
-#print-report table{ width:100%; border-collapse:collapse; }
-#print-report th, #print-report td{ border:1px solid #e5e7eb; padding:6px 8px; vertical-align:top; }
-#print-report th{ background:#f8fafc; text-align:left; font-weight:700; }
+#print-report{
+  display:none;
+  padding:16px;
+  font:11px/1.3 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  color:#111827;
+}
+#print-report h1{ font-size:16px; margin:0 0 8px; }
+#print-report .meta{ font-size:10px; color:#6b7280; margin-bottom:8px; }
+#print-report table{ width:100%; border-collapse:collapse; table-layout:fixed; }
+#print-report th, #print-report td{
+  border:1px solid #e5e7eb;
+  padding:4px 6px;
+  vertical-align:top;
+  white-space:nowrap;           /* سطر واحد */
+  overflow:hidden; text-overflow:ellipsis;
+  font-size:11px;
+}
+#print-report th{
+  background:#f8fafc;
+  text-align:left;
+  font-weight:700;
+}
+#print-report td.num, #print-report th.num{ text-align:right; }
 #print-report tfoot td{ font-weight:700; background:#f9fafb; }
-@media print {
+
+@media print{
   body > *:not(#print-report){ display:none !important; }
   #print-report{ display:block !important; }
   thead{ display:table-header-group; }
@@ -1509,15 +1590,23 @@ function ensurePrintStyles(){
   document.head.appendChild(style);
 }
 
+
 /* 2) أدوات تنسيق */
 function fmtNum(n){ const x=Number(n); return Number.isFinite(x)? x.toFixed(2) : ''; }
-function fmtTs(ts){
+function fmtTsLatn(ts, locale='de-DE'){
   try{
-    if (ts?.toDate) return ts.toDate().toLocaleString();
-    if (typeof ts==='number') return new Date(ts).toLocaleString();
-    return ts || '';
+    const d = ts?.toDate ? ts.toDate()
+      : (ts instanceof Date ? ts
+      : (typeof ts==='number' ? new Date(ts) : null));
+    if(!d) return '';
+    return new Intl.DateTimeFormat(locale, {
+      year:'numeric', month:'2-digit', day:'2-digit',
+      hour:'2-digit', minute:'2-digit',
+      numberingSystem:'latn', hour12:false
+    }).format(d);
   }catch(_){ return ''; }
 }
+
 function getAllOrdersLoaded(){ return Array.isArray(orders)? orders : []; }
 function getVisibleOrderIds(){
   const wrap = document.getElementById('orders-log');
@@ -1531,79 +1620,6 @@ function getVisibleOrders(){
   const map = new Map(orders.map(o=>[o.id,o]));
   return ids.map(id => map.get(id)).filter(Boolean);
 }
-
-/* 3) بناء تقرير للطباعة (جداول) */
-function buildPrintableReport(rows){
-  let host = document.getElementById('print-report');
-  if(host) host.remove();
-  host = document.createElement('div');
-  host.id = 'print-report';
-
-  let sumQty=0, sumPrice=0, sumFee=0;
-  rows.forEach(o=>{
-    sumQty += Number(o.qty||0);
-    sumPrice += Number(o.price||0);
-    sumFee += Number(readFee(o)||0);
-  });
-
-  const now = new Date().toLocaleString();
-  const title = currentLang==='ar' ? 'تقرير الطلبات'
-              : currentLang==='de' ? 'Auftragsbericht'
-              : 'Orders Report';
-
-  const headCols = ['Nr/Code','OrderId','Restaurant','Rest.Phone','Driver','Driver.Phone','Platform','Qty','Price €','Del.Fee €','Status','Pickup','Created','Updated'];
-  const esc = s => String(s ?? '').replace(/[<>&]/g, c=>({ '<':'&lt;','>':'&gt;','&':'&amp;' }[c]));
-
-  const bodyRows = rows.map(o=>{
-    const nrOr = (o.nr!=null? `#${o.nr}` : (o.shortCode || (o.id || '')));
-    const plat = Array.isArray(o.platform)? o.platform.join(' / ') : (o.platform||'');
-    const rName= o.restaurant?.name || '';
-    const rPhone=o.restaurant?.phone || '';
-    const dName= o.driver?.fullName || '';
-    const dPhone=o.driver?.phone || '';
-    const price= fmtNum(o.price);
-    const fee  = fmtNum(readFee(o));
-    const created = fmtTs(o.createdAt);
-    const updated = fmtTs(o.updatedAt);
-    return `<tr>
-      <td>${esc(nrOr)}</td>
-      <td>${esc(o.id||'')}</td>
-      <td>${esc(rName)}</td>
-      <td>${esc(rPhone)}</td>
-      <td>${esc(dName)}</td>
-      <td>${esc(dPhone)}</td>
-      <td>${esc(plat)}</td>
-      <td>${Number(o.qty||0)}</td>
-      <td>${esc(price)}</td>
-      <td>${esc(fee)}</td>
-      <td>${esc(o.status||'')}</td>
-      <td>${esc(o.pickupTime||'')}</td>
-      <td>${esc(created)}</td>
-      <td>${esc(updated)}</td>
-    </tr>`;
-  }).join('');
-
-  const footer = `<tr>
-    <td colspan="7">Totals</td>
-    <td>${sumQty}</td>
-    <td>${fmtNum(sumPrice)}</td>
-    <td>${fmtNum(sumFee)}</td>
-    <td colspan="4"></td>
-  </tr>`;
-
-  host.innerHTML = `
-    <h1>${esc(title)}</h1>
-    <div class="meta">${esc(now)} • ${rows.length} rows</div>
-    <table>
-      <thead><tr>${headCols.map(h=>`<th>${esc(h)}</th>`).join('')}</tr></thead>
-      <tbody>${bodyRows}</tbody>
-      <tfoot>${footer}</tfoot>
-    </table>
-  `;
-  document.body.appendChild(host);
-  return host;
-}
-
 /* 4) CSV عام */
 function exportCsv(rows, filenameTag){
   const headers = ['NrOrCode','OrderId','Restaurant','RestaurantPhone','Driver','DriverPhone','Platform','Qty','PriceEUR','DeliveryFeeEUR','Status','PickupTime','CreatedAt','UpdatedAt'];
@@ -1633,46 +1649,25 @@ function exportCsv(rows, filenameTag){
   document.body.appendChild(a); a.click(); a.remove();
   URL.revokeObjectURL(url);
 }
-
 /* 5) شريط الأزرار */
 function ensureExportBar(){
   const logWrap = document.getElementById('orders-log');
   if(!logWrap) return;
-  if(document.getElementById('orders-export-bar')) return;
 
-  const bar = document.createElement('div');
-  bar.id = 'orders-export-bar';
-  bar.style.cssText = 'display:flex;gap:8px;align-items:center;justify-content:flex-end;margin:8px 0;';
-  bar.innerHTML = `
-    <button id="btn-print" class="btn secondary" title="Print / PDF">🖨️ Print/PDF</button>
-    <button id="btn-csv-visible" class="btn" title="Export CSV (Shown)">⬇️ CSV (Shown)</button>
-    <button id="btn-csv-all" class="btn" title="Export CSV (All)">⬇️ CSV (All)</button>
-  `;
-  logWrap.parentElement?.insertBefore(bar, logWrap);
+  let bar = document.getElementById('orders-export-bar');
+  if(!bar){
+    bar = document.createElement('div');
+    bar.id = 'orders-export-bar';
+    bar.style.cssText = 'display:flex;gap:8px;align-items:center;justify-content:flex-end;margin:8px 0;';
+    bar.innerHTML = `<button id="btn-export-open" class="btn">📦 Export…</button>`;
+    logWrap.parentElement?.insertBefore(bar, logWrap);
+  }
 
-  document.getElementById('btn-print').addEventListener('click', ()=>{
-    const visible = getVisibleOrders();
-    const rows = visible.length ? visible : getAllOrdersLoaded();
-    if(!rows.length){ alert('لا توجد بيانات للطباعة'); return; }
-    ensurePrintStyles();
-    const host = buildPrintableReport(rows);
-    const cleanup = ()=>{ host?.remove(); window.removeEventListener('afterprint', cleanup); };
-    window.addEventListener('afterprint', cleanup);
-    window.print();
-  });
-
-  document.getElementById('btn-csv-visible').addEventListener('click', ()=>{
-    const rows = getVisibleOrders();
-    if(!rows.length){ alert('لا توجد صفوف ظاهرة للتصدير'); return; }
-    exportCsv(rows, 'visible');
-  });
-
-  document.getElementById('btn-csv-all').addEventListener('click', ()=>{
-    const rows = getAllOrdersLoaded();
-    if(!rows.length){ alert('لا توجد بيانات'); return; }
-    exportCsv(rows, 'all');
-  });
+  const btn = document.getElementById('btn-export-open');
+  if(btn) btn.onclick = openExportModal;
 }
+
+
 
 /* ===== Pending Approvals (Admin Inbox) ===== */
 let pendingDrivers = [];
@@ -2012,6 +2007,414 @@ setMuted(isMuted);
 translatePage();
 lucide.createIcons();
 initMiniMap().catch(()=>{});
+/* ===== Smart Export (Billing) ===== */
+/* ===== Smart Export (Billing) — XLSX (Excel) lazy loader & exporter ===== */
+/* 1) Loader كسول للـ XLSX — لا يوقف الملف لو فشل */
+let __xlsxMod = null;
+async function loadXLSX(){
+  if(__xlsxMod) return __xlsxMod;
+  try {
+    // المحاولة الأولى: unpkg (نسخة .mjs)
+    __xlsxMod = await import("https://unpkg.com/xlsx@0.19.3/xlsx.mjs");
+    return __xlsxMod;
+  } catch(e1){
+    console.warn("Primary XLSX import failed, trying fallback...", e1);
+    try {
+      // المحاولة الثانية: آخر نسخة على jsDelivr
+      __xlsxMod = await import("https://cdn.jsdelivr.net/npm/xlsx/xlsx.mjs");
+      return __xlsxMod;
+    } catch(e2){
+      console.error("Both XLSX imports failed", e2);
+      return null;
+    }
+  }
+}
+
+
+/* 2) دالة البناء (لا تعتمد على متغيّر عام؛ نمرّر XLSX صراحةً) */
+function buildXlsxCustom(mappedRows, cols, metaText, fileTag, XLSX){
+  if(!XLSX || !XLSX.utils){
+    console.warn('XLSX ESM not loaded');
+    if (typeof exportMsg !== 'undefined' && exportMsg) exportMsg.textContent = 'Excel engine failed to load';
+    return;
+  }
+
+  // AoA = meta + blank + headers + data + totals
+  const headerLine = [metaText || ''];
+  const blank = [''];
+  const headers = cols.map(c => c.label);
+  const dataRows = mappedRows.map(r => cols.map(c => r[c.key] ?? ''));
+
+  // Totals (مرتبطة بالأعمدة المختارة)
+  const ordersCount = mappedRows.length;
+  let sumQty=0, sumPrice=0, sumFee=0;
+  mappedRows.forEach(r=>{ sumQty+=Number(r.qty||0); sumPrice+=Number(r.price||0); sumFee+=Number(r.fee||0); });
+
+  const totalsRow = cols.map((c, idx)=>{
+    if(idx===0)          return 'Totals';
+    if(c.key==='id')     return ordersCount;
+    if(c.key==='qty')    return sumQty;
+    if(c.key==='price')  return Number(sumPrice.toFixed(2)); // سننسّق € لاحقًا
+    if(c.key==='fee')    return Number(sumFee.toFixed(2));   // سننسّق € لاحقًا
+    return '';
+  });
+
+  const aoa = [headerLine, blank, headers, ...dataRows, totalsRow];
+
+  // إنشاء الورقة
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+
+  // عرض أعمدة منطقي
+  const colWidths = cols.map(c=>{
+    if(c.key==='created') return { wch: 22 };
+    if(['price','fee'].includes(c.key)) return { wch: 12 };
+    if(c.key==='qty') return { wch: 6 };
+    return { wch: 16 };
+  });
+  // ميتا + سطر فاصل + أعمدة البيانات
+  ws['!cols'] = [{ wch: 40 }, { wch: 6 }, ...colWidths];
+
+  // تنسيق € لصف التوتال للأعمدة المالية
+  const range = XLSX.utils.decode_range(ws['!ref']);
+  const lastRow = range.e.r; // صف التوتال
+  cols.forEach((c, i)=>{
+    if(c.key==='price' || c.key==='fee'){
+      const cellAddr = XLSX.utils.encode_cell({ r: lastRow, c: 2 + i }); // +2 بسبب الميتا+الفاصل
+      if(ws[cellAddr]) ws[cellAddr].z = '#,##0.00 "€"';
+    }
+  });
+
+  // إنشاء Workbook وحفظ الملف
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Billing');
+  const tag = fileTag || new Date().toISOString().slice(0,10);
+  XLSX.writeFile(wb, `taussil_billing_${tag}.xlsx`, { bookType:'xlsx' });
+}
+
+/* 3) مستمع زر Excel — يُحمّل XLSX عند الطلب ثم يصدّر */
+document.getElementById('export-run-xlsx')?.addEventListener('click', async ()=>{
+  // يفترض وجود عناصر ودوال منظومة التصدير لديك:
+  // exportMsg, exportRest, exportFrom, exportTo
+  // readSelectedStatuses, readSelectedCols
+  // queryOrdersForExport, mapRow, fmtTsLatn, getRestaurantDisplayName
+
+  if (typeof exportMsg !== 'undefined' && exportMsg) exportMsg.textContent = 'Building Excel…';
+
+  // التحقق من الفترة
+  const rid   = exportRest?.value || '';
+  const fromD = exportFrom?.value ? new Date(exportFrom.value) : null;
+  const toD   = exportTo?.value   ? new Date(exportTo.value + 'T23:59:59') : null;
+  if(!fromD || !toD){
+    if (exportMsg) exportMsg.textContent='Bitte Zeitraum wählen';
+    return;
+  }
+
+  // قراءة الفلاتر والأعمدة
+  const sts   = readSelectedStatuses();
+  const cols  = readSelectedCols();
+  if(!cols.length){
+    if (exportMsg) exportMsg.textContent='Select at least one column';
+    return;
+  }
+
+  // تحميل XLSX كسولًا
+  const XLSX = await loadXLSX();
+  if(!XLSX){
+    if (exportMsg) exportMsg.textContent='Excel engine failed to load';
+    return;
+  }
+
+  // جلب البيانات من Firestore (الدالة موجودة سابقًا عندك)
+  const rows = await queryOrdersForExport({
+    restaurantId: rid || null,
+    fromDate: fromD,
+    toDate: toD,
+    statuses: sts
+  });
+  const mapped = rows.map(mapRow);
+
+  // ميتا التقرير (عنوان أعلى الشيت)
+  const restName = getRestaurantDisplayName(rid || '');
+  const fromTxt  = fmtTsLatn(fromD);
+  const toTxt    = fmtTsLatn(toD);
+  const stsLabel = sts.length ? sts.join(', ') : 'All';
+  const meta = `Restaurant: ${restName} • Period: ${fromTxt} → ${toTxt} • Status: ${stsLabel}`;
+
+  // بناء وحفظ Excel
+  buildXlsxCustom(
+    mapped,
+    cols,
+    meta,
+    `${exportFrom.value}_${exportTo.value}${rid?('_'+rid):''}`,
+    XLSX
+  );
+
+  if (exportMsg) exportMsg.textContent = `Excel generated: ${mapped.length} rows`;
+});
+/* ===== End XLSX Export ===== */
+
+const exportModal = document.getElementById('export-modal');
+const exportClose = document.getElementById('export-close');
+const exportRest  = document.getElementById('export-restaurant');
+const exportStatus= document.getElementById('export-status');
+const exportFrom  = document.getElementById('export-from');
+const exportTo    = document.getElementById('export-to');
+const exportCols  = document.getElementById('export-cols');
+const exportMsg   = document.getElementById('export-msg');
+
+const EXPORT_COL_DEFS = [
+  {key:'nr',         label:'Nr/Code'},
+  {key:'id',         label:'OrderId'},
+  {key:'restaurant', label:'Restaurant'},
+  {key:'restPhone',  label:'Rest.Phone'},
+  {key:'driver',     label:'Driver'},
+  {key:'drvPhone',   label:'Driver.Phone'},
+  {key:'platform',   label:'Platform'},
+  {key:'qty',        label:'Qty'},
+  {key:'price',      label:'Price €'},
+  {key:'fee',        label:'Del.Fee €'},
+  {key:'status',     label:'Status'},
+  {key:'pickup',     label:'Pickup'},
+  {key:'created',    label:'Created'},
+  {key:'updated',    label:'Updated'},
+];
+
+function openExportModal(){
+  // تعبئة المطاعم
+  if(exportRest && exportRest.options.length <= 1){
+    const seen = new Set();
+    [...(restaurants||[]), ...(restaurantUsersApproved||[])]
+      .forEach(r=>{
+        const id = r.id;
+        if(!id || seen.has(id)) return;
+        seen.add(id);
+        const name = r.name || id;
+        const opt = document.createElement('option');
+        opt.value = id; opt.textContent = name;
+        exportRest.appendChild(opt);
+      });
+  }
+
+  // تعبئة الأعمدة (مع اختيار افتراضي)
+  if(exportCols && !exportCols.dataset.ready){
+    exportCols.dataset.ready = '1';
+    const defaultOn = new Set(['nr','id','restaurant','qty','price','fee','status','created','updated']);
+    EXPORT_COL_DEFS.forEach(c=>{
+      const id = 'col_'+c.key;
+      const wrap = document.createElement('label');
+      wrap.style.cssText='display:flex;align-items:center;gap:6px;border:1px solid #e5e7eb;padding:4px 8px;border-radius:10px;background:#fff';
+      wrap.innerHTML = `<input type="checkbox" id="${id}" ${defaultOn.has(c.key)?'checked':''}> <span>${c.label}</span>`;
+      exportCols.appendChild(wrap);
+    });
+  }
+
+  // افتراض الفترة = هذا الشهر
+  const today = new Date();
+  const y = today.getFullYear(), m = String(today.getMonth()+1).padStart(2,'0');
+  exportFrom.value = `${y}-${m}-01`;
+  exportTo.value   = `${y}-${m}-${String(new Date(y, Number(m), 0).getDate()).padStart(2,'0')}`;
+
+  exportMsg.textContent = 'Select filters then export.';
+  exportModal.classList.add('open');
+}
+exportClose?.addEventListener('click', ()=> exportModal.classList.remove('open'));
+
+function readSelectedStatuses(){
+  return Array.from(exportStatus?.selectedOptions || []).map(o=>o.value);
+}
+function readSelectedCols(){
+  const picks = [];
+  EXPORT_COL_DEFS.forEach(c=>{
+    const el = document.getElementById('col_'+c.key);
+    if(el && el.checked) picks.push(c);
+  });
+  return picks;
+}
+
+function toEndOfDay(ts){ const d = new Date(ts); d.setHours(23,59,59,999); return d; }
+
+async function queryOrdersForExport({restaurantId, fromDate, toDate, statuses}){
+  const colRef = collection(db,'orders');
+  // الأساس: مدى التاريخ + ترتيب
+  let baseQ = query(
+    colRef,
+    where('createdAt','>=', Timestamp.fromDate(fromDate)),
+    where('createdAt','<=', Timestamp.fromDate(toDate)),
+    orderBy('createdAt','asc')
+  );
+
+  // إن وُجد مطعم، فلتر بالسيرفر أولاً (الأفضل) – قد يطلب Index
+  let qy = baseQ;
+  if (restaurantId) {
+    qy = query(baseQ, where('restaurant.id','==', restaurantId));
+  }
+
+  try {
+    const snap = await getDocs(qy);
+    let rows = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+    // فلترة الحالة على العميل (multi-select)
+    if (statuses && statuses.length) {
+      const want = new Set(statuses.map(s => String(s||'').toLowerCase()));
+      rows = rows.filter(o => want.has(String(o.status||'').toLowerCase()));
+    }
+    return rows;
+
+  } catch (e) {
+    // إذا احتاج Index، نعمل Fallback: نجلب بالمدى فقط ثم نفلتر المطعم محليًا
+    if (e?.code === 'failed-precondition') {
+      console.warn('[Export] Missing index; using client-side filter fallback.');
+      const snap = await getDocs(baseQ);
+      let rows = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      if (restaurantId) {
+        rows = rows.filter(o => (o.restaurant?.id || o.restaurantId) === restaurantId);
+      }
+      if (statuses && statuses.length) {
+        const want = new Set(statuses.map(s => String(s||'').toLowerCase()));
+        rows = rows.filter(o => want.has(String(o.status||'').toLowerCase()));
+      }
+      return rows;
+    }
+    throw e;
+  }
+}
+
+
+function mapRow(o){
+  return {
+    nr: (o.nr!=null? `#${o.nr}` : (o.shortCode||o.id||'')),
+    id: o.id||'',
+    restaurant: o.restaurant?.name||'',
+    restPhone: o.restaurant?.phone||'',
+    driver: o.driver?.fullName||'',
+    drvPhone: o.driver?.phone||'',
+    platform: Array.isArray(o.platform)? o.platform.join(' / ') : (o.platform||''),
+    qty: Number(o.qty||0),
+    price: fmtNum(o.price),
+    fee: fmtNum(readFee(o)),
+    status: o.status||'',
+    pickup: o.pickupTime||'',
+    created: fmtTsLatn(o.createdAt),   // <-- هنا
+    updated: fmtTsLatn(o.updatedAt),   // <-- وهنا
+  };
+}
+
+
+function buildCsvCustom(rows, cols, tag){
+  const headers = cols.map(c=>c.label).join(',');
+  const esc = v => {
+    if (v===null||v===undefined) return '';
+    const s = String(v).replace(/"/g,'""');
+    return /[",\n]/.test(s) ? `"${s}"` : s;
+  };
+  const lines = rows.map(r => cols.map(c => esc(r[c.key] ?? '')).join(','));
+  const csv = [headers, ...lines].join('\n');
+  const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
+  const url  = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = `taussil-billing_${tag||Date.now()}.csv`;
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
+}
+
+function buildPrintableReportCustom(mappedRows, cols, metaText){
+  ensurePrintStyles();
+
+  let host = document.getElementById('print-report');
+  if(host) host.remove();
+  host = document.createElement('div');
+  host.id = 'print-report';
+
+  const esc = s => String(s ?? '').replace(/[<>&]/g, c=>({ '<':'&lt;','>':'&gt;','&':'&amp;' }[c]));
+
+  // حساب الإجماليات
+  const ordersCount = mappedRows.length;
+  let sumQty = 0, sumPrice = 0, sumFee = 0;
+  mappedRows.forEach(r=>{
+    sumQty   += Number(r.qty||0);
+    sumPrice += Number(r.price||0);
+    sumFee   += Number(r.fee||0);
+  });
+
+  // الرؤوس
+  const thead = `<tr>${cols.map(c=>`<th${(['qty','price','fee'].includes(c.key)?' class="num"':'')}>${esc(c.label)}</th>`).join('')}</tr>`;
+
+  // الجسم
+  const tbody = mappedRows.map(r=>`<tr>${
+    cols.map(c=>{
+      const val = r[c.key] ?? '';
+      const cls = (['qty','price','fee'].includes(c.key)? ' class="num"' : '');
+      return `<td${cls}>${esc(val)}</td>`;
+    }).join('')
+  }</tr>`).join('');
+
+  // تذييل: Totals ديناميكي لكل الأعمدة المختارة
+  const tfootCells = cols.map((c, idx)=>{
+    if(idx===0){
+      return `<td>Totals (Orders: ${ordersCount})</td>`;
+    }
+    if(c.key==='qty')   return `<td class="num">${sumQty}</td>`;
+    if(c.key==='price') return `<td class="num">${sumPrice.toFixed(2)}</td>`;
+    if(c.key==='fee')   return `<td class="num">${sumFee.toFixed(2)}</td>`;
+    return `<td></td>`;
+  }).join('');
+  const tfoot = `<tr>${tfootCells}</tr>`;
+
+  // تجميع
+  host.innerHTML = `
+    <h1>${esc(currentLang==='ar' ? 'تقرير الفوترة' : (currentLang==='de' ? 'Abrechnungsbericht' : 'Billing Report'))}</h1>
+    <div class="meta">${esc(metaText || '')} • Rows: ${ordersCount}</div>
+    <table>
+      <thead>${thead}</thead>
+      <tbody>${tbody}</tbody>
+      <tfoot>${tfoot}</tfoot>
+    </table>
+  `;
+  document.body.appendChild(host);
+
+  const cleanup = ()=>{ host?.remove(); window.removeEventListener('afterprint', cleanup); };
+  window.addEventListener('afterprint', cleanup);
+  window.print();
+}
+
+
+async function runExport(kind){
+  try{
+    exportMsg.textContent = 'Loading…';
+    const rid   = exportRest.value || '';
+    const fromD = exportFrom.value ? new Date(exportFrom.value) : null;
+    const toD   = exportTo.value   ? toEndOfDay(new Date(exportTo.value)) : null;
+    if(!fromD || !toD){ exportMsg.textContent='Bitte Zeitraum wählen'; return; }
+    const sts   = readSelectedStatuses();
+    const cols  = readSelectedCols();
+    if(!cols.length){ exportMsg.textContent='Select at least one column'; return; }
+
+    const rows = await queryOrdersForExport({ restaurantId: rid || null, fromDate: fromD, toDate: toD, statuses: sts });
+    const mapped = rows.map(mapRow);
+
+    const restName = getRestaurantDisplayName(rid || '');
+const stsLabel = sts.length ? sts.join(', ') : 'All';
+const fromTxt  = fmtTsLatn(fromD);
+const toTxt    = fmtTsLatn(toD);
+const meta = `Restaurant: ${restName} • Period: ${fromTxt} → ${toTxt} • Status: ${stsLabel}`;
+
+
+    if(kind==='csv'){
+      buildCsvCustom(mapped, cols, `${exportFrom.value}_${exportTo.value}${rid?('_'+rid):''}`);
+      exportMsg.textContent = `CSV generated: ${mapped.length} rows`;
+    }else{
+      buildPrintableReportCustom(mapped, cols, meta);
+      exportMsg.textContent = `PDF ready: ${mapped.length} rows`;
+    }
+  }catch(e){
+    console.warn(e);
+    exportMsg.textContent = 'Export failed. Check console.';
+  }
+}
+
+document.getElementById('export-run-csv')?.addEventListener('click', ()=> runExport('csv'));
+document.getElementById('export-run-pdf') ?.addEventListener('click', ()=> runExport('pdf'));
+
 </script>
 
 
