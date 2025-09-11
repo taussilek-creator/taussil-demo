@@ -1163,34 +1163,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
   switchPane(lastAuthTab==='register' ? 'register' : 'login');
 });
 </script>
-  ...
-  <!-- سكربتاتك الحالية -->
-
-  <script>
-  document.addEventListener("DOMContentLoaded", ()=>{
-    console.log(">>> Trying direct Median start...");
-    try {
-      median.backgroundLocation.start({
-        postUrl: "https://europe-west1-taussil-lieferservice-8bbe9.cloudfunctions.net/driverLocation?uid=TEST123&token=Taussil_hK8f9Q2w7yP1n",
-        androidPriority: "highAccuracy",
-        androidInterval: 15000,
-        androidFastestInterval: 5000,
-        androidNotificationTitle: "Taussil – Standort aktiv",
-        androidNotificationText: "Fahrer-Tracking läuft im Hintergrund.",
-        iosBackgroundIndicator: true,
-        iosPauseAutomatically: false,
-        iosDesiredAccuracy: "bestForNavigation",
-        iosActivityType: "automotiveNavigation"
-      });
-      console.log(">>> Median started!");
-    } catch(e){
-      console.error(">>> Median failed:", e);
-    }
-  });
-  </script>
 
 </body>
 </html>
 
-</body>
-</html>
