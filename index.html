@@ -435,64 +435,98 @@ body::before{
       modal?.addEventListener('click', (e)=>{ if(e.target === modal) modal.classList.remove('active'); });
     })();
 
-    // Costs logic (pricing formula) — display-only tweaks for the grid values
-    (function(){
-      const el = document.getElementById('costGrid');
-      if(!el) return;
-      const base = +el.dataset.base; const inc = +el.dataset.includedKm;
-      const per  = +el.dataset.perKm; const wait = +el.dataset.waitPer5;
-      const cBase = document.getElementById('cBase');
-      const cInc  = document.getElementById('cInc');
-      const cPer  = document.getElementById('cPer');
-      const cWait = document.getElementById('cWait');
+  // Costs logic (pricing formula) — NEW (matches the bullet rules)
+  (function(){
+    const grid = document.getElementById('costGrid');
+    if(!grid) return;
 
-      // عرض فقط (لا يمس المنطق): نُظهر السياسة الجديدة
-      cBase && (cBase.textContent = '≤25: 3,50 • >25: 14 %');
-      cInc  && (cInc.textContent  = '2');
-      cPer  && (cPer.textContent  = '>2–7: 0,50 • >7–12: 0,80 • >12: 1,00');
-      cWait && (cWait.textContent = wait.toFixed(2));
+    // إظهار السياسة الجديدة فقط (نصيّاً)
+    const cBase = document.getElementById('cBase');
+    const cInc  = document.getElementById('cInc');
+    const cPer  = document.getElementById('cPer');
+    const cWait = document.getElementById('cWait');
 
-      // === المنطق القديم للحاسبة يبقى كما هو (حسب طلبك) ===
-      function computeTotal(amount, km){
-        amount = Math.max(0, +amount || 0);
-        km     = Math.max(0, +km || 0);
+    // إعدادات العرض
+    cBase && (cBase.textContent = '≤25: 3,50 • >25: 14 %');
+    cInc  && (cInc.textContent  = '2');
+    cPer  && (cPer.textContent  = '>2–7: 0,50 • >7–12: 0,80 • >12: 1,00');
 
-        let basePart;
-        if (amount <= 20 && km <= 5) {
-          basePart = 3.5;
-        } else if (amount > 20 && amount <= 25 && km <= 5) {
-          basePart = 3.5 + (0.10 * km);
-        } else if (amount > 25 && km <= 5) {
-          basePart = (amount * 0.14) + (0.10 * km);
-        } else if (amount <= 20 && km > 5) {
-          basePart = 3.5 + (0.50 * (km - 5));
-        } else if (amount > 20 && amount <= 25 && km > 5) {
-          basePart = (3.5 + (0.10 * km)) + (0.40 * (km - 5));
-        } else if (amount > 25 && km > 5) {
-          basePart = ((amount * 0.14) + (0.10 * km)) + (0.40 * (km - 5));
-        } else {
-          basePart = 0;
-        }
+    // نقرأ سعر الانتظار لكل 5 دقائق من الـ DOM إن وُجد، وإلا 0.80 €
+    const WAIT_PER_5 = (()=>{
+      const v = parseFloat((cWait?.textContent || '').replace(',', '.'));
+      return Number.isFinite(v) ? v : 0.80;
+    })();
+    if(cWait) cWait.textContent = WAIT_PER_5.toFixed(2);
 
-        let surcharge = 0;
-        if (km > 20) {
-          surcharge = (0.50 * (20 - 15)) + (1.10 * (km - 20));
-        } else if (km > 15) {
-          surcharge = 0.50 * (km - 15);
-        }
+    // ثوابت السياسة
+    const INCLUDED_KM = 2; // حتى 2 كم بدون جزء مسافة
+    const TIER_1_RATE = 0.50; // >2–7 km
+    const TIER_2_RATE = 0.80; // >7–12 km
+    const TIER_3_RATE = 1.00; // >12 km
 
-        return basePart + surcharge;
+    // تقريب آمن
+    const to2 = n => Math.round((Number(n||0) + Number.EPSILON) * 100) / 100;
+
+    // الحاسبة الجديدة المطابقة للنص:
+    // - ≤25€: قاعدة 3.50€، >25€: 14% من قيمة الطلب
+    // - جزء المسافة فقط لما بعد 2 كم وبشرائح (5 كم، 5 كم، الباقي)
+    // - الانتظار يُحسب لكل 5 دقائق (مقربة للأعلى)
+    function computeTotal(amount, km, waitMin){
+      amount  = Math.max(0, +amount || 0);
+      km      = Math.max(0, +km || 0);
+      waitMin = Math.max(0, +waitMin || 0);
+
+      // Base
+      const base = amount <= 25 ? 3.50 : (amount * 0.14);
+
+      // Distance (beyond INCLUDED_KM only)
+      let d = Math.max(0, km - INCLUDED_KM);
+      let dist = 0;
+
+      // >2–7 km  (حتى 5 كم التالية)
+      const tier1 = Math.min(d, 5);
+      dist += tier1 * TIER_1_RATE;
+      d -= tier1;
+
+      // >7–12 km (حتى 5 كم التالية)
+      if(d > 0){
+        const tier2 = Math.min(d, 5);
+        dist += tier2 * TIER_2_RATE;
+        d -= tier2;
       }
 
-      const btn = document.getElementById('calcBtn');
-      btn?.addEventListener('click', ()=>{
-        const km  = Math.max(0, +document.getElementById('inKm')?.value  || 0);
-        const amt = Math.max(0, +document.getElementById('inAmt')?.value || 0);
-        const total = computeTotal(amt, km);
-        const out = document.getElementById('total');
-        out && (out.textContent = total.toFixed(2));
-      });
-    })();
+      // >12 km (المتبقي)
+      if(d > 0){
+        dist += d * TIER_3_RATE;
+      }
+
+      // Waiting (per started 5 minutes)
+      const waitBlocks = Math.ceil(waitMin / 5);
+      const waitCost = waitBlocks * WAIT_PER_5;
+
+      const total = to2(base + dist + waitCost);
+      return { base: to2(base), dist: to2(dist), wait: to2(waitCost), total };
+    }
+
+    // ربط بالواجهة
+    const btn   = document.getElementById('calcBtn');
+    const inKm  = document.getElementById('inKm');
+    const inAmt = document.getElementById('inAmt');
+    const inWait= document.getElementById('inWait');
+    const out   = document.getElementById('total');
+
+    btn?.addEventListener('click', ()=>{
+      const km   = Math.max(0, +inKm?.value   || 0);
+      const amt  = Math.max(0, +inAmt?.value  || 0);
+      const wait = Math.max(0, +inWait?.value || 0);
+
+      const r = computeTotal(amt, km, wait);
+      if(out) out.textContent = r.total.toFixed(2);
+      // (لو حابب تعرض التفصيل، ممكن تضيف عناصر للـ base/dist/wait وتملأها هنا)
+      // console.log('DEBUG:', r);
+    });
+  })();
+
 
     // Card press feedback
     document.querySelectorAll('.card').forEach(c=>{
