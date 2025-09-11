@@ -506,6 +506,8 @@ mLogout.addEventListener('click', async (e)=>{
   sessionStorage.removeItem(SESSION_OK);
   appRoot.style.display='none'; authModal.style.display='flex';
   detachOrders(); stopPresence(); stopIncomingAlert();
+  stopMedianBG();
+
   toast('Abgemeldet');
 });
 
@@ -601,16 +603,31 @@ registerBtn.addEventListener('click', async (e)=>{
 });
 
 /* ===== Online toggle ===== */
-onlineToggle.addEventListener("click", (e)=>{ e.preventDefault(); setOnline(!online); });
-function setOnline(flag){
+onlineToggle.addEventListener("click", (e)=>{ e.preventDefault(); setOnline(!online); });function setOnline(flag){
   if(!uid){ toast("Bitte zuerst anmelden."); return; }
   if(!approved){ toast("Dein Konto wird geprüft"); return; }
-  online=!!flag;
+
+  online = !!flag;
   onlineToggle.classList.toggle("on", online);
-  statText.textContent = online? "Online":"Offline";
-  localStorage.setItem(ONLINE_PREF_KEY, online?'1':'0');
-  if(online){ startPresence(); attachOrders(); attachInbox(); } else { stopPresence(); detachOrders(); detachInbox(); stopIncomingAlert(); }
+  statText.textContent = online ? "Online" : "Offline";
+  localStorage.setItem(ONLINE_PREF_KEY, online ? '1' : '0');
+
+  if (online){
+    startPresence();
+    attachOrders();
+    attachInbox();
+    // ✅ شغّل تتبّع Median لما يكون Online
+    startMedianBG(uid);
+  } else {
+    stopPresence();
+    detachOrders();
+    detachInbox();
+    stopIncomingAlert();
+    // ⛔️ أوقف Median لما يكون Offline
+    stopMedianBG();
+  }
 }
+
 
 /* ===== Presence + GPS (RTDB) ===== */
 let hbTimer = null; // مؤقت النبضات
@@ -706,6 +723,55 @@ function driverLiveStop(){
 
 // أعِد تشغيل التتبّع عند رجوع التبويب للمقدمة (Safari/Android قد يوقفه بالخلفية)
 document.addEventListener('visibilitychange', ()=>{ if (!document.hidden) driverLiveStart(); });
+/* ===== Median Background Location (Android/iOS) ===== */
+let MEDIAN_BG_ON = false;
+
+function startMedianBG(uid){
+  if(!uid) return;
+
+  const postUrlBase = "https://europe-west1-taussil-lieferservice-8bbe9.cloudfunctions.net/driverLocation";
+  const url = `${postUrlBase}?uid=${encodeURIComponent(uid)}&token=Taussil_hK8f9Q2w7yP1n`;
+
+  const tryStart = () => {
+    try{
+      if (!window.median || !median.backgroundLocation) return false;
+      median.backgroundLocation.start({
+        postUrl: url,
+
+        // ANDROID
+        androidPriority: "highAccuracy",
+        androidInterval: 15000,
+        androidFastestInterval: 5000,
+        androidNotificationTitle: "Taussil – Standort aktiv",
+        androidNotificationText:  "Fahrer-Tracking läuft im Hintergrund.",
+
+        // iOS
+        iosBackgroundIndicator: true,
+        iosPauseAutomatically: false,
+        iosDesiredAccuracy: "bestForNavigation",
+        iosActivityType: "automotiveNavigation"
+      });
+      MEDIAN_BG_ON = true;
+      return true;
+    }catch(e){
+      console.warn("[Median] start failed (will retry)", e);
+      return false;
+    }
+  };
+
+  if (!tryStart()){
+    let tries = 0;
+    const t = setInterval(()=>{
+      tries++;
+      if (tryStart() || tries >= 20) clearInterval(t);
+    }, 500);
+  }
+}
+
+function stopMedianBG(){
+  try{ median?.backgroundLocation?.stop(); }catch(_){}
+  MEDIAN_BG_ON = false;
+}
 
 /* ===== Orders ===== */
 let unsubOrders=null, unsubInbox=null;
@@ -1064,6 +1130,8 @@ onAuthStateChanged(auth, async (user)=>{
     uid=null;
     appRoot.style.display='none'; authModal.style.display='flex';
     detachOrders(); stopPresence(); stopIncomingAlert();
+	stopMedianBG();
+
     switchPane(lastAuthTab==='register' ? 'register' : 'login');
     return;
   }
