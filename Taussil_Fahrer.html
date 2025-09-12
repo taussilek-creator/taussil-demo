@@ -993,7 +993,9 @@ function renderOrders(items){
       e.stopPropagation();
       const el = btn.closest('.card-order');
       const id  = el?.getAttribute("data-id");
-      const idx = el?.getAttribute("data-idx"); // قد تكون null للكارت الرئيس (المفرد)
+      const idxRaw = el?.getAttribute("data-idx");
+const idx = idxRaw !== null ? Number(idxRaw) : null;
+
       await finalizeOrderWithFee(id, idx);
     });
   });
@@ -1275,10 +1277,12 @@ async function finalizeOrderWithFee(id, idx=null){
     // === SINGLE (لا يوجد items) ===
    if(!Array.isArray(o.items) || o.items.length===0){
 // ✅ حماية من تسليم الطلب المركّب بالكامل بالخطأ
-if(Array.isArray(o.items) && o.items.length > 0 && idx === null){
+if(Array.isArray(o.items) && o.items.length > 0 && (idx === null || !Number.isInteger(idx))){
   toast("Bitte jeden Teilauftrag einzeln liefern");
   return;
 }
+
+
 
       const km     = await computeLegKmForOrder(o);
       const betrag = getOrderAmount(o);
