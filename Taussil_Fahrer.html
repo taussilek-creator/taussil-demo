@@ -424,6 +424,18 @@ function calcDeliveryFeeEUR(betrag, km){
 /* تخزين حالة التسعير عبر الأرجل في localStorage */
 const LS_ROUTE_PRICE = 'driver:chain:pricing';
 const round2 = n => Math.round((Number(n||0) + Number.EPSILON) * 100) / 100;
+/* TAUSSIL-PATCH-BEGIN [items-total-for-commission] */
+function itemsTotalFromOrder(o){
+  try{
+    if (Array.isArray(o.items) && o.items.length){
+      const sum = o.items.reduce((a,it)=> a + (Number(it?.price)||0), 0);
+      return round2(sum);
+    }
+  }catch(_){}
+  // إن لم تصل items[] لأي سبب، نرجع لمبلغ الطلب الموجود في الوثيقة
+  return round2(getOrderAmount(o));
+}
+/* TAUSSIL-PATCH-END */
 
 function loadRouteState(){
   try{
@@ -497,20 +509,34 @@ function calcBaseV21(amount){
    - مفرد (لا سلسلة): نستخدم معادلتك الحالية calcDeliveryFeeEUR (تحسب 2 كم على نفس الطلب)
    - داخل سلسلة Multi: 2 كم مجاناً مرة واحدة + الشرائح تراكميًا عبر الأرجل
 */
+/* TAUSSIL-PATCH-BEGIN [commission-14pct-on-multi] */
 function calcFeeSingleOrMulti(orderObj, betrag, legKm){
-  const base = round2(calcBaseV21(betrag));
+  // هل الطلب Multi؟ (إما items[] فيها أكثر من عنصر أو العلم multi=true)
+  const isMulti = (Array.isArray(orderObj?.items) && orderObj.items.length > 1) || orderObj?.multi === true;
+
+  // 1) العمولة:
+  //   - Multi: دائمًا 14% من مجموع أسعار العناصر (itemsTotalFromOrder)
+  //   - Single: القاعدة القديمة (3.5€ إذا ≤25، وإلا 14%)
+  let commissionEUR = 0;
+  if (isMulti){
+    const itemsTotal = itemsTotalFromOrder(orderObj);
+    commissionEUR = round2(itemsTotal * 0.14);
+  } else {
+    commissionEUR = round2(calcBaseV21(betrag));
+  }
+
+  // 2) تكلفة المسافة التراكمية (مع 2 كم مجانًا مرة واحدة على مستوى الرحلة)
   const firstLeg = isRouteFirstLeg(orderObj);
+  const inChain  = !firstLeg && !!getLastDest();
+  const distEUR  = inChain
+    ? priceDistanceProgressive(legKm, false)  // رجل لاحقة: استمر على الحالة
+    : priceDistanceProgressive(legKm, true);  // أول رجل: صفّر الحالة وابدأ
 
-  // إن كانت سلسلة: استخدم التسعير التراكمي لهذه الرجل
-  const inChain = !firstLeg && !!getLastDest(); // وجود وجهة سابقة = داخل سلسلة
-  const distEUR = inChain
-    ? priceDistanceProgressive(legKm, false)
-    : priceDistanceProgressive(legKm, true);    // أول رجل: صفّر الحالة وابدأ من جديد
-
-  // ملاحظة: لو أردت إجبار الطلبات المنفردة خارج أي سلسلة على المعادلة القديمة:
-  // return round2(base + (inChain ? distEUR : priceDistanceSingle(legKm)));
-  return round2(base + distEUR);
+  // 3) الإجمالي
+  return round2(commissionEUR + distEUR);
 }
+/* TAUSSIL-PATCH-END */
+
 
 
 /* ===== Helpers/UI ===== */
@@ -889,64 +915,78 @@ function attachOrders(){
   }, ()=>{ ordersInfo.textContent="Wird geprüft…"; });
 }
 
-function renderOrders(items){
-  const filtered = items.filter(({o})=> inTab(o, currentTab));
-  ordersInfo.textContent = `${filtered.length} sichtbar (${currentTab})`;
-  if(filtered.length===0){ listEl.innerHTML = `<div class="small" style="opacity:.8">— Keine Aufträge —</div>`; return; }
+/* TAUSSIL-PATCH-BEGIN [renderOrders multi-support] */
+function renderOrders(snapshot) {
+  const listEl = document.getElementById("orders-list");
+  listEl.innerHTML = "";
 
-  listEl.innerHTML = filtered.map(({id,o})=>{
-    const stRaw=o.status||"—", st=mapStatusLabel(stRaw);
-    const rest=o.restaurant?.name||"—";
-    const addr=(o.restaurant?.addressText || o.restaurant?.address_text || "").trim();
-    const qty =Number(o.qty||0)||0;
-    const plat=Array.isArray(o.platform)? o.platform.join(" / ") : (o.platform||"—");
-    const lower=String(stRaw).toLowerCase();
-    const showStart = (lower==="angenommen" || lower==="zugewiesen" || lower==="assigned" || lower==="bearbeitung");
-    const showDone  = (lower==="unterwegs");
-    const logoUrl=o.restaurant?.logoUrl||"";
-    const logoHTML = logoUrl? `<img src="${logoUrl}" alt="${rest}">` : `<div class="ph">${(rest||"—").slice(0,2).toUpperCase()}</div>`;
-    const navHref = addr ? makeNavUrl(addr) : '#';
-    return `
-      <div class="card-order" data-id="${id}" data-addr="${encodeURIComponent(addr)}">
-        <div class="logo">${logoHTML}</div>
-        <div class="info">
-          <div class="line"><strong>${rest}</strong> <span class="tag">${st}</span></div>
-          <div class="small">${plat} · Qty ${qty}</div>
-          <div class="small" style="opacity:.85;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${addr || '—'}</div>
-        </div>
-        <div class="act">
-          ${ showStart ? `<a class="btn-icon btn-go" href="${navHref}" target="_blank" rel="noopener noreferrer" data-act="start">▶</a>` : ``}
-          ${ showDone  ? `<button class="btn-icon btn-done" data-act="delivered">✓</button>` : ``}
-        </div>
-      </div>
-    `;
-  }).join("");
+  snapshot.forEach((doc) => {
+    const o = doc.data();
+    const id = doc.id;
 
-  // ربط الأحداث
-  listEl.querySelectorAll(".card-order").forEach(el=>{
-    el.addEventListener("click",(e)=>{
-      if(e.target.closest(".btn-icon")) return;
-      const id = el.getAttribute("data-id"); openDetail(id);
-    });
-    const startA = el.querySelector('a[data-act="start"]');
-    if(startA){
-      startA.addEventListener("click", async (e)=>{
-        const id = el.getAttribute("data-id");
-        const addr = decodeURIComponent(el.getAttribute("data-addr")||"").trim();
-        if(!addr){ e.preventDefault(); toast('Restaurant-Adresse fehlt'); return; }
-        await safeSetStatusToUnterwegs(id);
+    if (o.items && Array.isArray(o.items) && o.items.length > 0) {
+      // MULTI-ORDER
+      o.items.forEach((item, idx) => {
+        const card = document.createElement("div");
+        card.className = "card-order";
+        card.setAttribute("data-id", id);
+        card.setAttribute("data-idx", idx);
+
+        card.innerHTML = `
+          <h3>Order ${id} – Item ${idx + 1}</h3>
+          <p><b>Kunde:</b> ${item.customer || "-"}</p>
+          <p><b>Adresse:</b> ${item.address || "-"}</p>
+          <p><b>Preis:</b> €${item.price?.toFixed(2) || "0.00"}</p>
+          ${idx === 0 ? `<button data-act="start">Start Fahrt</button>` : ""}
+          <button data-act="delivered">Geliefert</button>
+        `;
+
+        listEl.appendChild(card);
+      });
+    } else {
+      // SINGLE-ORDER
+      const card = document.createElement("div");
+      card.className = "card-order";
+      card.setAttribute("data-id", id);
+
+      card.innerHTML = `
+        <h3>Order ${id}</h3>
+        <p><b>Kunde:</b> ${o.customer || "-"}</p>
+        <p><b>Adresse:</b> ${o.address || "-"}</p>
+        <p><b>Preis:</b> €${o.price?.toFixed(2) || "0.00"}</p>
+        <button data-act="start">Start Fahrt</button>
+        <button data-act="delivered">Geliefert</button>
+      `;
+
+      listEl.appendChild(card);
+    }
+  });
+
+  // Event Listener للأزرار
+  listEl.querySelectorAll(".card-order").forEach((el) => {
+    const id = el.getAttribute("data-id");
+    const idx = el.getAttribute("data-idx");
+
+    const startBtn = el.querySelector('button[data-act="start"]');
+    if (startBtn) {
+      startBtn.addEventListener("click", async (e) => {
+        e.stopPropagation();
+        await updateAllItemsStatus(id, "Unterwegs");
       });
     }
+
     const doneBtn = el.querySelector('button[data-act="delivered"]');
-    if(doneBtn){
-      doneBtn.addEventListener("click", async (e)=>{
+    if (doneBtn) {
+      doneBtn.addEventListener("click", async (e) => {
         e.stopPropagation();
-        const id = el.getAttribute("data-id");
-        await finalizeOrderWithFee(id);
+        await finalizeOrderWithFee(id, idx);
       });
     }
   });
 }
+/* TAUSSIL-PATCH-END */
+
+
 
 
 /* ===== Inbox (RTDB) ===== */
@@ -1190,25 +1230,81 @@ async function writeFeeOnly(id, fee){
 
 
 /* العملية الكاملة عند التسليم: route → km → Betrag → Fee → تحديث */
-async function finalizeOrderWithFee(id){
-  try{
-    const ds = await getDoc(doc(db,"orders", id));
-    if(!ds.exists()){ toast("Auftrag nicht gefunden"); return; }
-    const o = ds.data() || {};
-    const km = await computeLegKmForOrder(o);              // كم فعلي
-    const betrag = getOrderAmount(o);                      // مبلغ الطلب
-    const fee = calcFeeSingleOrMulti(o, betrag, km);
-           // المعادلة
-    const res = await writeFeeOnly(id, fee);
-    // اربط السلسلة: آخر نقطة = هذا التسليم
-    const drop = getDropAddr(o);
-    if(drop) setLastDestFromText(drop); else if(lastLL) setLastDestFromLL(lastLL);
-    toast(`Geliefert · ${km.toFixed(2)} km · Liefergebühr ${fee.toFixed(2)}€ (${res.field})`);
-  }catch(e){
-    console.error('finalizeOrderWithFee', e);
-    toast('Fehler beim Abschließen');
+/* TAUSSIL-PATCH-BEGIN [finalizeOrderWithFee multi-support] */
+async function finalizeOrderWithFee(id, idx) {
+  try {
+    if (typeof idx !== "undefined") {
+      // MULTI
+      const orderRef = doc(db, "orders", id);
+      const orderSnap = await getDoc(orderRef);
+      if (!orderSnap.exists()) return;
+      const order = orderSnap.data();
+
+      // تحديث العنصر الحالي كـ Geliefert
+      await updateDoc(orderRef, {
+        [`items.${idx}.status`]: "Geliefert",
+        updatedAt: serverTimestamp()
+      });
+
+      // حساب المسافة (Directions API أو haversine)
+      let legDistanceKm = await routeKm(order, idx); // لازم يكون عندك هالدالة شغالة
+      if (isNaN(legDistanceKm)) legDistanceKm = 0;
+
+      // تخزين المسافة التراكمية
+      const key = "multi_dist_" + id;
+      let total = parseFloat(localStorage.getItem(key) || "0");
+      total += legDistanceKm;
+      localStorage.setItem(key, total.toString());
+
+      // إذا آخر item → حساب العمولة + رسوم المسافة
+      if (parseInt(idx) === order.items.length - 1) {
+        const itemsTotal = order.items.reduce((sum, it) => sum + (it.price || 0), 0);
+        const commission = itemsTotal * 0.14;
+
+        // تطبيق الشرائح على المسافة
+        let distFee = 0;
+        let km = Math.max(0, total - 2); // أول 2 كم مجاني
+        if (km > 0) {
+          const tier1 = Math.min(5, km); // 2–7
+          distFee += tier1 * 0.5;
+          km -= tier1;
+        }
+        if (km > 0) {
+          const tier2 = Math.min(5, km); // 7–12
+          distFee += tier2 * 0.8;
+          km -= tier2;
+        }
+        if (km > 0) {
+          distFee += km * 1.0; // باقي المسافة
+        }
+
+        const deliveryFee = commission + distFee;
+
+        await updateDoc(orderRef, {
+          status: "Geliefert",
+          deliveryFee: round2(deliveryFee),
+          updatedAt: serverTimestamp()
+        });
+
+        localStorage.removeItem(key);
+        toast("Multi-Order abgeschlossen ✔");
+      }
+    } else {
+      // SINGLE
+      await safeSetStatusToGeliefert(id);
+      await calcFeeSingleOrMulti(id);
+    }
+  } catch (err) {
+    console.error("finalizeOrderWithFee error", err);
+    toast("Fehler beim Abschließen des Auftrags");
   }
 }
+/* TAUSSIL-PATCH-END */
+
+
+
+
+
 
 /* ===== Auth gate ===== */
 onAuthStateChanged(auth, async (user)=>{
@@ -1254,8 +1350,22 @@ document.addEventListener('DOMContentLoaded', ()=>{
   authModal.style.display='flex';
   switchPane(lastAuthTab==='register' ? 'register' : 'login');
 });
-</script>
 
+/* ===== Multi helper ===== */
+async function updateAllItemsStatus(id, status) {
+  const orderRef = doc(db, "orders", id);
+  const orderSnap = await getDoc(orderRef);
+  if (!orderSnap.exists()) return;
+
+  const updates = {};
+  orderSnap.data().items.forEach((_, idx) => {
+    updates[`items.${idx}.status`] = status;
+  });
+  updates.updatedAt = serverTimestamp();
+
+  await updateDoc(orderRef, updates);
+}
+
+</script>
 </body>
 </html>
-
