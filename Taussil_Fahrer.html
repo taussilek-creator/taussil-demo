@@ -915,7 +915,7 @@ function attachOrders(){
   }, ()=>{ ordersInfo.textContent="Wird geprüft…"; });
 }
 
-/* TAUSSIL-PATCH-BEGIN [renderOrders:multi-cards] */
+/* TAUSSIL-PATCH-BEGIN [renderOrders:multi-expand] */
 function renderOrders(items){
   const filtered = items.filter(({o})=> inTab(o, currentTab));
   ordersInfo.textContent = `${filtered.length} sichtbar (${currentTab})`;
@@ -925,17 +925,12 @@ function renderOrders(items){
     return;
   }
 
-  // نولّد HTML كسلاسل (ندعم Multi بالتمدد إلى عدّة بطاقات)
   const html = filtered.map(({id,o})=>{
     const baseStatusRaw = o.status || "—";
-    const baseStatusLow = String(baseStatusRaw).toLowerCase();
-
-    const restName = o.restaurant?.name || "—";
-    const plat     = Array.isArray(o.platform)? o.platform.join(" / ") : (o.platform || "—");
-    const logoUrl  = o.restaurant?.logoUrl || "";
-    const logoHTML = logoUrl
-      ? `<img src="${logoUrl}" alt="${restName}">`
-      : `<div class="ph">${(restName||"—").slice(0,2).toUpperCase()}</div>`;
+    const rest = o.restaurant?.name || "—";
+    const plat = Array.isArray(o.platform)? o.platform.join(" / ") : (o.platform || "—");
+    const logoUrl = o.restaurant?.logoUrl || "";
+    const logoHTML = logoUrl ? `<img src="${logoUrl}" alt="${rest}">` : `<div class="ph">${(rest||"—").slice(0,2).toUpperCase()}</div>`;
 
     const canStart = (s)=> {
       const low=String(s||'').toLowerCase();
@@ -943,33 +938,27 @@ function renderOrders(items){
     };
     const canDone = (s)=> String(s||'').toLowerCase()==="unterwegs";
 
-    // --- إن كان MULTI: نمدّده لعدّة بطاقات ---
+    // === MULTI: وسّع الطلب إلى عدّة بطاقات (لكل عنصر بطاقة) ===
     if (Array.isArray(o.items) && o.items.length>0){
       return o.items.map((it, idx)=>{
         const stRaw = it.status || baseStatusRaw;
         const st    = mapStatusLabel(stRaw);
 
-        // عنوان البطاقة لهذه القطعة
+        // عنوان العميل للعنصر
         const addr = (it.address || it.address_text || it.dropoff?.addressText || it.dropoff?.address_text || "").trim();
+        const navHref = addr ? makeNavUrl(addr) : '#';
 
-        // إظهار زر البدء على أول بطاقة فقط (ويغير حالة الجميع)
+        // Start يظهر فقط على أول عنصر ويغيّر حالة كل العناصر
         const showStart = (idx===0) && canStart(stRaw);
         const showDone  = canDone(stRaw) || canDone(baseStatusRaw);
-
-        const navHref = addr ? makeNavUrl(addr) : '#';
 
         return `
           <div class="card-order" data-id="${id}" data-idx="${idx}" data-addr="${encodeURIComponent(addr)}">
             <div class="logo">${logoHTML}</div>
             <div class="info">
-              <div class="line">
-                <strong>${restName}</strong>
-                <span class="tag">${st}</span>
-              </div>
+              <div class="line"><strong>${rest}</strong> <span class="tag">${st}</span></div>
               <div class="small">${plat} · Item ${idx+1}/${o.items.length}</div>
-              <div class="small" style="opacity:.85;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
-                ${addr || '—'}
-              </div>
+              <div class="small" style="opacity:.85;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${addr || '—'}</div>
             </div>
             <div class="act">
               ${ showStart ? `<a class="btn-icon btn-go" href="${navHref}" target="_blank" rel="noopener noreferrer" data-act="start">▶</a>` : ``}
@@ -980,12 +969,11 @@ function renderOrders(items){
       }).join('');
     }
 
-    // --- SINGLE كما هو ---
+    // === SINGLE كما هو ===
     const addr = (o.restaurant?.addressText || o.restaurant?.address_text || "").trim();
     const st   = mapStatusLabel(baseStatusRaw);
     const navHref = addr ? makeNavUrl(addr) : '#';
     const qty  = Number(o.qty||0) || 0;
-
     const showStart = canStart(baseStatusRaw);
     const showDone  = canDone(baseStatusRaw);
 
@@ -993,7 +981,7 @@ function renderOrders(items){
       <div class="card-order" data-id="${id}" data-addr="${encodeURIComponent(addr)}">
         <div class="logo">${logoHTML}</div>
         <div class="info">
-          <div class="line"><strong>${restName}</strong> <span class="tag">${st}</span></div>
+          <div class="line"><strong>${rest}</strong> <span class="tag">${st}</span></div>
           <div class="small">${plat} · Qty ${qty}</div>
           <div class="small" style="opacity:.85;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${addr || '—'}</div>
         </div>
@@ -1007,12 +995,12 @@ function renderOrders(items){
 
   listEl.innerHTML = html;
 
-  // ربط الأحداث (يدعم Multi عبر data-idx إن وجدت)
+  // ربط الأحداث (يدعم Multi عبر data-idx)
   listEl.querySelectorAll(".card-order").forEach(el=>{
     el.addEventListener("click",(e)=>{
       if(e.target.closest(".btn-icon")) return;
       const id = el.getAttribute("data-id");
-      openDetail(id); // التفاصيل على مستوى الطلب
+      openDetail(id);
     });
 
     const startA = el.querySelector('a[data-act="start"]');
@@ -1021,8 +1009,7 @@ function renderOrders(items){
         const id   = el.getAttribute("data-id");
         const addr = decodeURIComponent(el.getAttribute("data-addr")||"").trim();
         if(!addr){ e.preventDefault(); toast('Restaurant-Adresse fehlt'); return; }
-
-        // اضبط حالة الطلب "Unterwegs" (عندك موجودة) + حدّث كل عناصر الـMulti
+        // START: set order to Unterwegs + كل عناصر الـMulti
         await safeSetStatusToUnterwegs(id);
         await updateAllItemsStatus(id, "Unterwegs");
       });
@@ -1286,76 +1273,104 @@ async function writeFeeOnly(id, fee){
 
 
 /* العملية الكاملة عند التسليم: route → km → Betrag → Fee → تحديث */
-/* TAUSSIL-PATCH-BEGIN [finalizeOrderWithFee multi-support] */
-async function finalizeOrderWithFee(id, idx) {
-  try {
-    if (typeof idx !== "undefined") {
-      // MULTI
-      const orderRef = doc(db, "orders", id);
-      const orderSnap = await getDoc(orderRef);
-      if (!orderSnap.exists()) return;
-      const order = orderSnap.data();
+/* TAUSSIL-PATCH-BEGIN [finalizeOrderWithFee:multi-distance+14%] */
+async function finalizeOrderWithFee(id, idx){
+  try{
+    const ref = doc(db,"orders", id);
+    const snap= await getDoc(ref);
+    if(!snap.exists()) return;
+    const o = snap.data() || {};
 
-      // تحديث العنصر الحالي كـ Geliefert
-      await updateDoc(orderRef, {
-        [`items.${idx}.status`]: "Geliefert",
-        updatedAt: serverTimestamp()
+    const toNum = v => Number.isFinite(+v) ? +v : 0;
+    const round2 = n => Math.round((Number(n||0)+Number.EPSILON)*100)/100;
+
+    // === MULTI: يوجد idx ===
+    if(typeof idx !== "undefined"){
+      const i = parseInt(idx,10);
+      if(!Array.isArray(o.items) || !o.items[i]){ toast("Item fehlt"); return; }
+
+      // 1) احسب مسافة الرجل الحالية
+      const restOrigin = getRestaurantAddr(o);
+      const prevAddr = (i===0)
+        ? restOrigin
+        : (o.items[i-1]?.geo || o.items[i-1]?.address || o.items[i-1]?.address_text || o.items[i-1]?.dropoff?.addressText || o.items[i-1]?.dropoff?.address_text || null);
+
+      const destAddr = (o.items[i]?.geo || o.items[i]?.address || o.items[i]?.address_text || o.items[i]?.dropoff?.addressText || o.items[i]?.dropoff?.address_text || null);
+
+      let legKm = 0;
+      try{
+        if(prevAddr && destAddr) legKm = await routeKm(prevAddr, destAddr);
+      }catch(_){
+        if(prevAddr?.lat && destAddr?.lat) legKm = haversineKm(prevAddr, destAddr);
+      }
+      legKm = Math.max(0, toNum(legKm));
+
+      // 2) راكم المسافة في localStorage
+      const distKey = "multi_dist_" + id;
+      let totalKm = toNum(localStorage.getItem(distKey) || "0");
+      totalKm += legKm;
+      localStorage.setItem(distKey, String(totalKm));
+
+      // 3) علّم هذا الـitem كـ Geliefert وزِد deliveredCount (بدون إغلاق الطلب الآن)
+      await runTransaction(db, async (tx)=>{
+        const s2 = await tx.get(ref);
+        if(!s2.exists()) throw new Error("not-found");
+        const d2 = s2.data() || {};
+        const cur = toNum(d2.deliveredCount || 0);
+        const path = `items.${i}.status`;
+        tx.update(ref, { [path]: "Geliefert", deliveredCount: cur+1, updatedAt: serverTimestamp() });
       });
 
-      // حساب المسافة (Directions API أو haversine)
-      let legDistanceKm = await routeKm(order, idx); // لازم يكون عندك هالدالة شغالة
-      if (isNaN(legDistanceKm)) legDistanceKm = 0;
+      // 4) إذا هذا آخر عنصر → احسب العمولة %14 + شرائح المسافة واغلق الطلب
+      const fresh = (await getDoc(ref)).data() || {};
+      const itemsLen = Array.isArray(fresh.items)? fresh.items.length : 0;
+      const deliveredCount = toNum(fresh.deliveredCount || 0);
 
-      // تخزين المسافة التراكمية
-      const key = "multi_dist_" + id;
-      let total = parseFloat(localStorage.getItem(key) || "0");
-      total += legDistanceKm;
-      localStorage.setItem(key, total.toString());
+      if(deliveredCount >= itemsLen && itemsLen>0){
+        // عمولة 14% من مجموع أسعار العناصر
+        const totalPrice = fresh.items.reduce((s, it)=> s + toNum(it.price), 0);
+        const commission = totalPrice * 0.14;
 
-      // إذا آخر item → حساب العمولة + رسوم المسافة
-      if (parseInt(idx) === order.items.length - 1) {
-        const itemsTotal = order.items.reduce((sum, it) => sum + (it.price || 0), 0);
-        const commission = itemsTotal * 0.14;
-
-        // تطبيق الشرائح على المسافة
+        // شرائح المسافة: أول 2 كم مجاني
+        let remain = Math.max(0, toNum(localStorage.getItem(distKey)||"0") - 2);
         let distFee = 0;
-        let km = Math.max(0, total - 2); // أول 2 كم مجاني
-        if (km > 0) {
-          const tier1 = Math.min(5, km); // 2–7
-          distFee += tier1 * 0.5;
-          km -= tier1;
+        if(remain > 0){
+          const a = Math.min(remain, 5); distFee += a*0.50; remain -= a;
         }
-        if (km > 0) {
-          const tier2 = Math.min(5, km); // 7–12
-          distFee += tier2 * 0.8;
-          km -= tier2;
+        if(remain > 0){
+          const b = Math.min(remain, 5); distFee += b*0.80; remain -= b;
         }
-        if (km > 0) {
-          distFee += km * 1.0; // باقي المسافة
+        if(remain > 0){
+          distFee += remain * 1.00;
         }
 
-        const deliveryFee = commission + distFee;
+        const deliveryFee = round2(commission + distFee);
 
-        await updateDoc(orderRef, {
-          status: "Geliefert",
-          deliveryFee: round2(deliveryFee),
-          updatedAt: serverTimestamp()
-        });
+        await updateDoc(ref, { status:"Geliefert", deliveryFee, updatedAt: serverTimestamp() });
+        localStorage.removeItem(distKey);
 
-        localStorage.removeItem(key);
-        toast("Multi-Order abgeschlossen ✔");
+        toast(`Geliefert · Fee €${deliveryFee.toFixed(2)}`);
+      }else{
+        toast(`Teil geliefert · +${legKm.toFixed(2)} km`);
       }
-    } else {
-      // SINGLE
-      await safeSetStatusToGeliefert(id);
-      await calcFeeSingleOrMulti(id);
+
+      return; // انتهى فرع الـMulti
     }
-  } catch (err) {
-    console.error("finalizeOrderWithFee error", err);
-    toast("Fehler beim Abschließen des Auftrags");
+
+    // === SINGLE: نفس منطقك — 3.5€ إن ≤25 وإلا 14%
+    const price = toNum(o.price || 0);
+    const fee   = round2(price <= 25 ? 3.50 : (price * 0.14));
+
+    await updateDoc(ref, { status:"Geliefert", deliveryFee: fee, updatedAt: serverTimestamp() });
+    toast(`Geliefert · Fee €${fee.toFixed(2)}`);
+
+  }catch(e){
+    console.error("finalizeOrderWithFee error", e);
+    toast("Fehler beim Abschließen");
   }
 }
 /* TAUSSIL-PATCH-END */
+
 
 
 
