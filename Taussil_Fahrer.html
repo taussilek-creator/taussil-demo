@@ -915,76 +915,132 @@ function attachOrders(){
   }, ()=>{ ordersInfo.textContent="Wird geprüft…"; });
 }
 
-/* TAUSSIL-PATCH-BEGIN [renderOrders multi-support] */
-function renderOrders(snapshot) {
-  const listEl = document.getElementById("orders-list");
-  listEl.innerHTML = "";
+/* TAUSSIL-PATCH-BEGIN [renderOrders:multi-cards] */
+function renderOrders(items){
+  const filtered = items.filter(({o})=> inTab(o, currentTab));
+  ordersInfo.textContent = `${filtered.length} sichtbar (${currentTab})`;
 
-  snapshot.forEach((doc) => {
-    const o = doc.data();
-    const id = doc.id;
+  if(filtered.length===0){
+    listEl.innerHTML = `<div class="small" style="opacity:.8">— Keine Aufträge —</div>`;
+    return;
+  }
 
-    if (o.items && Array.isArray(o.items) && o.items.length > 0) {
-      // MULTI-ORDER
-      o.items.forEach((item, idx) => {
-        const card = document.createElement("div");
-        card.className = "card-order";
-        card.setAttribute("data-id", id);
-        card.setAttribute("data-idx", idx);
+  // نولّد HTML كسلاسل (ندعم Multi بالتمدد إلى عدّة بطاقات)
+  const html = filtered.map(({id,o})=>{
+    const baseStatusRaw = o.status || "—";
+    const baseStatusLow = String(baseStatusRaw).toLowerCase();
 
-        card.innerHTML = `
-          <h3>Order ${id} – Item ${idx + 1}</h3>
-          <p><b>Kunde:</b> ${item.customer || "-"}</p>
-          <p><b>Adresse:</b> ${item.address || "-"}</p>
-          <p><b>Preis:</b> €${item.price?.toFixed(2) || "0.00"}</p>
-          ${idx === 0 ? `<button data-act="start">Start Fahrt</button>` : ""}
-          <button data-act="delivered">Geliefert</button>
+    const restName = o.restaurant?.name || "—";
+    const plat     = Array.isArray(o.platform)? o.platform.join(" / ") : (o.platform || "—");
+    const logoUrl  = o.restaurant?.logoUrl || "";
+    const logoHTML = logoUrl
+      ? `<img src="${logoUrl}" alt="${restName}">`
+      : `<div class="ph">${(restName||"—").slice(0,2).toUpperCase()}</div>`;
+
+    const canStart = (s)=> {
+      const low=String(s||'').toLowerCase();
+      return (low==="angenommen" || low==="zugewiesen" || low==="assigned" || low==="bearbeitung");
+    };
+    const canDone = (s)=> String(s||'').toLowerCase()==="unterwegs";
+
+    // --- إن كان MULTI: نمدّده لعدّة بطاقات ---
+    if (Array.isArray(o.items) && o.items.length>0){
+      return o.items.map((it, idx)=>{
+        const stRaw = it.status || baseStatusRaw;
+        const st    = mapStatusLabel(stRaw);
+
+        // عنوان البطاقة لهذه القطعة
+        const addr = (it.address || it.address_text || it.dropoff?.addressText || it.dropoff?.address_text || "").trim();
+
+        // إظهار زر البدء على أول بطاقة فقط (ويغير حالة الجميع)
+        const showStart = (idx===0) && canStart(stRaw);
+        const showDone  = canDone(stRaw) || canDone(baseStatusRaw);
+
+        const navHref = addr ? makeNavUrl(addr) : '#';
+
+        return `
+          <div class="card-order" data-id="${id}" data-idx="${idx}" data-addr="${encodeURIComponent(addr)}">
+            <div class="logo">${logoHTML}</div>
+            <div class="info">
+              <div class="line">
+                <strong>${restName}</strong>
+                <span class="tag">${st}</span>
+              </div>
+              <div class="small">${plat} · Item ${idx+1}/${o.items.length}</div>
+              <div class="small" style="opacity:.85;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
+                ${addr || '—'}
+              </div>
+            </div>
+            <div class="act">
+              ${ showStart ? `<a class="btn-icon btn-go" href="${navHref}" target="_blank" rel="noopener noreferrer" data-act="start">▶</a>` : ``}
+              ${ showDone  ? `<button class="btn-icon btn-done" data-act="delivered">✓</button>` : ``}
+            </div>
+          </div>
         `;
-
-        listEl.appendChild(card);
-      });
-    } else {
-      // SINGLE-ORDER
-      const card = document.createElement("div");
-      card.className = "card-order";
-      card.setAttribute("data-id", id);
-
-      card.innerHTML = `
-        <h3>Order ${id}</h3>
-        <p><b>Kunde:</b> ${o.customer || "-"}</p>
-        <p><b>Adresse:</b> ${o.address || "-"}</p>
-        <p><b>Preis:</b> €${o.price?.toFixed(2) || "0.00"}</p>
-        <button data-act="start">Start Fahrt</button>
-        <button data-act="delivered">Geliefert</button>
-      `;
-
-      listEl.appendChild(card);
+      }).join('');
     }
-  });
 
-  // Event Listener للأزرار
-  listEl.querySelectorAll(".card-order").forEach((el) => {
-    const id = el.getAttribute("data-id");
-    const idx = el.getAttribute("data-idx");
+    // --- SINGLE كما هو ---
+    const addr = (o.restaurant?.addressText || o.restaurant?.address_text || "").trim();
+    const st   = mapStatusLabel(baseStatusRaw);
+    const navHref = addr ? makeNavUrl(addr) : '#';
+    const qty  = Number(o.qty||0) || 0;
 
-    const startBtn = el.querySelector('button[data-act="start"]');
-    if (startBtn) {
-      startBtn.addEventListener("click", async (e) => {
-        e.stopPropagation();
+    const showStart = canStart(baseStatusRaw);
+    const showDone  = canDone(baseStatusRaw);
+
+    return `
+      <div class="card-order" data-id="${id}" data-addr="${encodeURIComponent(addr)}">
+        <div class="logo">${logoHTML}</div>
+        <div class="info">
+          <div class="line"><strong>${restName}</strong> <span class="tag">${st}</span></div>
+          <div class="small">${plat} · Qty ${qty}</div>
+          <div class="small" style="opacity:.85;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${addr || '—'}</div>
+        </div>
+        <div class="act">
+          ${ showStart ? `<a class="btn-icon btn-go" href="${navHref}" target="_blank" rel="noopener noreferrer" data-act="start">▶</a>` : ``}
+          ${ showDone  ? `<button class="btn-icon btn-done" data-act="delivered">✓</button>` : ``}
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  listEl.innerHTML = html;
+
+  // ربط الأحداث (يدعم Multi عبر data-idx إن وجدت)
+  listEl.querySelectorAll(".card-order").forEach(el=>{
+    el.addEventListener("click",(e)=>{
+      if(e.target.closest(".btn-icon")) return;
+      const id = el.getAttribute("data-id");
+      openDetail(id); // التفاصيل على مستوى الطلب
+    });
+
+    const startA = el.querySelector('a[data-act="start"]');
+    if(startA){
+      startA.addEventListener("click", async (e)=>{
+        const id   = el.getAttribute("data-id");
+        const addr = decodeURIComponent(el.getAttribute("data-addr")||"").trim();
+        if(!addr){ e.preventDefault(); toast('Restaurant-Adresse fehlt'); return; }
+
+        // اضبط حالة الطلب "Unterwegs" (عندك موجودة) + حدّث كل عناصر الـMulti
+        await safeSetStatusToUnterwegs(id);
         await updateAllItemsStatus(id, "Unterwegs");
       });
     }
 
     const doneBtn = el.querySelector('button[data-act="delivered"]');
-    if (doneBtn) {
-      doneBtn.addEventListener("click", async (e) => {
+    if(doneBtn){
+      doneBtn.addEventListener("click", async (e)=>{
         e.stopPropagation();
+        const id  = el.getAttribute("data-id");
+        const idx = el.hasAttribute("data-idx") ? Number(el.getAttribute("data-idx")) : undefined;
         await finalizeOrderWithFee(id, idx);
       });
     }
   });
 }
 /* TAUSSIL-PATCH-END */
+
 
 
 
