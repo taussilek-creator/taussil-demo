@@ -1217,23 +1217,33 @@ md_price_edit.onclick = (e)=>{
 };
 
   md.classList.add("show");
-  md_start.onclick=async (e)=>{
-    e.preventDefault();
-    if(!addr){ toast('Restaurant-Adresse fehlt'); return; }
-    window.open(makeNavUrl(addr), '_blank', 'noopener,noreferrer');
-    await safeSetStatusToUnterwegs(id);
-  };
+
+// 👇 إخفاء زر Geliefert في المودال لو الطلب Multi
+if (Array.isArray(o.items) && o.items.length > 1) {
+  md_done.style.display = "none";
+} else {
+  md_done.style.display = "";
   md_done.onclick = async (e)=>{
     e.preventDefault();
     await finalizeOrderWithFee(id);
     md.classList.remove("show");
   };
-  md_nav.onclick  = (e)=>{
-    e.preventDefault();
-    if(!addr){ toast('Restaurant-Adresse fehlt'); return; }
-    window.open(makeNavUrl(addr), '_blank', 'noopener,noreferrer');
-  };
 }
+
+md_start.onclick=async (e)=>{
+  e.preventDefault();
+  if(!addr){ toast('Restaurant-Adresse fehlt'); return; }
+  window.open(makeNavUrl(addr), '_blank', 'noopener,noreferrer');
+  await safeSetStatusToUnterwegs(id);
+};
+
+md_nav.onclick  = (e)=>{
+  e.preventDefault();
+  if(!addr){ toast('Restaurant-Adresse fehlt'); return; }
+  window.open(makeNavUrl(addr), '_blank', 'noopener,noreferrer');
+};
+}
+
 mdClose.addEventListener("click", ()=> md.classList.remove("show"));
 md.addEventListener("click",(e)=>{ if(e.target===md) md.classList.remove("show"); });
 
