@@ -420,6 +420,97 @@ function calcDeliveryFeeEUR(betrag, km){
   const fee = base + segA + segB + segC;
   return Math.round(fee * 100) / 100; // تقريب إلى سنتين
 }
+/* === PRICING v2.1 (Multi-Orders progressive tiers; no waiting) === */
+/* تخزين حالة التسعير عبر الأرجل في localStorage */
+const LS_ROUTE_PRICE = 'driver:chain:pricing';
+const round2 = n => Math.round((Number(n||0) + Number.EPSILON) * 100) / 100;
+
+function loadRouteState(){
+  try{
+    const s = JSON.parse(localStorage.getItem(LS_ROUTE_PRICE) || '{}');
+    const freeLeft = Number.isFinite(+s.freeLeft)? +s.freeLeft : 2;  // 2 كم مجاناً مرة لكل رحلة
+    const progKm   = Number.isFinite(+s.progKm)?   +s.progKm   : 0;  // كم فوترة مُستهلكة للشرائح
+    return { freeLeft, progKm };
+  }catch(_){ return { freeLeft:2, progKm:0 }; }
+}
+function saveRouteState(st){
+  try{ localStorage.setItem(LS_ROUTE_PRICE, JSON.stringify({ freeLeft: +st.freeLeft, progKm: +st.progKm })); }catch(_){}
+}
+function resetRouteState(){ saveRouteState({ freeLeft:2, progKm:0 }); }
+
+/* تسعير رجل واحدة بشكل تراكمي عبر الرحلة */
+function priceDistanceProgressive(legKm, resetFirstLeg=false){
+  if(resetFirstLeg) resetRouteState();
+  const st = loadRouteState();
+
+  const km = Math.max(0, +legKm || 0);
+
+  // استهلاك المجاني المتبقي من هذه الرجل
+  const freeUse = Math.min(st.freeLeft, km);
+  let billable  = Math.max(0, km - st.freeLeft);
+  st.freeLeft   = Math.max(0, st.freeLeft - km);
+
+  // تطبيق الشرائح تراكميًا حسب progKm
+  let val = 0;
+
+  // شريحة1: حتى +5 كم فوترة من بداية الرحلة
+  const tier1Left = Math.max(0, 5 - Math.min(st.progKm, 5));
+  const take1 = Math.min(billable, tier1Left);
+  val += take1 * 0.50; billable -= take1; st.progKm += take1;
+
+  // شريحة2: حتى +10 كم فوترة (5 إضافية)
+  if(billable > 0){
+    const tier2Cap  = 10;
+    const tier2Left = Math.max(0, tier2Cap - Math.min(st.progKm, tier2Cap));
+    const take2 = Math.min(billable, tier2Left);
+    val += take2 * 0.80; billable -= take2; st.progKm += take2;
+  }
+
+  // شريحة3: ما بعد ذلك
+  if(billable > 0){
+    val += billable * 1.00; st.progKm += billable;
+  }
+
+  saveRouteState(st);
+  return round2(val);
+}
+
+/* هل هذه بداية رحلة جديدة؟ (أول رجل: المطعم → عميل1) */
+function isRouteFirstLeg(orderObj){
+  const origin = computeLegOrigin(orderObj);     // من ملفك (يعتمد آخر تسليم أو عنوان المطعم)
+  const rest   = getRestaurantAddr(orderObj);    // من ملفك
+  if(!origin) return true;
+  // إذا كانت البداية من المطعم (نصّاً) نعتبرها أول رجل ونصفّر الحالة
+  if(typeof origin === 'string' && typeof rest === 'string'){
+    return origin.trim() === rest.trim();
+  }
+  return false;
+}
+
+/* قاعدة الطلب كما هي (≤25 = 3.50€، غير ذلك 14%) */
+function calcBaseV21(amount){
+  amount = Math.max(0, +amount || 0);
+  return amount <= 25 ? 3.50 : (amount * 0.14);
+}
+
+/* الرسوم النهائية لطلب واحد:
+   - مفرد (لا سلسلة): نستخدم معادلتك الحالية calcDeliveryFeeEUR (تحسب 2 كم على نفس الطلب)
+   - داخل سلسلة Multi: 2 كم مجاناً مرة واحدة + الشرائح تراكميًا عبر الأرجل
+*/
+function calcFeeSingleOrMulti(orderObj, betrag, legKm){
+  const base = round2(calcBaseV21(betrag));
+  const firstLeg = isRouteFirstLeg(orderObj);
+
+  // إن كانت سلسلة: استخدم التسعير التراكمي لهذه الرجل
+  const inChain = !firstLeg && !!getLastDest(); // وجود وجهة سابقة = داخل سلسلة
+  const distEUR = inChain
+    ? priceDistanceProgressive(legKm, false)
+    : priceDistanceProgressive(legKm, true);    // أول رجل: صفّر الحالة وابدأ من جديد
+
+  // ملاحظة: لو أردت إجبار الطلبات المنفردة خارج أي سلسلة على المعادلة القديمة:
+  // return round2(base + (inChain ? distEUR : priceDistanceSingle(legKm)));
+  return round2(base + distEUR);
+}
 
 
 /* ===== Helpers/UI ===== */
@@ -1106,7 +1197,8 @@ async function finalizeOrderWithFee(id){
     const o = ds.data() || {};
     const km = await computeLegKmForOrder(o);              // كم فعلي
     const betrag = getOrderAmount(o);                      // مبلغ الطلب
-    const fee = calcDeliveryFeeEUR(betrag, km);            // المعادلة
+    const fee = calcFeeSingleOrMulti(o, betrag, km);
+           // المعادلة
     const res = await writeFeeOnly(id, fee);
     // اربط السلسلة: آخر نقطة = هذا التسليم
     const drop = getDropAddr(o);
