@@ -911,7 +911,9 @@ function renderOrders(items){
     const logoHTML = logoUrl? `<img src="${logoUrl}" alt="${rest}">` : `<div class="ph">${(rest||"—").slice(0,2).toUpperCase()}</div>`;
     const navHref = addr ? makeNavUrl(addr) : '#';
 
-    const isMulti = Number(o.qty||0) > 1 || (Array.isArray(o.items) && o.items.length>1);
+    // اعتبر الطلب Multi فقط إذا كانت مصفوفة items موجودة وفيها أكثر من عنصر
+const isMulti = Array.isArray(o.items) && o.items.length > 1;
+
     const itemsHTML = isMulti
       ? (() => {
           const arr = getMultiItems(o);
