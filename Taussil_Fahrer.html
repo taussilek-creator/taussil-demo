@@ -1194,9 +1194,6 @@ price_save?.addEventListener('click', async ()=>{
 async function openDetail(id){
   const snap=await getDoc(doc(db,"orders", id)); if(!snap.exists()) return;
   const o=snap.data()||{};
-  const isMulti = (Array.isArray(o.items) && o.items.length>1) || (Number(o.qty||0) > 1);
-md_done.style.display = isMulti ? 'none' : '';
-
   md_id.textContent=id;
   md_status.textContent=mapStatusLabel(o.status||"—");
   md_platform.textContent=Array.isArray(o.platform)?o.platform.join(" / "):(o.platform||"—");
@@ -1219,13 +1216,11 @@ md_price_edit.onclick = (e)=>{
 
   md.classList.add("show");
   md_start.onclick=async (e)=>{
-  e.preventDefault();
-  if(!addr){ toast('Restaurant-Adresse fehlt'); return; }
-  window.open(makeNavUrl(addr), '_blank', 'noopener,noreferrer');
-  await safeSetStatusToUnterwegs(id);
-  try{ await updateAllItemsStatus(id, 'Unterwegs'); }catch(_){}
-};
-
+    e.preventDefault();
+    if(!addr){ toast('Restaurant-Adresse fehlt'); return; }
+    window.open(makeNavUrl(addr), '_blank', 'noopener,noreferrer');
+    await safeSetStatusToUnterwegs(id);
+  };
   md_done.onclick = async (e)=>{
     e.preventDefault();
     await finalizeOrderWithFee(id);
@@ -1270,97 +1265,104 @@ function __getBaseTaken(orderId){ try{ return localStorage.getItem(__lsKeyBaseTa
 function __setBaseTaken(orderId){ try{ localStorage.setItem(__lsKeyBaseTaken(orderId),'1'); }catch(_){ } }
 
 /* العملية الكاملة عند التسليم: route → km → Betrag → Fee → تحديث (Single + Multi) */
-/* === finalizeOrderWithFee: تسليم عنصر واحد في الـMulti، أو الطلب كله إن كان Single === */
-function __getItemDropAddr(it, fallbackAddr){
-  return (it?.dropoff?.addressText || it?.dropoff?.address_text || it?.address || fallbackAddr || '').trim();
-}
-
-async function finalizeOrderWithFee(id, idx = null){
+async function finalizeOrderWithFee(id, idx=null){
   try{
     const ref = doc(db,"orders", id);
-    const snap = await getDoc(ref);
-    if(!snap.exists()){ toast("Auftrag nicht gefunden"); return; }
-    const o   = snap.data() || {};
+    const ds  = await getDoc(ref);
+    if(!ds.exists()){ toast("Auftrag nicht gefunden"); return; }
+    const o   = ds.data() || {};
 
-    const hasItems = Array.isArray(o.items) && o.items.length > 0;
+    // === SINGLE (لا يوجد items) ===
+   if(!Array.isArray(o.items) || o.items.length===0){
+// ✅ حماية من تسليم الطلب المركّب بالكامل بالخطأ
+if(Array.isArray(o.items) && o.items.length > 0 && idx === null){
+  toast("Bitte jeden Teilauftrag einzeln liefern");
+  return;
+}
 
-    /* === SINGLE === */
-    if(!hasItems || idx === null){
       const km     = await computeLegKmForOrder(o);
       const betrag = getOrderAmount(o);
-      const fee    = calcFeeSingleOrMulti(o, betrag, km);
-      await patchOrder(id, { status:"Geliefert", deliveryFee: fee });
+      const fee    = calcFeeSingleOrMulti(o, betrag, km);   // فيها 14%/3.5 + الشرائح
+      await writeFeeOnly(id, fee);
 
+      // اربط السلسلة: آخر نقطة = هذا التسليم (لسيناريو لاحق)
       const drop = getDropAddr(o);
       if(drop) setLastDestFromText(drop); else if(lastLL) setLastDestFromLL(lastLL);
 
-      toast(`Geliefert · ${km.toFixed(2)} km · Fee ${fee.toFixed(2)}€`);
+      toast(`Geliefert · ${km.toFixed(2)} km · Liefergebühr ${fee.toFixed(2)}€`);
       return;
     }
 
-    /* === MULTI: عنصر محدد فقط === */
-    const items = o.items;
+    // === MULTI: عنصر محدد ===
+    const items = Array.isArray(o.items) ? o.items : [];
     const item  = items[idx];
+	if(!item || typeof idx !== 'number'){
+  toast("Teilauftrag ungültig");
+  return;
+}
+
     if(!item){ toast("Item nicht gefunden"); return; }
 
-    // حساب مسافة هذه الرجل فقط
-    const restAddr = getRestaurantAddr(o) || '';
-    const itemAddr = __getItemDropAddr(item, restAddr);
+    // 1) نحدّد km لهذه الرجل (من آخر تسليم/المطعم → عنوان هذا العنصر)
     const legKm = await (async ()=>{
-      const tmp = JSON.parse(JSON.stringify(o));
-      tmp.dropoff = { addressText: itemAddr };
-      return await computeLegKmForOrder(tmp);
+      // نولّف كائن order مؤقت فيه dropoff = عنوان هذا العنصر
+      const oLeg = JSON.parse(JSON.stringify(o));
+      oLeg.dropoff = { addressText: (item?.dropoff?.addressText || item?.dropoff?.address_text || item?.address || '').trim() };
+      return await computeLegKmForOrder(oLeg);
     })();
 
-    // راكم مسافة السلسلة
-    const newChainKm = Math.round((Number(o.chainKm||0) + Math.max(0,legKm)) * 100) / 100;
+    // 2) نجمع المسافة على مستوى الطلب
+    const chainKm = Math.max(0, Number(o.chainKm || 0)) + Math.max(0, legKm);
 
-    // حدّث العنصر فقط
+    // 3) نحدّث حالة هذا العنصر إلى Geliefert
     const updates = {};
     updates[`items.${idx}.status`] = "Geliefert";
-    updates[`items.${idx}.km`]     = Math.round(legKm * 100) / 100;
-    updates[`chainKm`]             = newChainKm;
+    updates[`items.${idx}.km`]     = Math.round(legKm*100)/100;
+    updates[`chainKm`]             = Math.round(chainKm*100)/100;
     updates.updatedAt              = serverTimestamp();
     await updateDoc(ref, updates);
 
-    // هل انتهت كل العناصر؟
+    // 4) إن كانت كل العناصر سُلّمت → احسب الرسوم النهائية للملتي
     const latest = (await getDoc(ref)).data() || {};
-    const allDelivered = Array.isArray(latest.items) && latest.items.every(it => String(it?.status||'').toLowerCase()==='geliefert');
+    const allDelivered = Array.isArray(latest.items) && latest.items.length>0 && latest.items.every(it => String(it?.status||'').toLowerCase()==='geliefert');
+    if(allDelivered){
+      // قاعدة الملتي: 14% من مجموع السعر الكلي (لا نستخدم 3.5€ هنا)
+      const totalPrice = Number(latest.price||0) || 0;
+      const baseEUR    = Math.round((totalPrice * 0.14) * 100) / 100;
 
-    if(!allDelivered){
-      if(itemAddr) setLastDestFromText(itemAddr); else if(lastLL) setLastDestFromLL(lastLL);
-      toast(`Teil geliefert · ${legKm.toFixed(2)} km · Σ≈ ${newChainKm.toFixed(2)} km`);
-      return;
+      // مسافة السلسلة (مع أول 2 كم مجانًا + شرائح تتابعية)
+      const totalKm    = Number(latest.chainKm||0) || 0;
+      const feeDist    = (function distFeeFromTotalKm(d){
+        let bill = Math.max(0, d - 2);          // أول 2 كم مجانًا
+        let cost = 0;
+        const take = (m)=>{ const t = Math.min(Math.max(bill,0), m); bill -= t; return t; };
+        const a = take(5);  cost += a * 0.50;   // >2–7 كم
+        const b = take(5);  cost += b * 0.80;   // >7–12 كم
+        const c = Math.max(bill,0); cost += c * 1.00; // >12 كم
+        return Math.round(cost*100)/100;
+      })(totalKm);
+
+      const finalFee = Math.round((baseEUR + feeDist)*100)/100;
+
+      await patchOrder(id, { status:"Geliefert", deliveryFee: finalFee });
+
+      // اربط آخر نقطة لتبدأ الرجل التالية من هنا في الرحلات اللاحقة
+      const finalDrop = latest.items?.[latest.items.length-1];
+      const finalAddr = (finalDrop?.dropoff?.addressText || finalDrop?.dropoff?.address_text || finalDrop?.address || '').trim();
+      if(finalAddr) setLastDestFromText(finalAddr); else if(lastLL) setLastDestFromLL(lastLL);
+
+      toast(`Multi geliefert · Σ ${totalKm.toFixed(2)} km · 14%=${baseEUR.toFixed(2)}€ · Dist=${feeDist.toFixed(2)}€ · Fee=${finalFee.toFixed(2)}€`);
+    }else{
+      // لم ننته بعد — نحدّث “آخر وجهة” لهذه الرجل فقط
+      const dropAddrThis = (item?.dropoff?.addressText || item?.dropoff?.address_text || item?.address || '').trim();
+      if(dropAddrThis) setLastDestFromText(dropAddrThis); else if(lastLL) setLastDestFromLL(lastLL);
+      toast(`Teil geliefert · ${legKm.toFixed(2)} km · Kette Σ≈ ${chainKm.toFixed(2)} km`);
     }
-
-    // كل العناصر سلّمت — احسب الرسوم النهائية للملتي
-    const totalPrice = Number(latest.price||0) || 0;
-    const baseEUR    = Math.round((totalPrice * 0.14) * 100) / 100;   // 14% من مجموع الأسعار
-    const totalKm    = Number(latest.chainKm||0) || 0;
-
-    // المسافة: أول 2 كم مجانًا ثم الشرائح
-    let bill = Math.max(0, totalKm - 2), cost = 0;
-    const take = (m)=>{ const t=Math.min(Math.max(bill,0), m); bill-=t; return t; };
-    const a = take(5);  cost += a * 0.50; // >2–7
-    const b = take(5);  cost += b * 0.80; // >7–12
-    const c = Math.max(bill,0); cost += c * 1.00; // >12
-    const feeDist = Math.round(cost * 100) / 100;
-
-    const finalFee = Math.round((baseEUR + feeDist) * 100) / 100;
-    await patchOrder(id, { status:"Geliefert", deliveryFee: finalFee });
-
-    // اربط آخر نقطة (آخر عنصر)
-    const lastItem = latest.items[latest.items.length - 1];
-    const lastAddr = __getItemDropAddr(lastItem, restAddr);
-    if(lastAddr) setLastDestFromText(lastAddr); else if(lastLL) setLastDestFromLL(lastLL);
-
-    toast(`Multi geliefert · Σ ${totalKm.toFixed(2)} km · 14%=${baseEUR.toFixed(2)}€ · Dist=${feeDist.toFixed(2)}€ · Fee=${finalFee.toFixed(2)}€`);
   }catch(e){
     console.error('finalizeOrderWithFee', e);
     toast('Fehler beim Abschließen');
   }
 }
-
 
 /* ===== /PATCH finalizeOrderWithFee ===== */
 
