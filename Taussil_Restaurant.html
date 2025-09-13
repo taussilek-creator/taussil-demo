@@ -274,6 +274,11 @@ input[type="number"]{-moz-appearance:textfield;text-align:center;font-variant-nu
 }
 .log-id{ font-family: ui-monospace, Menlo, monospace; font-size:12px; opacity:.9 }
 .log-tag{ font-size:11px; padding:3px 8px; border-radius:999px; background:#eef2ff; border:1px solid #e5e7eb }
+/* === MULTI-ORDERS (restaurant) — per-provider rows === */
+.multi-rows{ display:flex; flex-direction:column; gap:8px; margin:10px 0; }
+.multi-row{ display:grid; grid-template-columns: 1.2fr 0.8fr 1fr; gap:8px; align-items:center; }
+.multi-row .prov{ font-weight:700; }
+.multi-row input.input{ margin-top:0; }
 
 </style>
 </head>
@@ -374,15 +379,17 @@ input[type="number"]{-moz-appearance:textfield;text-align:center;font-variant-nu
           <div class="provider" data-src="Restablo"><img src="Restablo.jpg" alt="Restablo"><div class="p-qty"><button class="p-dec">−</button><span class="n">1</span><button class="p-inc">+</button></div></div>
           <div class="provider" data-src="Andere"><img src="Andere.png" alt="Andere"><div class="p-qty"><button class="p-dec">−</button><span class="n">1</span><button class="p-inc">+</button></div></div>
         </div>
-        <div class="row">
-          <div class="qty-wrap">
-            <button id="qtyMinus" class="btn-step" type="button">−</button>
-            <input id="qty" class="input center" type="number" value="0" placeholder="0" readonly>
-            <button id="qtyPlus" class="btn-step" type="button">+</button>
-          </div>
-          <input id="price" class="input center" type="text" value="0,00€" placeholder="0,00€">
-        </div>
-        <input id="time" class="input center full" type="time" placeholder="HH:MM">
+		<!-- === MULTI-ORDERS UI START === -->
+<div id="multiRows" class="multi-rows"></div>
+<!-- === MULTI-ORDERS UI END === -->
+
+        <!-- TAUSSIL-PATCH-BEGIN [row-time-replace] -->
+<div class="row">
+  <input id="time" class="input center" type="time" placeholder="HH:MM">
+  <input id="price" class="input center" type="text" value="0,00€" placeholder="0,00€" readonly>
+</div>
+<!-- TAUSSIL-PATCH-END -->
+
         <button id="sendBtn" class="send" type="button" disabled>Senden</button>
         <div id="banner" class="banner">✔ Gesendet</div>
 
@@ -539,49 +546,166 @@ rTabRegister?.addEventListener('click', (e)=>{ e.preventDefault(); switchPane('r
 /* ===== Providers + Qty logic ===== */
 const selectedProviders = new Set();
 const providerQty = new Map();
-
+/* TAUSSIL-PATCH-BEGIN [multi-rows-stepper-and-per-item-prices] */
 function refreshQtyAndSendState(){
-  if(!qtyEl || !sendBtn) return;
-  const sel = selectedProviders.size;
+  // تعويض آمن لأي استدعاءات قديمة
+  if (typeof renderMultiRows === 'function') renderMultiRows();
+}
+/* === MULTI-ORDERS: per-provider per-item prices + stepper in-row (no overlay) === */
+const providerPrices = new Map();   // key => number[] (سعر لكل عنصر لنفس المزوّد)
+const multiRows = document.getElementById('multiRows');
 
-  providerEls.forEach(el=> el.classList.toggle('show-badge', sel===1 && selectedProviders.has(el.getAttribute('data-src'))));
+function slugKey(k){ return String(k||'').toLowerCase().replace(/\s+/g,'_').replace(/[^a-z0-9_]/g,''); }
+function globalTotalQty(){
+  let s = 0; selectedProviders.forEach(k => s += Math.max(0, Number(providerQty.get(k)||0))); return s;
+}
+function ensurePricesArray(key){
+  const q = Math.max(1, Math.min(3, Number(providerQty.get(key)||1)));
+  providerQty.set(key, q);
+  let arr = Array.isArray(providerPrices.get(key)) ? providerPrices.get(key) : [];
+  if(arr.length < q) arr = arr.concat(new Array(q - arr.length).fill(0));
+  if(arr.length > q) arr = arr.slice(0, q);
+  providerPrices.set(key, arr);
+  return arr;
+}
+function totalsForForm(){
+  let totalQty = 0, totalAmount = 0;
+  selectedProviders.forEach(k=>{
+    const q   = Math.max(0, Number(providerQty.get(k)||0));
+    const arr = ensurePricesArray(k);
+    totalQty  += q;
+    totalAmount += arr.reduce((a,v)=> a + (Number(v)||0), 0);
+  });
+  totalAmount = Math.round(totalAmount * 100) / 100;
+  return { totalQty, totalAmount };
+}
+function recalcAndValidate(){
+  const { totalQty, totalAmount } = totalsForForm();
 
-  if(sel===0){
-    qtyEl.value='0'; qtyEl.readOnly=true; sendBtn.disabled = true;
-    if(qtyMinus) qtyMinus.disabled = true; if(qtyPlus) qtyPlus.disabled = true;
-  }else if(sel===1){
-    const key=[...selectedProviders][0];
-    if(!providerQty.has(key) || providerQty.get(key)<1) providerQty.set(key,1);
-    qtyEl.value=String(providerQty.get(key)); qtyEl.readOnly=false; sendBtn.disabled = false;
-    if(qtyMinus) qtyMinus.disabled = false; if(qtyPlus) qtyPlus.disabled = false;
-  }else{
-    selectedProviders.forEach(k=>providerQty.set(k,1));
-    qtyEl.value=String(sel); qtyEl.readOnly=true; sendBtn.disabled = false;
-    if(qtyMinus) qtyMinus.disabled = true; if(qtyPlus) qtyPlus.disabled = true;
-  }
+  // عرض الإجمالي في حقول الواجهة الأساسية
+  if(qtyEl){ qtyEl.value = String(totalQty); qtyEl.readOnly = true; }  // إن كان موجودًا
+  if(priceEl){ priceEl.value = money(totalAmount); priceEl.readOnly = true; }
+
+  // شروط التفعيل: 1..3 إجمالي كميات + كل سعر > 0
+  const inRange = (totalQty >= 1 && totalQty <= 3);
+  let allPriced = true;
+  selectedProviders.forEach(k=>{
+    const q   = Math.max(0, Number(providerQty.get(k)||0));
+    const arr = ensurePricesArray(k);
+    if(q===0){ allPriced=false; return; }
+    for(let i=0;i<q;i++){ if(!(Number(arr[i])>0)) { allPriced=false; break; } }
+  });
+  sendBtn.disabled = !(inRange && allPriced);
 }
 
+/* رسم صفوف المزودين: [اسم] [عداد +/−] [حقول أسعار بعدد الكمية] */
+function renderMultiRows(){
+  if(!multiRows) return;
+
+  const rows = [...selectedProviders].map(k=>{
+    const q   = Math.max(1, Math.min(3, Number(providerQty.get(k)||1)));
+    providerQty.set(k, q);
+    const arr = ensurePricesArray(k);
+
+    // الحقول السعرية لكل عنصر (#1..#q)
+    const pricesInputs = Array.from({length:q}, (_,i)=>{
+      const val = arr[i] ? String(arr[i]).replace('.',',') : '';
+      return `
+        <div class="price-chip" data-idx="${i}" style="display:flex;align-items:center;gap:6px;margin:4px 0;">
+          <span class="small" style="width:22px;text-align:center">#${i+1}</span>
+          <input class="input per-price" type="text" inputmode="decimal" placeholder="0,00€" value="${val}">
+        </div>`;
+    }).join('');
+
+    return `
+      <div class="multi-row" data-key="${k}">
+        <div class="prov">${k}</div>
+        <div class="qty-wrap">
+          <button type="button" class="btn-step q-dec">−</button>
+          <input class="input center per-qty" type="number" min="1" max="3" value="${q}" readonly>
+          <button type="button" class="btn-step q-inc">+</button>
+        </div>
+        <div class="prices">${pricesInputs}</div>
+      </div>`;
+  });
+
+  // الشبكة لديك معرفة مسبقًا: 1.2fr 0.8fr 1fr
+  multiRows.innerHTML = rows.join('');
+  recalcAndValidate();
+}
+
+/* إدخال الأسعار — يحسب الإجمالي ويغلق الإرسال إذا لزم */
+multiRows?.addEventListener('input', (e)=>{
+  if(!e.target.classList.contains('per-price')) return;
+  const row = e.target.closest('.multi-row'); if(!row) return;
+  const key = row.getAttribute('data-key');
+  const idx = Number(e.target.closest('.price-chip')?.getAttribute('data-idx')||0);
+  const raw = String(e.target.value||'').replace(/[^\d,.\-]/g,'').replace(',','.');
+  const num = Number(raw);
+  const arr = ensurePricesArray(key);
+  arr[idx] = (Number.isFinite(num) && num>0) ? Math.round(num*100)/100 : 0;
+  providerPrices.set(key, arr);
+  recalcAndValidate();
+}, true);
+
+/* تنسيق € عند blur */
+multiRows?.addEventListener('blur', (e)=>{
+  if(!e.target.classList.contains('per-price')) return;
+  const row = e.target.closest('.multi-row'); if(!row) return;
+  const key = row.getAttribute('data-key');
+  const idx = Number(e.target.closest('.price-chip')?.getAttribute('data-idx')||0);
+  const arr = ensurePricesArray(key);
+  const p = Number(arr[idx]||0);
+  e.target.value = p ? money(p) : '';
+}, true);
+
+/* عدّاد +/− داخل الصف */
+multiRows?.addEventListener('click', (e)=>{
+  const row = e.target.closest('.multi-row'); if(!row) return;
+  const key = row.getAttribute('data-key'); if(!selectedProviders.has(key)) return;
+
+  if(e.target.classList.contains('q-inc')){
+    const tot = globalTotalQty();
+    const cur = Math.max(1, Number(providerQty.get(key)||1));
+    if(tot >= 3 || cur >= 3) return;
+    providerQty.set(key, cur+1);
+    ensurePricesArray(key);
+    renderMultiRows();
+  }
+  if(e.target.classList.contains('q-dec')){
+    const cur = Math.max(1, Number(providerQty.get(key)||1));
+    if(cur <= 1) return;
+    providerQty.set(key, cur-1);
+    ensurePricesArray(key);
+    renderMultiRows();
+  }
+});
+
+/* اختيار/إلغاء اختيار المزود من شبكة الصور (بدون أي أزرار فوق الصور) */
 if(providersRoot){
   providersRoot.addEventListener('click', (ev)=>{
+    // تجاهل الضغط داخل شارة الصورة إن وُجدت (لكننا مخفيّنها أساسًا)
+    if(ev.target.closest('.p-qty')) return;
     const card = ev.target.closest('.provider'); if(!card) return;
-    const inc = ev.target.closest('.p-inc');
-    const dec = ev.target.closest('.p-dec');
     const key = card.getAttribute('data-src');
-
-    if(inc || dec){
-      if(selectedProviders.size!==1 || !selectedProviders.has(key)) return;
-      const cur = providerQty.get(key)||1;
-      providerQty.set(key, Math.max(1, cur + (inc?+1:-1)));
-      refreshQtyAndSendState();
-      return;
-    }
-
     card.classList.toggle('is-selected');
-    if(card.classList.contains('is-selected')) { selectedProviders.add(key); if(!providerQty.has(key)) providerQty.set(key,1); }
-    else { selectedProviders.delete(key); }
-    refreshQtyAndSendState();
+    if(card.classList.contains('is-selected')){
+      selectedProviders.add(key);
+      if(!providerQty.has(key)) providerQty.set(key, 1);
+      ensurePricesArray(key);
+    }else{
+      selectedProviders.delete(key);
+      providerQty.delete(key);
+      providerPrices.delete(key);
+    }
+    renderMultiRows();
   });
 }
+
+renderMultiRows();
+/* TAUSSIL-PATCH-END */
+
+
 
 qtyMinus?.addEventListener('click', ()=>{
   if(selectedProviders.size===1){
@@ -776,58 +900,120 @@ let lastDriverPos=null;
 const ORDER_CACHE=new Map();
 /* ===== Send Order ===== */
 async function computeFormQty(){
-  if(selectedProviders.size===0) return 0;
-  if(selectedProviders.size===1) return providerQty.get([...selectedProviders][0])||1;
-  return selectedProviders.size;
+  let sum = 0;
+  selectedProviders.forEach(k=>{ sum += Math.max(0, Number(providerQty.get(k)||0)); });
+  return sum;
 }
+
 sendBtn?.addEventListener('click', async ()=>{
-  if(!RESTAURANT_ID){ if(rLoginMsg) rLoginMsg.textContent='Bitte zuerst anmelden.'; showAuth(true); return; }
+  if(!RESTAURANT_ID){ 
+    if(rLoginMsg) rLoginMsg.textContent='Bitte zuerst anmelden.'; 
+    showAuth(true); 
+    return; 
+  }
+
   const platforms = Array.from(selectedProviders);
   const qty = await computeFormQty();
   const preis = Math.max(0, parsePrice(priceEl?.value||0));
   const pickup = timeEl?.value || null;
+
   if(platforms.length<1 || qty<1) return;
+
   try{
     sendBtn.disabled=true;
+
     const qNr   = query(collection(db,'orders'), where('restaurant.id','==', RESTAURANT_ID));
     const cSnap = await getCountFromServer(qNr);
     const nr    = Number(cSnap.data().count || 0) + 1;
+
     const id  = Math.random().toString(36).slice(2,8).toUpperCase();
     const ref = doc(db,'orders', id);
-	console.log('DBG hiddenDefaults.address_text =', hiddenDefaults?.address_text);
-	const rSnap = await getDoc(doc(db,'restaurants', RESTAURANT_ID));
-const addr  = rSnap.exists() ? (rSnap.data().address_text ?? rSnap.data().addressText ?? null) : null;
-if(!addr){ alert('عنوان المطعم غير متوفر في ملف المطعم.'); return; }
 
+    const rSnap = await getDoc(doc(db,'restaurants', RESTAURANT_ID));
+    const addr  = rSnap.exists() ? (rSnap.data().address_text ?? rSnap.data().addressText ?? null) : null;
+    if(!addr){ 
+      alert('عنوان المطعم غير متوفر في ملف المطعم.'); 
+      return; 
+    }
+
+    // الطلب الأم
     await setDoc(ref, {
-      nr,
-      status: 'Bearbeitung',
-      platform: platforms,
-      qty,
-      price: Math.round(preis * 100) / 100,
-      deliveryFee: 0,
-      pickupTime: pickup,
-      restaurant: {
-  id: RESTAURANT_ID,
-  name: hiddenDefaults?.Restaurant_Name ?? null,
-  phone: hiddenDefaults?.Telefon ?? null,
-  address_text: addr
-},
+  nr,
+  status: 'Bearbeitung',
+  platform: platforms,
+  qty,
 
-	  
-      driver: { id:null, firstName:null, pos:null },
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp()
-    });
+  // ⬇️ الجديد
+  stops_total: qty,
+  stops_delivered: 0,
+
+  price: Math.round(preis * 100) / 100,
+  deliveryFee: 0,
+  pickupTime: pickup,
+  restaurant: {
+    id: RESTAURANT_ID,
+    name: hiddenDefaults?.Restaurant_Name ?? null,
+    phone: hiddenDefaults?.Telefon ?? null,
+    address_text: addr
+  },
+  driver: { id:null, firstName:null, pos:null },
+  createdAt: serverTimestamp(),
+  updatedAt: serverTimestamp()
+});
+
+
+    // === TAUSSIL-PATCH: إنشاء stops إذا الطلب متعدد ===
+if (qty > 1 && Array.isArray(platforms) && platforms.length) {
+  try {
+    const stopCol = collection(ref, 'stops');
+    let stopIdx = 0;
+
+    for (const plat of platforms) {
+      const arr = providerPrices.get(plat) || [];
+      for (let i = 0; i < arr.length; i++) {
+        stopIdx++;
+        const stopId = `${plat}_${i+1}`;
+        const stopRef = doc(stopCol, stopId);
+
+        await setDoc(stopRef, {
+          nr,
+          platform: plat,
+          price: Math.round(Number(arr[i] || 0) * 100) / 100,
+          qty: 1,
+          deliveryFee: 0,
+          status: "Bearbeitung",
+          address_text: addr, // ✅ استخدام نفس المتغير addr
+          name: hiddenDefaults?.Restaurant_Name ?? null,
+          phone: hiddenDefaults?.Telefon ?? null,
+          fullName: null,
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp()
+        });
+      }
+    }
+  } catch(e){
+    console.error("stops creation failed", e);
+  }
+}
+// === END PATCH ===
+
+
     playSnd('send', id);
     if(nrBox) nrBox.textContent = nr;
-    if(banner){ banner.textContent='✔ Gesendet'; banner.classList.add('show'); setTimeout(()=>banner.classList.remove('show'),1600); }
-    providerQty.clear(); selectedProviders.clear();
+    if(banner){ 
+      banner.textContent='✔ Gesendet'; 
+      banner.classList.add('show'); 
+      setTimeout(()=>banner.classList.remove('show'),1600); 
+    }
+
+    providerQty.clear(); 
+    selectedProviders.clear();
     providerEls.forEach(el=>el.classList.remove('is-selected'));
     if(qtyEl){ qtyEl.value='0'; qtyEl.readOnly=true; }
     if(priceEl) priceEl.value='0,00€';
     if(timeEl) timeEl.value='';
     refreshQtyAndSendState();
+
   }catch(e){
     console.error(e);
     alert("Senden fehlgeschlagen. Prüfe Berechtigungen & Indizes.");
@@ -835,6 +1021,7 @@ if(!addr){ alert('عنوان المطعم غير متوفر في ملف المط
     sendBtn.disabled=false;
   }
 });
+
 /* ===== Totals + Last list ===== */
 function attachMyTotalsAndLast(){
   if(ORDERS_UNSUB){ ORDERS_UNSUB(); ORDERS_UNSUB=null; }
@@ -1272,7 +1459,8 @@ window.addEventListener('unhandledrejection', (e)=>{
 });
 /* ===== Init ===== */
 function showAuthSafe(){ switchPane('login'); showAuth(true); }
-refreshQtyAndSendState();
+renderMultiRows();
+
 if(priceEl && !priceEl.value) priceEl.value="0,00€";
 showAuthSafe();
 /* Drawer/Menu — isolated (no globals touched) */
