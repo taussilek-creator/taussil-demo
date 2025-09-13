@@ -759,7 +759,9 @@ async function assignDriverToOrderFromMap(orderId, driverId){
       }, {merge:true});
     });
     await rUpdate(rRef(rtdb,`drivers_inbox/${d.id}`), { lastOrderAssigned: orderId, ts: Date.now() }).catch(()=>{});
-    playSound('driver');
+    playSound('driver');    // مزامنة اسم/هاتف السائق إلى جميع الستوبز
+    await propagateDriverToStops(orderId, { fullName: d.fullName, phone: d.phone });
+
   }catch(_){}
 }
 function openMapAssignPanel(driverId){
@@ -1291,7 +1293,8 @@ $('#assign-confirm')?.addEventListener('click', async ()=>{
       }, {merge:true});
     });
     await rUpdate(rRef(rtdb,`drivers_inbox/${d.id}`), { lastOrderAssigned: oid, ts: Date.now() }).catch(()=>{});
-    playSound('driver');
+    playSound('driver');    await propagateDriverToStops(oid, { fullName: d.fullName, phone: d.phone });
+
   }finally{ assignSheet?.classList.remove('open'); }
 });
 function openAssignSheet(o){
@@ -1304,6 +1307,39 @@ function openAssignSheet(o){
   }).join('');
   assignSheet.classList.add('open');
 }
+// === [TAUSSIL-STOPS-PROPAGATION-START] ===
+async function propagateDriverToStops(orderId, driver){
+  try{
+    const stopColRef = collection(db, 'orders', orderId, 'stops');
+    const snap = await getDocs(stopColRef);
+    if (snap.empty) return;
+    const payload = {
+      fullName: driver?.fullName ?? null,
+      phone: driver?.phone ?? null,
+      updatedAt: serverTimestamp()
+    };
+    await Promise.all(
+      snap.docs.map(d => 
+        updateDoc(d.ref, payload).catch(() => setDoc(d.ref, payload, { merge:true }))
+      )
+    );
+  }catch(e){ console.warn('propagateDriverToStops failed:', e?.code||e); }
+}
+
+async function propagateStatusToStops(orderId, status){
+  try{
+    const stopColRef = collection(db, 'orders', orderId, 'stops');
+    const snap = await getDocs(stopColRef);
+    if (snap.empty) return;
+    const payload = { status: status || 'Bearbeitung', updatedAt: serverTimestamp() };
+    await Promise.all(
+      snap.docs.map(d => 
+        updateDoc(d.ref, payload).catch(() => setDoc(d.ref, payload, { merge:true }))
+      )
+    );
+  }catch(e){ console.warn('propagateStatusToStops failed:', e?.code||e); }
+}
+// === [TAUSSIL-STOPS-PROPAGATION-END] ===
 
 /* ===== Actions ===== */
 async function changeStatus(orderId, next){
@@ -1312,6 +1348,9 @@ async function changeStatus(orderId, next){
   }catch(_){
     await setDoc(doc(db,'orders', orderId), { status: next, updatedAt: serverTimestamp() }, { merge:true });
   }
+    // مزامنة الحالة إلى الستوبز
+  await propagateStatusToStops(orderId, next);
+
   if(next==='Unterwegs') playSound('unterwegs');
   if(next==='Geliefert') playSound('geliefert');
   renderAll();
