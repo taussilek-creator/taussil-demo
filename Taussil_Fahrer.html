@@ -61,6 +61,11 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
 .btn-icon{width:48px;height:48px;border-radius:12px;border:1px solid rgba(255,255,255,.12);background:#122037;display:flex;align-items:center;justify-content:center;cursor:pointer}
 .btn-go{background:linear-gradient(180deg,#4ade80,#22c55e);border:none;color:#06220f}
 .btn-done{background:linear-gradient(180deg,#a7f3d0,#34d399);border:none;color:#06220f}
+/* Multi-stops (inline, خفيف) */
+.multi-stops{margin-top:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,.08)}
+.stop-row{display:grid;grid-template-columns:56px 1fr 48px;gap:10px;align-items:center;
+  margin:6px 0;padding:8px 10px;border:1px solid rgba(255,255,255,.08);border-radius:14px;background:#0f1a30}
+.stop-logo{width:56px;height:56px;border-radius:12px;background:#1a2742;display:flex;align-items:center;justify-content:center;font-weight:800}
 
 /* Detail bottom sheet */
 .modal{position:fixed;inset:0;background:rgba(0,0,0,.45);display:none;align-items:flex-end;z-index:1000}
@@ -263,9 +268,10 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
 <script type="module">
 /* ===== Firebase ===== */
 import { initializeApp, getApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+// أضف getDocs هنا:
 import {
   getFirestore, collection, query, where, limit, onSnapshot, doc,
-  setDoc, updateDoc, getDoc, Timestamp, serverTimestamp,
+  setDoc, updateDoc, getDoc, getDocs, Timestamp, serverTimestamp,
   runTransaction, increment
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
@@ -865,8 +871,112 @@ function stopMedianBG(){
 }
 
 /* ===== Orders ===== */
+/* === Multi-order (stops) support === */
+const stopsUnsubs = new Map();
+function detachStopsAll(){ stopsUnsubs.forEach(u=>{try{u();}catch(_){}}); stopsUnsubs.clear(); }
+
+/* تسليم stop واحد مع حساب مسافة الرجل فقط (تراكمي عبر الرحلة) */
+async function finalizeStop(orderId, stopId, stopData, orderData){
+  try{
+    // نبني كائن "يشبه" الطلب لقياس المسافة: مطعم من الـorder ووجهة من الـstop
+    const orderLike = { ...orderData, address_text: (stopData.address_text || stopData.addressText || '') };
+    const km = await computeLegKmForOrder(orderLike);
+
+    // تسعير المسافة فقط بشكل تراكمي عبر الأرجل (الـ 2 كم المجانية تُطبَّق مرّة واحدة في بداية السلسلة)
+    const firstLeg = isRouteFirstLeg(orderData);
+    const distEUR  = priceDistanceProgressive(km, firstLeg);
+
+    // تحديث وثيقة الـstop فقط
+    const sref = doc(db, "orders", orderId, "stops", stopId);
+    await updateDoc(sref, {
+      status: "Geliefert",
+      deliveredAt: serverTimestamp(),
+      distance_km: km,
+      deliveryFee: distEUR,
+      updatedAt: serverTimestamp()
+    });
+
+    // ربط السلسلة: آخر وجهة = هذا التسليم
+    const drop = (stopData.address_text || stopData.addressText || '');
+    if(drop) setLastDestFromText(drop); else if(lastLL) setLastDestFromLL(lastLL);
+
+    // عدّاد التقدم في الـorder (بدون قراءة إضافية)
+    const prevDel = Number(orderData.stops_delivered||0);
+    const qty     = Number(orderData.qty||0);
+    await updateDoc(doc(db,"orders", orderId), { stops_delivered: increment(1), updatedAt: serverTimestamp() });
+	await recalcOrderFees(orderId);
+    if(qty>0 && (prevDel+1)>=qty){ await patchOrder(orderId, { status:"Geliefert" }); }
+
+    toast(`Stop geliefert · ${km.toFixed(2)} km · +${distEUR.toFixed(2)}€`);
+  }catch(e){ console.error(e); toast("Fehler beim Stop"); }
+}
+
+/* مستمع فرعي لكل طلب: يعرض أسطر الـstops ويخفي زر Delivered العام */
+function attachStopsForOrder(orderId, orderData, cardEl){
+  // فضِّ أي مستمع سابق لهذا الطلب
+  try{ stopsUnsubs.get(orderId)?.(); }catch(_){}
+  const cont = cardEl.querySelector('.multi-stops');
+  if(!cont) return;
+  const doneGeneral = cardEl.querySelector('button[data-act="delivered"]');
+
+  const subCol = collection(db, "orders", orderId, "stops");
+  const unsub = onSnapshot(subCol, (snap)=>{
+    const docs = snap.docs.map(d=>({ id:d.id, s:d.data()||{} }));
+    if(docs.length===0){
+      cont.style.display='none';
+      if(doneGeneral) doneGeneral.style.display='inline-flex'; // طلب منفرد => يرجع الزر العام
+      return;
+    }
+    cont.style.display='block';
+    if(doneGeneral) doneGeneral.style.display='none';          // Multi => نخفي الزر العام
+
+    // ترتيب: حسب nr ثم id
+    docs.sort((a,b)=>{
+      const na=Number(a.s.nr||0), nb=Number(b.s.nr||0);
+      if(na!==nb) return na-nb; return a.id.localeCompare(b.id);
+    });
+
+    cont.innerHTML = docs.map(({id,s},i)=>{
+      const st  = mapStatusLabel(s.status||'Bearbeitung');
+      const del = String(s.status||'').toLowerCase()==='geliefert';
+      const plat= s.platform || '';
+      const addr= s.address_text || s.addressText || '';
+      const initials = (plat||id).slice(0,2).toUpperCase();
+      const btn = del ? `<span class="btn-icon btn-done" title="Geliefert">✓</span>`
+                      : `<button class="btn-icon btn-done" data-stop="${id}" title="Diesen Stop liefern">✓</button>`;
+      return `
+        <div class="stop-row" data-stop="${id}">
+          <div class="stop-logo">${initials}</div>
+          <div class="info">
+            <div class="line"><strong>${s.name || orderData.restaurant?.name || '—'}</strong> <span class="tag">Item #${i+1} · ${st}</span></div>
+            <div class="small">${plat || '—'}</div>
+            <div class="small" style="opacity:.85;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${addr || '—'}</div>
+          </div>
+          <div class="act">${btn}</div>
+        </div>`;
+    }).join("");
+
+    // ربط زر التسليم لكل stop
+    cont.querySelectorAll('button[data-stop]').forEach(btn=>{
+      btn.onclick = async (e)=>{
+        e.stopPropagation();
+        const sid = btn.getAttribute('data-stop');
+        const sd  = docs.find(d=>d.id===sid)?.s || {};
+        await finalizeStop(orderId, sid, sd, orderData);
+      };
+    });
+  }, ()=>{ cont.style.display='none'; if(doneGeneral) doneGeneral.style.display='inline-flex'; });
+
+  stopsUnsubs.set(orderId, unsub);
+}
+
 let unsubOrders=null, unsubInbox=null;
-function detachOrders(){ unsubOrders?.(); unsubOrders=null; ordersInfo.textContent="—"; listEl.innerHTML=""; }
+function detachOrders(){
+  unsubOrders?.(); unsubOrders=null;
+  ordersInfo.textContent="—"; listEl.innerHTML="";
+  detachStopsAll(); /* ← إضافة */
+}
+
 function mapStatusLabel(s){ const low=String(s||"").toLowerCase(); if(low==="bearbeitung") return "Neu"; return s||"—"; }
 
 function attachOrders(){
@@ -913,6 +1023,7 @@ function renderOrders(items){
           <div class="line"><strong>${rest}</strong> <span class="tag">${st}</span></div>
           <div class="small">${plat} · Qty ${qty}</div>
           <div class="small" style="opacity:.85;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${addr || '—'}</div>
+		  <div class="multi-stops" data-stops-of="${id}" style="grid-column:1 / -1; display:none"></div>
         </div>
         <div class="act">
           ${ showStart ? `<a class="btn-icon btn-go" href="${navHref}" target="_blank" rel="noopener noreferrer" data-act="start">▶</a>` : ``}
@@ -921,6 +1032,40 @@ function renderOrders(items){
       </div>
     `;
   }).join("");
+  // خريطة للوصول السريع لكائن الـorder
+const omap = new Map(filtered.map(({id,o})=>[id,o]));
+
+listEl.querySelectorAll(".card-order").forEach(el=>{
+  const id = el.getAttribute("data-id");
+  const addr = decodeURIComponent(el.getAttribute("data-addr")||"").trim();
+
+  // ربط تفاصيل البطاقة كما هو موجود عندك
+  el.addEventListener("click",(e)=>{
+    if(e.target.closest(".btn-icon")) return;
+    openDetail(id);
+  });
+
+  // أزرارك القديمة كما هي
+  const startA = el.querySelector('a[data-act="start"]');
+  if(startA){
+    startA.addEventListener("click", async (e)=>{
+      if(!addr){ e.preventDefault(); toast('Restaurant-Adresse fehlt'); return; }
+      await safeSetStatusToUnterwegs(id);
+    });
+  }
+  const doneBtn = el.querySelector('button[data-act="delivered"]');
+  if(doneBtn){
+    doneBtn.addEventListener("click", async (e)=>{
+      e.stopPropagation();
+      await finalizeOrderWithFee(id); // يظل للطلب المنفرد فقط
+    });
+  }
+
+  // ✅ تشغيل مستمع الـstops لهذا الطلب (إن وُجدت subcollection سيظهروا؛ غير ذلك يبقى المنطق القديم)
+  const o = omap.get(id) || {};
+  attachStopsForOrder(id, o, el);
+});
+
 
   // ربط الأحداث
   listEl.querySelectorAll(".card-order").forEach(el=>{
@@ -1167,48 +1312,101 @@ mdClose.addEventListener("click", ()=> md.classList.remove("show"));
 md.addEventListener("click",(e)=>{ if(e.target===md) md.classList.remove("show"); });
 
 /* ===== Patch order helper ===== */
-// لو أردت استخدام deliveryFee رسميًا: اسمح به في الـ Rules (أنظر أعلى الرسالة)
+// لو أردت استخدام deliveryFee رسميًا: اسمح به في الـ Rules
 const PREFER_DELIVERY_FEE_FIELD = true;
+
 async function patchOrder(id, fields){
   const allowed = {};
-  if('status'      in fields) allowed.status      = fields.status;
-  if('price'       in fields) allowed.price       = Number(fields.price);
-  if('deliveryFee' in fields) allowed.deliveryFee = Number(fields.deliveryFee);
-  if('etmTargetMs' in fields) allowed.etmTargetMs = fields.etmTargetMs;
-  if('ETM_Target'  in fields) allowed.ETM_Target  = fields.ETM_Target;
+  if ('status'      in fields) allowed.status      = fields.status;
+  if ('price'       in fields) allowed.price       = Number(fields.price);
+  if ('deliveryFee' in fields) allowed.deliveryFee = Number(fields.deliveryFee);
+  if ('etmTargetMs' in fields) allowed.etmTargetMs = fields.etmTargetMs;
+  if ('ETM_Target'  in fields) allowed.ETM_Target  = fields.ETM_Target;
   allowed.updatedAt = serverTimestamp();
-  const refDoc=doc(db,"orders", id);
-  try{ await updateDoc(refDoc, allowed); }
-  catch{ await setDoc(refDoc, allowed, { merge:true }); }
+
+  const refDoc = doc(db, "orders", id);
+  try { await updateDoc(refDoc, allowed); }
+  catch { await setDoc(refDoc, allowed, { merge:true }); }
 }
 
-/* كتابة الرسوم مع Fallback ليتوافق مع القواعد الحالية */
+/* كتابة الرسوم مع Fallback ليتوافق مع القواعد الحالية (للطلب المفرد) */
 async function writeFeeOnly(id, fee){
   await patchOrder(id, { status:"Geliefert", deliveryFee: fee });
   return { field:'deliveryFee', fee };
 }
 
+/* === Recalculate order fees (Multi-Orders: 14% + distance from stops) === */
+async function recalcOrderFees(orderId){
+  try{
+    const oref  = doc(db,"orders", orderId);
+    const osnap = await getDoc(oref);
+    if(!osnap.exists()) return;
 
-/* العملية الكاملة عند التسليم: route → km → Betrag → Fee → تحديث */
+    // اقرأ ستوبز
+    const sref = collection(db, "orders", orderId, "stops");
+    const snap = await getDocs(sref);
+    if (snap.empty) return; // لا ستوبز => ليس ملتي
+
+    let itemsTotal = 0;
+    let distTotal  = 0;
+    let delivered  = 0;
+    let qtyTotal   = 0;
+
+    snap.forEach(d=>{
+      const s = d.data() || {};
+      itemsTotal += Number(s.price||0) || 0;
+      qtyTotal   += Number(s.qty||0)   || 0;
+
+      // نجمع رسوم المسافة فقط للستوب المعلن Geliefert
+      if (String(s.status||'').trim().toLowerCase() === 'geliefert'){
+        delivered++;
+        distTotal += Number(s.deliveryFee||0) || 0;
+      }
+    });
+
+    // 14% من إجمالي قيمة عناصر الملتي
+    const service = Math.round(itemsTotal * 0.14 * 100) / 100;
+    const total   = Math.round((service + distTotal) * 100) / 100;
+
+    await updateDoc(oref, {
+      items_total_eur: itemsTotal,
+      serviceFee:      service,
+      distanceFee:     distTotal,
+      deliveryFee:     total,
+      stops_delivered: delivered,
+      qty:             qtyTotal,
+      updatedAt:       serverTimestamp()
+    });
+  }catch(e){
+    console.error('recalcOrderFees', e);
+  }
+}
+
+/* العملية الكاملة عند التسليم: route → km → Betrag → Fee → تحديث (للطلب المفرد) */
 async function finalizeOrderWithFee(id){
   try{
     const ds = await getDoc(doc(db,"orders", id));
     if(!ds.exists()){ toast("Auftrag nicht gefunden"); return; }
-    const o = ds.data() || {};
-    const km = await computeLegKmForOrder(o);              // كم فعلي
-    const betrag = getOrderAmount(o);                      // مبلغ الطلب
-    const fee = calcFeeSingleOrMulti(o, betrag, km);
-           // المعادلة
+    const o   = ds.data() || {};
+
+    const km     = await computeLegKmForOrder(o); // كم فعلي
+    const betrag = getOrderAmount(o);             // مبلغ الطلب
+    const fee    = calcFeeSingleOrMulti(o, betrag, km);
+
     const res = await writeFeeOnly(id, fee);
+
     // اربط السلسلة: آخر نقطة = هذا التسليم
     const drop = getDropAddr(o);
-    if(drop) setLastDestFromText(drop); else if(lastLL) setLastDestFromLL(lastLL);
+    if (drop) setLastDestFromText(drop);
+    else if (lastLL) setLastDestFromLL(lastLL);
+
     toast(`Geliefert · ${km.toFixed(2)} km · Liefergebühr ${fee.toFixed(2)}€ (${res.field})`);
   }catch(e){
     console.error('finalizeOrderWithFee', e);
     toast('Fehler beim Abschließen');
   }
 }
+
 
 /* ===== Auth gate ===== */
 onAuthStateChanged(auth, async (user)=>{
