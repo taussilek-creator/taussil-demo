@@ -889,14 +889,6 @@ function attachOrders(){
   }, ()=>{ ordersInfo.textContent="Wird geprüft…"; });
 }
 
-/* ===== PATCH: renderOrders (supports multi items) ===== */
-function getMultiItems(o){
-  // إن وُجدت items في الوثيقة نستخدمها؛ وإلا ننشئ مصفوفة بطول qty
-  if (Array.isArray(o.items) && o.items.length) return o.items.map((it,i)=>({ ...it, idx:i }));
-  const q = Math.max(0, Number(o.qty||0));
-  return Array.from({length: q}, (_,i)=>({ idx:i, status: o.status || 'Bearbeitung' }));
-}
-
 function renderOrders(items){
   const filtered = items.filter(({o})=> inTab(o, currentTab));
   ordersInfo.textContent = `${filtered.length} sichtbar (${currentTab})`;
@@ -906,54 +898,21 @@ function renderOrders(items){
     const stRaw=o.status||"—", st=mapStatusLabel(stRaw);
     const rest=o.restaurant?.name||"—";
     const addr=(o.restaurant?.addressText || o.restaurant?.address_text || "").trim();
+    const qty =Number(o.qty||0)||0;
     const plat=Array.isArray(o.platform)? o.platform.join(" / ") : (o.platform||"—");
+    const lower=String(stRaw).toLowerCase();
+    const showStart = (lower==="angenommen" || lower==="zugewiesen" || lower==="assigned" || lower==="bearbeitung");
+    const showDone  = (lower==="unterwegs");
     const logoUrl=o.restaurant?.logoUrl||"";
     const logoHTML = logoUrl? `<img src="${logoUrl}" alt="${rest}">` : `<div class="ph">${(rest||"—").slice(0,2).toUpperCase()}</div>`;
     const navHref = addr ? makeNavUrl(addr) : '#';
-
-    const isMulti = Number(o.qty||0) > 1 || (Array.isArray(o.items) && o.items.length>1);
-    const itemsHTML = isMulti
-      ? (() => {
-          const arr = getMultiItems(o);
-          return `
-            <div class="small" style="margin-top:6px;display:flex;flex-direction:column;gap:6px">
-              ${arr.map(it=>{
-                const itSt = String(it.status||o.status||'—').toLowerCase();
-                const canDone = (itSt==='unterwegs'); // زر التسليم يظهر عندما الحالة Unterwegs
-                return `
-                <div class="card-order" data-id="${id}" data-addr="${encodeURIComponent(addr)}" data-idx="${it.idx}">
-                  <div class="logo">${logoHTML}</div>
-                  <div class="info">
-                    <div class="line">
-                      <strong>${rest}</strong>
-                      <span class="tag">Item #${it.idx+1} · ${mapStatusLabel(it.status||o.status||"—")}</span>
-                    </div>
-                    <div class="small">${plat}</div>
-                    <div class="small" style="opacity:.85;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${addr || '—'}</div>
-                  </div>
-                  <div class="act">
-                    ${ canDone ? `<button class="btn-icon btn-done" data-act="delivered">✓</button>` : ``}
-                  </div>
-                </div>`;
-              }).join('')}
-            </div>
-          `;
-        })()
-      : '';
-
-    // الكارت الرئيس للطلب (Start/Navigation، وDone في حالة single فقط)
-    const lower=String(stRaw).toLowerCase();
-    const showStart = (lower==="angenommen" || lower==="zugewiesen" || lower==="assigned" || lower==="bearbeitung");
-    const showDone  = (!isMulti && lower==="unterwegs"); // المفرد فقط
-
     return `
       <div class="card-order" data-id="${id}" data-addr="${encodeURIComponent(addr)}">
         <div class="logo">${logoHTML}</div>
         <div class="info">
           <div class="line"><strong>${rest}</strong> <span class="tag">${st}</span></div>
-          <div class="small">${plat} · Qty ${Number(o.qty||0)||0}</div>
+          <div class="small">${plat} · Qty ${qty}</div>
           <div class="small" style="opacity:.85;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${addr || '—'}</div>
-          ${itemsHTML}
         </div>
         <div class="act">
           ${ showStart ? `<a class="btn-icon btn-go" href="${navHref}" target="_blank" rel="noopener noreferrer" data-act="start">▶</a>` : ``}
@@ -964,44 +923,30 @@ function renderOrders(items){
   }).join("");
 
   // ربط الأحداث
-  // 1) فتح التفاصيل عند الضغط على منطقة البطاقة (بدون أزرار)
   listEl.querySelectorAll(".card-order").forEach(el=>{
     el.addEventListener("click",(e)=>{
       if(e.target.closest(".btn-icon")) return;
-      const id = el.getAttribute("data-id"); 
-      openDetail(id);
+      const id = el.getAttribute("data-id"); openDetail(id);
     });
-  });
-
-  // 2) Start على الكارت الرئيس: يغيّر حالة الطلب + كل الـitems إلى Unterwegs
-  listEl.querySelectorAll('a[data-act="start"]').forEach(a=>{
-    a.addEventListener("click", async (e)=>{
-      const el = a.closest('.card-order');
-      const id = el?.getAttribute("data-id");
-      const addr = decodeURIComponent(el?.getAttribute("data-addr")||"").trim();
-      if(!addr){ e.preventDefault(); toast('Restaurant-Adresse fehlt'); return; }
-      // غيّر حالة الطلب
-      await safeSetStatusToUnterwegs(id);
-      // غيّر حالة جميع العناصر (تفكيك منطقي)
-      try{ await updateAllItemsStatus(id, 'Unterwegs'); }catch(_){}
-    });
-  });
-
-  // 3) Done لكل عنصر في الـmulti (يحمل data-idx)
-  listEl.querySelectorAll('button[data-act="delivered"]').forEach(btn=>{
-    btn.addEventListener("click", async (e)=>{
-      e.stopPropagation();
-      const el = btn.closest('.card-order');
-      const id  = el?.getAttribute("data-id");
-      const idxRaw = el?.getAttribute("data-idx");
-const idx = idxRaw !== null ? Number(idxRaw) : null;
-
-      await finalizeOrderWithFee(id, idx);
-    });
+    const startA = el.querySelector('a[data-act="start"]');
+    if(startA){
+      startA.addEventListener("click", async (e)=>{
+        const id = el.getAttribute("data-id");
+        const addr = decodeURIComponent(el.getAttribute("data-addr")||"").trim();
+        if(!addr){ e.preventDefault(); toast('Restaurant-Adresse fehlt'); return; }
+        await safeSetStatusToUnterwegs(id);
+      });
+    }
+    const doneBtn = el.querySelector('button[data-act="delivered"]');
+    if(doneBtn){
+      doneBtn.addEventListener("click", async (e)=>{
+        e.stopPropagation();
+        const id = el.getAttribute("data-id");
+        await finalizeOrderWithFee(id);
+      });
+    }
   });
 }
-/* ===== /PATCH renderOrders ===== */
-
 
 
 /* ===== Inbox (RTDB) ===== */
@@ -1074,22 +1019,6 @@ function startIncomingSound(scope=''){
 function stopIncomingAlert(){
   if(beepTimer){ clearInterval(beepTimer); beepTimer=null; }
   try{ newOrderSound?.pause(); }catch(_){}
-}
-
-/* ===== Multi helper ===== */
-async function updateAllItemsStatus(id, status) {
-  const orderRef = doc(db, "orders", id);
-  const orderSnap = await getDoc(orderRef);
-  if (!orderSnap.exists()) return;
-
-  const updates = {};
-  const arr = Array.isArray(orderSnap.data().items) ? orderSnap.data().items : [];
-  arr.forEach((_, idx) => {
-    updates[`items.${idx}.status`] = status;
-  });
-  updates.updatedAt = serverTimestamp();
-
-  await updateDoc(orderRef, updates);
 }
 
 /* ===== Start / Accept / Reject ===== */
@@ -1261,115 +1190,25 @@ async function writeFeeOnly(id, fee){
 
 
 /* العملية الكاملة عند التسليم: route → km → Betrag → Fee → تحديث */
-/* ===== PATCH: finalizeOrderWithFee (single + multi progressive) ===== */
-function __lsKeyBaseTaken(orderId){ return `multi:baseTaken:${orderId}`; }
-function __getBaseTaken(orderId){ try{ return localStorage.getItem(__lsKeyBaseTaken(orderId))==='1'; }catch(_){ return false; } }
-function __setBaseTaken(orderId){ try{ localStorage.setItem(__lsKeyBaseTaken(orderId),'1'); }catch(_){ } }
-
-/* العملية الكاملة عند التسليم: route → km → Betrag → Fee → تحديث (Single + Multi) */
-async function finalizeOrderWithFee(id, idx=null){
+async function finalizeOrderWithFee(id){
   try{
-    const ref = doc(db,"orders", id);
-    const ds  = await getDoc(ref);
+    const ds = await getDoc(doc(db,"orders", id));
     if(!ds.exists()){ toast("Auftrag nicht gefunden"); return; }
-    const o   = ds.data() || {};
-
-    // === SINGLE (لا يوجد items) ===
-   if(!Array.isArray(o.items) || o.items.length===0){
-// ✅ حماية من تسليم الطلب المركّب بالكامل بالخطأ
-if(Array.isArray(o.items) && o.items.length > 0 && (idx === null || !Number.isInteger(idx))){
-  toast("Bitte jeden Teilauftrag einzeln liefern");
-  return;
-}
-
-
-
-      const km     = await computeLegKmForOrder(o);
-      const betrag = getOrderAmount(o);
-      const fee    = calcFeeSingleOrMulti(o, betrag, km);   // فيها 14%/3.5 + الشرائح
-      await writeFeeOnly(id, fee);
-
-      // اربط السلسلة: آخر نقطة = هذا التسليم (لسيناريو لاحق)
-      const drop = getDropAddr(o);
-      if(drop) setLastDestFromText(drop); else if(lastLL) setLastDestFromLL(lastLL);
-
-      toast(`Geliefert · ${km.toFixed(2)} km · Liefergebühr ${fee.toFixed(2)}€`);
-      return;
-    }
-
-    // === MULTI: عنصر محدد ===
-    const items = Array.isArray(o.items) ? o.items : [];
-    const item  = items[idx];
-	if(!item || typeof idx !== 'number'){
-  toast("Teilauftrag ungültig");
-  return;
-}
-
-    if(!item){ toast("Item nicht gefunden"); return; }
-
-    // 1) نحدّد km لهذه الرجل (من آخر تسليم/المطعم → عنوان هذا العنصر)
-    const legKm = await (async ()=>{
-      // نولّف كائن order مؤقت فيه dropoff = عنوان هذا العنصر
-      const oLeg = JSON.parse(JSON.stringify(o));
-      oLeg.dropoff = { addressText: (item?.dropoff?.addressText || item?.dropoff?.address_text || item?.address || '').trim() };
-      return await computeLegKmForOrder(oLeg);
-    })();
-
-    // 2) نجمع المسافة على مستوى الطلب
-    const chainKm = Math.max(0, Number(o.chainKm || 0)) + Math.max(0, legKm);
-
-    // 3) نحدّث حالة هذا العنصر إلى Geliefert
-    const updates = {};
-    updates[`items.${idx}.status`] = "Geliefert";
-    updates[`items.${idx}.km`]     = Math.round(legKm*100)/100;
-    updates[`chainKm`]             = Math.round(chainKm*100)/100;
-    updates.updatedAt              = serverTimestamp();
-    await updateDoc(ref, updates);
-
-    // 4) إن كانت كل العناصر سُلّمت → احسب الرسوم النهائية للملتي
-    const latest = (await getDoc(ref)).data() || {};
-    const allDelivered = Array.isArray(latest.items) && latest.items.length>0 && latest.items.every(it => String(it?.status||'').toLowerCase()==='geliefert');
-    if(allDelivered){
-      // قاعدة الملتي: 14% من مجموع السعر الكلي (لا نستخدم 3.5€ هنا)
-      const totalPrice = Number(latest.price||0) || 0;
-      const baseEUR    = Math.round((totalPrice * 0.14) * 100) / 100;
-
-      // مسافة السلسلة (مع أول 2 كم مجانًا + شرائح تتابعية)
-      const totalKm    = Number(latest.chainKm||0) || 0;
-      const feeDist    = (function distFeeFromTotalKm(d){
-        let bill = Math.max(0, d - 2);          // أول 2 كم مجانًا
-        let cost = 0;
-        const take = (m)=>{ const t = Math.min(Math.max(bill,0), m); bill -= t; return t; };
-        const a = take(5);  cost += a * 0.50;   // >2–7 كم
-        const b = take(5);  cost += b * 0.80;   // >7–12 كم
-        const c = Math.max(bill,0); cost += c * 1.00; // >12 كم
-        return Math.round(cost*100)/100;
-      })(totalKm);
-
-      const finalFee = Math.round((baseEUR + feeDist)*100)/100;
-
-      await patchOrder(id, { status:"Geliefert", deliveryFee: finalFee });
-
-      // اربط آخر نقطة لتبدأ الرجل التالية من هنا في الرحلات اللاحقة
-      const finalDrop = latest.items?.[latest.items.length-1];
-      const finalAddr = (finalDrop?.dropoff?.addressText || finalDrop?.dropoff?.address_text || finalDrop?.address || '').trim();
-      if(finalAddr) setLastDestFromText(finalAddr); else if(lastLL) setLastDestFromLL(lastLL);
-
-      toast(`Multi geliefert · Σ ${totalKm.toFixed(2)} km · 14%=${baseEUR.toFixed(2)}€ · Dist=${feeDist.toFixed(2)}€ · Fee=${finalFee.toFixed(2)}€`);
-    }else{
-      // لم ننته بعد — نحدّث “آخر وجهة” لهذه الرجل فقط
-      const dropAddrThis = (item?.dropoff?.addressText || item?.dropoff?.address_text || item?.address || '').trim();
-      if(dropAddrThis) setLastDestFromText(dropAddrThis); else if(lastLL) setLastDestFromLL(lastLL);
-      toast(`Teil geliefert · ${legKm.toFixed(2)} km · Kette Σ≈ ${chainKm.toFixed(2)} km`);
-    }
+    const o = ds.data() || {};
+    const km = await computeLegKmForOrder(o);              // كم فعلي
+    const betrag = getOrderAmount(o);                      // مبلغ الطلب
+    const fee = calcFeeSingleOrMulti(o, betrag, km);
+           // المعادلة
+    const res = await writeFeeOnly(id, fee);
+    // اربط السلسلة: آخر نقطة = هذا التسليم
+    const drop = getDropAddr(o);
+    if(drop) setLastDestFromText(drop); else if(lastLL) setLastDestFromLL(lastLL);
+    toast(`Geliefert · ${km.toFixed(2)} km · Liefergebühr ${fee.toFixed(2)}€ (${res.field})`);
   }catch(e){
     console.error('finalizeOrderWithFee', e);
     toast('Fehler beim Abschließen');
   }
 }
-
-/* ===== /PATCH finalizeOrderWithFee ===== */
-
 
 /* ===== Auth gate ===== */
 onAuthStateChanged(auth, async (user)=>{
@@ -1415,8 +1254,6 @@ document.addEventListener('DOMContentLoaded', ()=>{
   authModal.style.display='flex';
   switchPane(lastAuthTab==='register' ? 'register' : 'login');
 });
-
-
 </script>
 
 </body>
