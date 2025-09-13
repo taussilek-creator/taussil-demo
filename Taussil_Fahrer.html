@@ -1280,7 +1280,8 @@ async function finalizeOrderWithFee(id, idx=null){
     const o   = ds.data() || {};
 
     // === SINGLE (لا يوجد items) ===
-   if(!Array.isArray(o.items) || o.items.length===0){
+   if(!Array.isArray(o.items) || o.items.length === 0 || idx === null || !Number.isInteger(idx)){
+
 // ✅ حماية من تسليم الطلب المركّب بالكامل بالخطأ
 if(Array.isArray(o.items) && o.items.length > 0 && (idx === null || !Number.isInteger(idx))){
   toast("Bitte jeden Teilauftrag einzeln liefern");
