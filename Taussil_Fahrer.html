@@ -1270,109 +1270,74 @@ function __getBaseTaken(orderId){ try{ return localStorage.getItem(__lsKeyBaseTa
 function __setBaseTaken(orderId){ try{ localStorage.setItem(__lsKeyBaseTaken(orderId),'1'); }catch(_){ } }
 
 /* العملية الكاملة عند التسليم: route → km → Betrag → Fee → تحديث (Single + Multi) */
-async function finalizeOrderWithFee(id, idx=null){
-  try{
-    const ref = doc(db,"orders", id);
-    const ds  = await getDoc(ref);
-	console.log('[DEBUG] finalizeOrderWithFee called with:', { id, idx });
+async function finalizeOrderWithFee(id, idx = null) {
+  const ref = doc(db, "orders", id);
+  const ds = await getDoc(ref);
 
-    if(!ds.exists()){ toast("Auftrag nicht gefunden"); return; }
-    const o   = ds.data() || {};
-
-    // === SINGLE (لا يوجد items) ===
-   if(!Array.isArray(o.items) || o.items.length === 0 || idx === null || !Number.isInteger(idx)){
-
-// ✅ حماية من تسليم الطلب المركّب بالكامل بالخطأ
-if(Array.isArray(o.items) && o.items.length > 0 && (idx === null || !Number.isInteger(idx))){
-  toast("Bitte jeden Teilauftrag einzeln liefern");
-  return;
-}
-
-
-
-      const km     = await computeLegKmForOrder(o);
-      const betrag = getOrderAmount(o);
-      const fee    = calcFeeSingleOrMulti(o, betrag, km);   // فيها 14%/3.5 + الشرائح
-      await writeFeeOnly(id, fee);
-
-      // اربط السلسلة: آخر نقطة = هذا التسليم (لسيناريو لاحق)
-      const drop = getDropAddr(o);
-      if(drop) setLastDestFromText(drop); else if(lastLL) setLastDestFromLL(lastLL);
-
-      toast(`Geliefert · ${km.toFixed(2)} km · Liefergebühr ${fee.toFixed(2)}€`);
-      return;
-    }
-
-    // === MULTI: عنصر محدد ===
-    const items = Array.isArray(o.items) ? o.items : [];
-    const item  = items[idx];
-	if(!item || typeof idx !== 'number'){
-  toast("Teilauftrag ungültig");
-  return;
-}
-
-    if(!item){ toast("Item nicht gefunden"); return; }
-
-    // 1) نحدّد km لهذه الرجل (من آخر تسليم/المطعم → عنوان هذا العنصر)
-    const legKm = await (async ()=>{
-      // نولّف كائن order مؤقت فيه dropoff = عنوان هذا العنصر
-      const oLeg = JSON.parse(JSON.stringify(o));
-      oLeg.dropoff = { addressText: (item?.dropoff?.addressText || item?.dropoff?.address_text || item?.address || '').trim() };
-      return await computeLegKmForOrder(oLeg);
-    })();
-
-    // 2) نجمع المسافة على مستوى الطلب
-    const chainKm = Math.max(0, Number(o.chainKm || 0)) + Math.max(0, legKm);
-
-    // 3) نحدّث حالة هذا العنصر إلى Geliefert
-    const updates = {};
-    updates[`items.${idx}.status`] = "Geliefert";
-    updates[`items.${idx}.km`]     = Math.round(legKm*100)/100;
-    updates[`chainKm`]             = Math.round(chainKm*100)/100;
-    updates.updatedAt              = serverTimestamp();
-    await updateDoc(ref, updates);
-
-    // 4) إن كانت كل العناصر سُلّمت → احسب الرسوم النهائية للملتي
-    const latest = (await getDoc(ref)).data() || {};
-    const allDelivered = Array.isArray(latest.items) && latest.items.length>0 && latest.items.every(it => String(it?.status||'').toLowerCase()==='geliefert');
-    if(allDelivered){
-      // قاعدة الملتي: 14% من مجموع السعر الكلي (لا نستخدم 3.5€ هنا)
-      const totalPrice = Number(latest.price||0) || 0;
-      const baseEUR    = Math.round((totalPrice * 0.14) * 100) / 100;
-
-      // مسافة السلسلة (مع أول 2 كم مجانًا + شرائح تتابعية)
-      const totalKm    = Number(latest.chainKm||0) || 0;
-      const feeDist    = (function distFeeFromTotalKm(d){
-        let bill = Math.max(0, d - 2);          // أول 2 كم مجانًا
-        let cost = 0;
-        const take = (m)=>{ const t = Math.min(Math.max(bill,0), m); bill -= t; return t; };
-        const a = take(5);  cost += a * 0.50;   // >2–7 كم
-        const b = take(5);  cost += b * 0.80;   // >7–12 كم
-        const c = Math.max(bill,0); cost += c * 1.00; // >12 كم
-        return Math.round(cost*100)/100;
-      })(totalKm);
-
-      const finalFee = Math.round((baseEUR + feeDist)*100)/100;
-
-      await patchOrder(id, { status:"Geliefert", deliveryFee: finalFee });
-
-      // اربط آخر نقطة لتبدأ الرجل التالية من هنا في الرحلات اللاحقة
-      const finalDrop = latest.items?.[latest.items.length-1];
-      const finalAddr = (finalDrop?.dropoff?.addressText || finalDrop?.dropoff?.address_text || finalDrop?.address || '').trim();
-      if(finalAddr) setLastDestFromText(finalAddr); else if(lastLL) setLastDestFromLL(lastLL);
-
-      toast(`Multi geliefert · Σ ${totalKm.toFixed(2)} km · 14%=${baseEUR.toFixed(2)}€ · Dist=${feeDist.toFixed(2)}€ · Fee=${finalFee.toFixed(2)}€`);
-    }else{
-      // لم ننته بعد — نحدّث “آخر وجهة” لهذه الرجل فقط
-      const dropAddrThis = (item?.dropoff?.addressText || item?.dropoff?.address_text || item?.address || '').trim();
-      if(dropAddrThis) setLastDestFromText(dropAddrThis); else if(lastLL) setLastDestFromLL(lastLL);
-      toast(`Teil geliefert · ${legKm.toFixed(2)} km · Kette Σ≈ ${chainKm.toFixed(2)} km`);
-    }
-  }catch(e){
-    console.error('finalizeOrderWithFee', e);
-    toast('Fehler beim Abschließen');
+  if (!ds.exists()) {
+    toast("Auftrag nicht gefunden");
+    return;
   }
+
+  const o = ds.data() || {};
+  const items = Array.isArray(o.items) ? o.items : [];
+  const isMulti = items.length > 0;
+  const isValidIdx = Number.isInteger(idx) && idx >= 0 && idx < items.length;
+
+  // ✅ طلب مفرد أو idx غير صالح → تسليم كامل
+  if (!isMulti || !isValidIdx) {
+    const km = await computeLegKmForOrder(o);
+    const betrag = getOrderAmount(o);
+    const fee = calcFeeSingleOrMulti(o, betrag, km);
+    await writeFeeOnly(id, fee);
+
+    const drop = getDropAddr(o);
+    if (drop) setLastDestFromText(drop);
+    else if (lastLL) setLastDestFromLL(lastLL);
+
+    toast(`Geliefert · ${km.toFixed(2)} km · Liefergebühr ${fee.toFixed(2)}€`);
+    return;
+  }
+
+  // ✅ تسليم عنصر واحد داخل الطلب المركّب
+  const item = items[idx];
+
+  if (!item || (item.status || "").toLowerCase() === "geliefert") {
+    toast("Teilauftrag bereits geliefert oder ungültig");
+    return;
+  }
+
+  const legKm = await computeLegKmForItem(o, idx); // تحسب المسافة لهذا العنصر فقط
+  item.status = "Geliefert";
+  item.km = legKm;
+
+  // سلسلة التسليم chainKM
+  let chainKm = Array.isArray(o.items)
+    ? o.items.reduce((a, b) => a + (b.km || 0), 0)
+    : legKm;
+
+  const allDelivered = o.items.every(it => (it.status || "").toLowerCase() === "geliefert");
+
+  let fee = 0;
+  if (allDelivered) {
+    const betrag = getOrderAmount(o);
+    fee = calcFeeSingleOrMulti(o, betrag, chainKm);
+    o.status = "Geliefert";
+  }
+
+  o.items[idx] = item;
+  o.chainKm = chainKm;
+  if (fee) o.deliveryFee = fee;
+
+  await updateDoc(ref, o);
+
+  const drop = item.drop || getDropAddr(item);
+  if (drop) setLastDestFromText(drop);
+  else if (lastLL) setLastDestFromLL(lastLL);
+
+  toast(`Teilauftrag geliefert · ${legKm.toFixed(2)} km`);
 }
+
 
 /* ===== /PATCH finalizeOrderWithFee ===== */
 
