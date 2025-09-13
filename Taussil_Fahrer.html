@@ -990,17 +990,14 @@ function renderOrders(items){
   // 3) Done لكل عنصر في الـmulti (يحمل data-idx)
   listEl.querySelectorAll('button[data-act="delivered"]').forEach(btn=>{
     btn.addEventListener("click", async (e)=>{
-  e.stopPropagation();
-  const el = btn.closest('.card-order');
-  const id  = el?.getAttribute("data-id");
-  const idxRaw = el?.getAttribute("data-idx");
-  const idx = idxRaw !== null ? Number(idxRaw) : null;
+      e.stopPropagation();
+      const el = btn.closest('.card-order');
+      const id  = el?.getAttribute("data-id");
+      const idxRaw = el?.getAttribute("data-idx");
+const idx = idxRaw !== null ? Number(idxRaw) : null;
 
-  console.log('[DEBUG] Delivered Clicked:', { id, idx, idxRaw });
-
-  await finalizeOrderWithFee(id, idx);
-});
-
+      await finalizeOrderWithFee(id, idx);
+    });
   });
 }
 /* ===== /PATCH renderOrders ===== */
@@ -1274,14 +1271,11 @@ async function finalizeOrderWithFee(id, idx=null){
   try{
     const ref = doc(db,"orders", id);
     const ds  = await getDoc(ref);
-	console.log('[DEBUG] finalizeOrderWithFee called with:', { id, idx });
-
     if(!ds.exists()){ toast("Auftrag nicht gefunden"); return; }
     const o   = ds.data() || {};
 
     // === SINGLE (لا يوجد items) ===
-   if(!Array.isArray(o.items) || o.items.length === 0 || idx === null || !Number.isInteger(idx)){
-
+   if(!Array.isArray(o.items) || o.items.length===0){
 // ✅ حماية من تسليم الطلب المركّب بالكامل بالخطأ
 if(Array.isArray(o.items) && o.items.length > 0 && (idx === null || !Number.isInteger(idx))){
   toast("Bitte jeden Teilauftrag einzeln liefern");
