@@ -308,7 +308,8 @@ async function ensureGmaps(){
     const cb='gm_cb_'+Math.random().toString(36).slice(2);
     window[cb]=()=>{ delete window[cb]; resolve(true); };
     const s=document.createElement('script');
-    s.src=`https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(GMAPS_API_KEY)}&v=weekly&callback=${cb}`;
+    s.src=`https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(GMAPS_API_KEY)}&v=weekly&loading=async&callback=${cb}`;
+
     s.async=true; s.defer=true; s.onerror=()=>{ delete window[cb]; reject(new Error('gmaps-load-failed')); };
     document.head.appendChild(s);
   });
@@ -407,25 +408,32 @@ function getOrderAmount(o){
   return 0;
 }
 
-/* معادلة Liefergebühr التي أرسلتها (مقربة للسنت) */
+/* معادلة Liefergebühr (متوافقة مع سياسة <25 ثابت) */
 function calcDeliveryFeeEUR(betrag, km){
   const price = Math.max(0, Number(betrag || 0));
   const d     = Math.max(0, Number(km || 0));
 
-  // الجزء الثابت حسب السعر
-  const base = (price <= 25) ? 3.50 : (price * 0.14);
+  // الجزء الثابت/النسبي حسب السياسة
+  const base = (price < 25) ? 3.50 : (price * 0.14);
 
-  // شرائح المسافة (حاسبة هامشية)
-  // >2–7 كم: 0.50 €/كم (حتى 5 كم من هذه الشريحة)
-  const segA = Math.min(Math.max(d - 2, 0), 5) * 0.50;
-  // >7–12 كم: 0.80 €/كم (حتى 5 كم من هذه الشريحة)
-  const segB = Math.min(Math.max(d - 7, 0), 5) * 0.80;
-  // >12 كم: 1.00 €/كم (بلا حد أعلى)
-  const segC = Math.max(d - 12, 0) * 1.00;
+  // شرائح المسافة بعد أول 2 كم مجانًا
+  const segA = Math.min(Math.max(d - 2, 0), 5) * 0.50;  // >2–7
+  const segB = Math.min(Math.max(d - 7, 0), 5) * 0.80;  // >7–12
+  const segC = Math.max(d - 12, 0) * 1.00;              // >12
 
   const fee = base + segA + segB + segC;
   return Math.round(fee * 100) / 100; // تقريب إلى سنتين
 }
+// === Distance cost from TOTAL km (multi-order): deduct 2 km, then tiers
+function distanceCostFromTotalKm(totalKm){
+  const d = Math.max(0, Number(totalKm) || 0);
+  const bill = Math.max(0, d - 2);
+  const segA = Math.min(bill, 5) * 0.50;                 // >2–7
+  const segB = Math.min(Math.max(bill - 5, 0), 5) * 0.80; // >7–12
+  const segC = Math.max(bill - 10, 0) * 1.00;             // >12
+  return Math.round((segA + segB + segC) * 100) / 100;
+}
+
 /* === PRICING v2.1 (Multi-Orders progressive tiers; no waiting) === */
 /* تخزين حالة التسعير عبر الأرجل في localStorage */
 const LS_ROUTE_PRICE = 'driver:chain:pricing';
@@ -493,11 +501,12 @@ function isRouteFirstLeg(orderObj){
   return false;
 }
 
-/* قاعدة الطلب كما هي (≤25 = 3.50€، غير ذلك 14%) */
+/* قاعدة الطلب كما هي (<25 = 3.50€، وإلا 14%) */
 function calcBaseV21(amount){
   amount = Math.max(0, +amount || 0);
-  return amount <= 25 ? 3.50 : (amount * 0.14);
+  return amount < 25 ? 3.50 : (amount * 0.14);
 }
+
 
 /* الرسوم النهائية لطلب واحد:
    - مفرد (لا سلسلة): نستخدم معادلتك الحالية calcDeliveryFeeEUR (تحسب 2 كم على نفس الطلب)
@@ -729,6 +738,11 @@ onlineToggle.addEventListener("click", (e)=>{ e.preventDefault(); setOnline(!onl
 /* ===== Presence + GPS (RTDB) ===== */
 let hbTimer = null; // مؤقت النبضات
 function startPresence(){
+function startPresence(){
+  if (!uid) { console.warn('startPresence: no uid'); return; }
+  // باقي الدالة كما هو
+}
+
   const pRef = ref(rtdb, `drivers_presence/${uid}`);
   rUpdate(pRef,{ online:true, desired:true, ts: Date.now(), ver:'driver-web-v7' }).catch(()=>{});
   try{ onDisconnect(pRef).update({ lastDisconnectAt: rServerTs() }); }catch(_){}
@@ -768,7 +782,8 @@ let LIVE_WATCH_ID=null, LIVE_LAST_LL=null, LIVE_LAST_SENT=0, LIVE_HB=null;
 function driverLiveStart(){
   try{
     const uid = auth?.currentUser?.uid; if(!uid || !('geolocation' in navigator)) return;
-    const locRef = rRef(rtdb, `drivers_locations/${uid}`);
+    const locRef = ref(rtdb, `drivers_locations/${uid}`);
+
 
     // طلقة أولى دقيقة
     navigator.geolocation.getCurrentPosition(p=>{
@@ -878,38 +893,46 @@ function detachStopsAll(){ stopsUnsubs.forEach(u=>{try{u();}catch(_){}}); stopsU
 /* تسليم stop واحد مع حساب مسافة الرجل فقط (تراكمي عبر الرحلة) */
 async function finalizeStop(orderId, stopId, stopData, orderData){
   try{
-    // نبني كائن "يشبه" الطلب لقياس المسافة: مطعم من الـorder ووجهة من الـstop
+    // 1) كم الرجل
     const orderLike = { ...orderData, address_text: (stopData.address_text || stopData.addressText || '') };
     const km = await computeLegKmForOrder(orderLike);
 
-    // تسعير المسافة فقط بشكل تراكمي عبر الأرجل (الـ 2 كم المجانية تُطبَّق مرّة واحدة في بداية السلسلة)
-    const firstLeg = isRouteFirstLeg(orderData);
-    const distEUR  = priceDistanceProgressive(km, firstLeg);
+    // 2) 14% لهذا الستوب (deliveryFee في الستوب = 14% من price)
+    const stopPrice = Number(stopData.price || 0);
+    const serviceFeeStop = Math.round(stopPrice * 0.14 * 100) / 100;
 
-    // تحديث وثيقة الـstop فقط
+    // 3) تحديث وثيقة الستوب
     const sref = doc(db, "orders", orderId, "stops", stopId);
-    await updateDoc(sref, {
+    await setDoc(sref, {
       status: "Geliefert",
       deliveredAt: serverTimestamp(),
       distance_km: km,
-      deliveryFee: distEUR,
+      deliveryFee: serviceFeeStop,  // 14% للستوب
       updatedAt: serverTimestamp()
-    });
+    }, { merge: true });
 
-    // ربط السلسلة: آخر وجهة = هذا التسليم
+    // 4) ربط السلسلة بآخر وجهة
     const drop = (stopData.address_text || stopData.addressText || '');
     if(drop) setLastDestFromText(drop); else if(lastLL) setLastDestFromLL(lastLL);
 
-    // عدّاد التقدم في الـorder (بدون قراءة إضافية)
+    // 5) عدّاد + تجميع فقط عند آخر ستوب
     const prevDel = Number(orderData.stops_delivered||0);
     const qty     = Number(orderData.qty||0);
     await updateDoc(doc(db,"orders", orderId), { stops_delivered: increment(1), updatedAt: serverTimestamp() });
-	await recalcOrderFees(orderId);
-    if(qty>0 && (prevDel+1)>=qty){ await patchOrder(orderId, { status:"Geliefert" }); }
 
-    toast(`Stop geliefert · ${km.toFixed(2)} km · +${distEUR.toFixed(2)}€`);
-  }catch(e){ console.error(e); toast("Fehler beim Stop"); }
+    const justDelivered = prevDel + 1;
+    if (qty > 0 && justDelivered >= qty) {
+      await recalcOrderFees(orderId);           // ← ينشر النهائي مرة واحدة
+      await patchOrder(orderId, { status:"Geliefert" });
+    }
+
+    toast(`Stop geliefert · ${km.toFixed(2)} km · 14%=${serviceFeeStop.toFixed(2)}€`);
+  }catch(e){
+    console.error(e);
+    toast("Fehler beim Stop");
+  }
 }
+
 
 /* مستمع فرعي لكل طلب: يعرض أسطر الـstops ويخفي زر Delivered العام */
 function attachStopsForOrder(orderId, orderData, cardEl){
@@ -1341,46 +1364,52 @@ async function recalcOrderFees(orderId){
     const oref  = doc(db,"orders", orderId);
     const osnap = await getDoc(oref);
     if(!osnap.exists()) return;
+    const odata = osnap.data() || {};
 
-    // اقرأ ستوبز
+    // اقرأ الستوبز
     const sref = collection(db, "orders", orderId, "stops");
     const snap = await getDocs(sref);
-    if (snap.empty) return; // لا ستوبز => ليس ملتي
+    if (snap.empty) return;
 
-    let itemsTotal = 0;
-    let distTotal  = 0;
-    let delivered  = 0;
-    let qtyTotal   = 0;
+    let sumKm = 0;     // Σ distance_km
+    let sum14 = 0;     // Σ deliveryFee (هنا = 14% لكل ستوب حسب تعديلنا)
+    let delivered = 0;
+    const totalStops = snap.size;
 
     snap.forEach(d=>{
       const s = d.data() || {};
-      itemsTotal += Number(s.price||0) || 0;
-      qtyTotal   += Number(s.qty||0)   || 0;
-
-      // نجمع رسوم المسافة فقط للستوب المعلن Geliefert
-      if (String(s.status||'').trim().toLowerCase() === 'geliefert'){
-        delivered++;
-        distTotal += Number(s.deliveryFee||0) || 0;
-      }
+      sumKm += Number(s.distance_km || 0) || 0;
+      sum14 += Number(s.deliveryFee  || 0) || 0;
+      if (String(s.status||'').trim().toLowerCase() === 'geliefert') delivered++;
     });
 
-    // 14% من إجمالي قيمة عناصر الملتي
-    const service = Math.round(itemsTotal * 0.14 * 100) / 100;
-    const total   = Math.round((service + distTotal) * 100) / 100;
+    // أمان: لا نكتب شيء إن لم تكن كل الستوبز مسلّمة
+    if (delivered < totalStops) return;
+
+    // احسب تكلفة المسافة من إجمالي km بعد خصم 2 كم والشرائح
+    const distanceFee = distanceCostFromTotalKm(sumKm);
+    const sum14Round  = Math.round(sum14 * 100) / 100;
+    const serviceFee  = Math.round((distanceFee + sum14Round) * 100) / 100;
+
+    // (اختياري) توثيق إجمالي العناصر
+    let itemsTotal = 0;
+    snap.forEach(d=>{ itemsTotal += Number((d.data()||{}).price || 0) || 0; });
+    if(itemsTotal<=0){ itemsTotal = Number(odata.price || 0) || 0; }
 
     await updateDoc(oref, {
-      items_total_eur: itemsTotal,
-      serviceFee:      service,
-      distanceFee:     distTotal,
-      deliveryFee:     total,
+      distanceFee:     distanceFee,   // تكلفة المسافة النهائية (من إجمالي km)
+      deliveryFee:     sum14Round,    // مجموع 14% لكل الستوبز
+      serviceFee:      serviceFee,    // النهائي الذي ستعرضه الواجهة
+      items_total_eur: Math.round(itemsTotal*100)/100,
       stops_delivered: delivered,
-      qty:             qtyTotal,
+      stops_total:     totalStops,
       updatedAt:       serverTimestamp()
     });
   }catch(e){
     console.error('recalcOrderFees', e);
   }
 }
+
 
 /* العملية الكاملة عند التسليم: route → km → Betrag → Fee → تحديث (للطلب المفرد) */
 async function finalizeOrderWithFee(id){
