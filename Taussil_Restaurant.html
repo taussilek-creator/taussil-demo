@@ -466,9 +466,10 @@ const firebaseConfig = {
 import { initializeApp, getApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import {
   getFirestore, collection, doc, setDoc, getDoc, serverTimestamp,
-  onSnapshot, query, where, orderBy, limit, getDocs,
+  onSnapshot, query, where, orderBy, limit, getDocs, startAfter,
   getCountFromServer
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
 
 import { getDatabase, ref as rRef, get as rGet, onValue as rOn, off as rOff } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, setPersistence, browserLocalPersistence } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
@@ -1028,13 +1029,18 @@ function attachMyTotalsAndLast(){
   if(!RESTAURANT_ID) return;
   onSnapshot(query(collection(db,'orders'), where('restaurant.id','==', RESTAURANT_ID)), (snap)=>{
     let sumP=0, sumL=0;
-    snap.forEach(d=>{
-      const o=d.data()||{};
-      if(String(o.status||'')==='Abgebrochen') return;
-      const p=Number(o.price||0), l=Number(o.deliveryFee||0);
-      if(Number.isFinite(p)) sumP+=p;
-      if(Number.isFinite(l)) sumL+=l;
-    });
+snap.forEach(d=>{
+  const o=d.data()||{};
+  if(String(o.status||'')==='Abgebrochen') return;
+
+  const p = Number(o.price || 0);
+  const isMulti = Number(o.stops_total || o.qty || 0) > 1;
+  const l = isMulti ? Number(o.serviceFee || 0) : Number(o.deliveryFee || 0);
+
+  if (Number.isFinite(p)) sumP += p;
+  if (Number.isFinite(l)) sumL += l;
+});
+
     if(sumPreis) sumPreis.textContent=money(sumP);
     if(sumLiefer) sumLiefer.textContent=money(sumL);
   });
@@ -1136,7 +1142,13 @@ function showTripCard(oid, o){
   card.classList.remove('hidden');
   document.getElementById('tripOrderId').textContent  = oid;
   document.getElementById('tripStatus').textContent   = o.status || '—';
-  document.getElementById('tripDeliveryFee').textContent = money(Number(o.deliveryFee||0));
+  {
+  const isMulti = Number(o.stops_total || o.qty || 0) > 1;
+  const feeVal  = isMulti ? Number(o.serviceFee || 0) : Number(o.deliveryFee || 0);
+  const el = document.getElementById('tripDeliveryFee');
+  if (el) el.textContent = money(feeVal);
+}
+
   resolveDriverName(o.driver||{}).then(n=>{
     const el=document.getElementById('tripDriverName'); if(el) el.textContent=n||'—';
   });
@@ -1149,7 +1161,13 @@ function attachOrderListener(orderId){
     if(!ds.exists()) return;
     const o = ds.data() || {};
     document.getElementById('tripStatus').textContent = o.status || '—';
-    document.getElementById('tripDeliveryFee').textContent= money(Number(o.deliveryFee||0));
+    {
+  const isMulti = Number(o.stops_total || o.qty || 0) > 1;
+  const feeVal  = isMulti ? Number(o.serviceFee || 0) : Number(o.deliveryFee || 0);
+  const el = document.getElementById('tripDeliveryFee');
+  if (el) el.textContent = money(feeVal);
+}
+
     resolveDriverName(o.driver||{}).then(n=>{
       const el=document.getElementById('tripDriverName'); if(el) el.textContent=n||'—';
     });
@@ -1527,11 +1545,18 @@ showAuthSafe();
     try{
       const qs = await getDocs(query(collection(db,'orders'), where('restaurant.id','==', RID)));
       let sumP=0, sumL=0;
-      qs.forEach(d=>{
-        const o=d.data()||{}; if(String(o.status||'')==='Abgebrochen') return;
-        const p=Number(o.price||0), l=Number(o.deliveryFee||0);
-        if(Number.isFinite(p)) sumP+=p; if(Number.isFinite(l)) sumL+=l;
-      });
+qs.forEach(d=>{
+  const o=d.data()||{}; 
+  if(String(o.status||'')==='Abgebrochen') return;
+
+  const p = Number(o.price || 0);
+  const isMulti = Number(o.stops_total || o.qty || 0) > 1;
+  const l = isMulti ? Number(o.serviceFee || 0) : Number(o.deliveryFee || 0);
+
+  if (Number.isFinite(p)) sumP += p; 
+  if (Number.isFinite(l)) sumL += l;
+});
+
       if(logSumPrice) logSumPrice.textContent = money(sumP);
       if(logSumFee)   logSumFee.textContent   = money(sumL);
     }catch(e){ /* ignore */ }
@@ -1655,7 +1680,9 @@ showAuthSafe();
       const plat   = Array.isArray(o.platform)? o.platform.join(' / ') : (o.platform||'—');
       const qty    = Number(o.qty||0) || 0;
       const price  = Number(o.price||0);
-      const fee    = Number(o.deliveryFee||0);
+      const isMulti = Number(o.stops_total || o.qty || 0) > 1;
+const fee     = isMulti ? Number(o.serviceFee || 0) : Number(o.deliveryFee || 0);
+
       const status = o.status || '—';
       const dt     = (o.updatedAt?.toDate?.() || o.createdAt?.toDate?.() || null);
       const created= dt ? dt.toLocaleString('de-DE') : '—';
@@ -1695,7 +1722,10 @@ showAuthSafe();
       const plat = platStr(o.platform);
       const qty  = Number(o.qty||0) || 0;
       const price = money(Number(o.price||0));
-      const fee   = money(Number(o.deliveryFee||0));
+      const isMulti = Number(o.stops_total || o.qty || 0) > 1;
+const feeNum  = isMulti ? Number(o.serviceFee || 0) : Number(o.deliveryFee || 0);
+const fee     = money(feeNum);
+
       const st    = o.status || '—';
       const dt    = (o.updatedAt?.toDate?.() || o.createdAt?.toDate?.() || null);
       const dtStr = dateISO(dt);
@@ -1832,4 +1862,3 @@ showAuthSafe();
 </script>
 </body>
 </html>
-
