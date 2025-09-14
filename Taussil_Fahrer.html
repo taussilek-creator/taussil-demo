@@ -737,11 +737,6 @@ onlineToggle.addEventListener("click", (e)=>{ e.preventDefault(); setOnline(!onl
 /* ===== Presence + GPS (RTDB) ===== */
 let hbTimer = null; // مؤقت النبضات
 function startPresence(){
-function startPresence(){
-  if (!uid) { console.warn('startPresence: no uid'); return; }
-  // باقي الدالة كما هو
-}
-
   const pRef = ref(rtdb, `drivers_presence/${uid}`);
   rUpdate(pRef,{ online:true, desired:true, ts: Date.now(), ver:'driver-web-v7' }).catch(()=>{});
   try{ onDisconnect(pRef).update({ lastDisconnectAt: rServerTs() }); }catch(_){}
@@ -781,8 +776,7 @@ let LIVE_WATCH_ID=null, LIVE_LAST_LL=null, LIVE_LAST_SENT=0, LIVE_HB=null;
 function driverLiveStart(){
   try{
     const uid = auth?.currentUser?.uid; if(!uid || !('geolocation' in navigator)) return;
-    const locRef = ref(rtdb, `drivers_locations/${uid}`);
-
+    const locRef = rRef(rtdb, `drivers_locations/${uid}`);
 
     // طلقة أولى دقيقة
     navigator.geolocation.getCurrentPosition(p=>{
