@@ -911,13 +911,64 @@ async function finalizeStop(orderId, stopId, stopData, orderData){
 
     // 3) تحديث وثيقة الستوب
     const sref = doc(db, "orders", orderId, "stops", stopId);
+	// === TAUSSIL: sequential distance (before writing the stop) ===
+// 1) اقرأ الطلب لمعرفة آخر نقطة تمّ تسليمها:
+const ordRef  = doc(db, "orders", orderId);
+const ordSnap = await getDoc(ordRef);
+const ordData = ordSnap.exists() ? (ordSnap.data() || {}) : {};
+const lastPos = ordData.last_delivered_pos || null;
+
+// 2) التقط موقع السائق الحالي (إذا عندك متغيرات جاهزة لموقع السائق استخدمها بدل geolocation):
+async function getCurrentPos(){
+  try{
+    const p = await new Promise((res, rej) =>
+      navigator.geolocation.getCurrentPosition(
+        (pos)=>res({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+        (err)=>rej(err),
+        { enableHighAccuracy:true, maximumAge:10000, timeout:8000 }
+      )
+    );
+    return p;
+  }catch(_){ return null; }
+}
+const curPos = await getCurrentPos();
+
+// 3) دالة haversine محلية (كم): 
+function haversineKm(a, b){
+  const R=6371, toRad=(x)=>x*Math.PI/180;
+  const dLat=toRad(b.lat-a.lat), dLng=toRad(b.lng-a.lng);
+  const s=Math.sin(dLat/2)**2 + Math.cos(toRad(a.lat))*Math.cos(toRad(b.lat))*Math.sin(dLng/2)**2;
+  return 2*R*Math.asin(Math.sqrt(s));
+}
+
+// 4) حدّد نقطة البداية لأول ستوب: من المطعم (إن وُجدت إحداثيات) وإلا اترك km القديمة كما هي
+let kmToSave = km; // القيمة القديمة fallback إن ما قدرنا نحسب المتتابعة
+if (curPos && lastPos && Number.isFinite(lastPos.lat) && Number.isFinite(lastPos.lng)) {
+  // ستوبات لاحقة → احسب متتابعة من آخر تسليم إلى موقعي الآن
+  kmToSave = Math.round(haversineKm(lastPos, curPos) * 1000) / 1000;
+} else if (curPos && ordData?.restaurant?.pos && Number.isFinite(ordData.restaurant.pos.lat) && Number.isFinite(ordData.restaurant.pos.lng)) {
+  // أول ستوب → احسب من المطعم إلى موقعي الآن (إذا مطعم مخزّن pos)
+  kmToSave = Math.round(haversineKm(ordData.restaurant.pos, curPos) * 1000) / 1000;
+}
+// === /TAUSSIL ===
+
     await setDoc(sref, {
       status: "Geliefert",
       deliveredAt: serverTimestamp(),
-      distance_km: km,
-      deliveryFee: serviceFeeStop,  // 14% للستوب
+      distance_km: kmToSave,
+      deliveryFee: serviceFeeStop,
+delivered_pos: curPos || null,	  // 14% للستوب
       updatedAt: serverTimestamp()
     }, { merge: true });
+	// === TAUSSIL: remember last delivered position on the ORDER ===
+if (curPos) {
+  await setDoc(ordRef, {
+    last_delivered_pos: curPos,
+    updatedAt: serverTimestamp()
+  }, { merge: true });
+}
+// === /TAUSSIL ===
+
 
     // 4) ربط السلسلة بآخر وجهة
     const drop = (stopData.address_text || stopData.addressText || '');
