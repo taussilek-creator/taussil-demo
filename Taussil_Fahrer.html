@@ -738,6 +738,17 @@ onlineToggle.addEventListener("click", (e)=>{ e.preventDefault(); setOnline(!onl
 /* ===== Presence + GPS (RTDB) ===== */
 let hbTimer = null; // مؤقت النبضات
 function startPresence(){
+function startPresence(){
+  if (!uid) { console.warn('startPresence: no uid yet'); return; }
+  // ... الباقي كما هو
+}
+
+function stopPresence(){
+  if (hbTimer){ clearInterval(hbTimer); hbTimer=null; }
+  if (!uid) { console.warn('stopPresence: no uid'); stopWatch(); return; }
+  try{ rUpdate(ref(rtdb,`drivers_presence/${uid}`), { online:false, desired:false, ts: Date.now() }); }catch(_){}
+  stopWatch();
+}
 
 
   const pRef = ref(rtdb, `drivers_presence/${uid}`);
@@ -1442,15 +1453,15 @@ onAuthStateChanged(auth, async (user)=>{
     authModal.style.display='flex'; appRoot.style.display='none';
     return;
   }
-  if (!user){
-  stopPresence();         // ← أولاً
-  uid = null;             // ← ثانيًا
-  appRoot.style.display='none'; authModal.style.display='flex';
-  detachOrders(); stopIncomingAlert(); stopMedianBG();
-  switchPane(lastAuthTab==='register' ? 'register' : 'login');
-  return;
-}
-
+  if(!user){
+    // نوقف الحضور باستخدام uid القديم
+    stopPresence();
+    uid = null;                      // ← انقله هنا (بعد stopPresence)
+    appRoot.style.display='none'; authModal.style.display='flex';
+    detachOrders(); stopIncomingAlert(); stopMedianBG();
+    switchPane(lastAuthTab==='register' ? 'register' : 'login');
+    return;
+  }
   uid = user.uid;
 
   // تحقق الموافقة
