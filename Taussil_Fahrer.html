@@ -919,6 +919,7 @@ function stopMedianBG(){
 
 /* ===== Orders ===== */
 /* === Multi-order (stops) support === */
+
 // يجلب delivered_ll لأحدث ستوب "Geliefert" (غير الحالي) داخل نفس الطلب
 async function getPrevDeliveredLL(orderId, excludeStopId){
   const sref = collection(db, "orders", orderId, "stops");
@@ -943,68 +944,55 @@ function detachStopsAll(){ stopsUnsubs.forEach(u=>{try{u();}catch(_){}}); stopsU
 /* تسليم stop واحد مع حساب مسافة الرجل فقط (تراكمي عبر الرحلة) */
 async function finalizeStop(orderId, stopId, stopData, orderData){
   try{
-    const sref = doc(db, "orders", orderId, "stops", stopId);
+    // 1) أصل الرجل: آخر ستوب مُسلَّم قبله وإلا المطعم
+    const origin = await getSequentialOriginForStop(orderId, stopData, orderData);
 
-    // 1) Destination = إحداثيات التسليم المخزّنة في نفس الستوب
-    const asLL = (x)=> (x && Number.isFinite(+x.lat) && Number.isFinite(+x.lng))
-      ? { lat:+Number(x.lat).toFixed(6), lng:+Number(x.lng).toFixed(6) } : null;
-    const destLL = asLL(stopData?.delivered_ll);
-
-    if(!destLL){
-      // لا نخمّن؛ إن ما في LL نغلق الستوب بدون مسافة ونكتب 14%
-      const fee14 = Math.round((Number(stopData?.price||0)*0.14)*100)/100;
-      await setDoc(sref, {
-        status:"Geliefert", deliveredAt: serverTimestamp(),
-        deliveryFee: fee14, updatedAt: serverTimestamp()
-      }, { merge:true });
-      toast('Stop geliefert · keine Koordinaten');
-      return;
+    // 2) وجهة هذه الوقفة
+    let destination = (stopData.address_text || stopData.addressText || null);
+    if(!destination){
+      const ll = lastLL || await getCurrentLLOnce();
+      if(ll) destination = {lat: ll.lat, lng: ll.lng};
     }
+    if(!origin || !destination){ toast('Adresse fehlt'); return; }
 
-    // 2) Origin:
-    //    - إن وُجد ستوب مُسلَّم سابق ⇒ prev.delivered_ll
-    //    - وإلا (أول تسليم) ⇒ عنوان المطعم من الطلب الأم (order.address_text)
-    let origin = await getPrevDeliveredLL(orderId, stopId);
-    if(!origin){
-      const restAddr = String(orderData?.address_text || '').trim()
-                    || String(orderData?.restaurant?.address_text || orderData?.restaurant?.addressText || '').trim();
-      origin = restAddr || null; // نص عنوان المطعم فقط
-    }
-
-    if(!origin){
-      const fee14 = Math.round((Number(stopData?.price||0)*0.14)*100)/100;
-      await setDoc(sref, {
-        status:"Geliefert", deliveredAt: serverTimestamp(),
-        deliveryFee: fee14, updatedAt: serverTimestamp()
-      }, { merge:true });
-      toast('Stop geliefert · kein Origin');
-      return;
-    }
-
-    // 3) km: نفس المكان = 0 (≤50م)، وإلا Directions مع هافرسين كـ fallback
+    // 3) حساب km لهذه الرجل (Directions ثم fallback)
     let km = 0;
-    if (typeof origin==='object'){
-      const approx = haversineKm(origin, destLL);
-      km = (approx <= 0.05) ? 0 : (await routeKm(origin, destLL).catch(()=>approx));
-    } else {
-      km = await routeKm(origin, destLL).catch(()=>0); // origin نصّي (عنوان المطعم)
+    try{
+      km = await routeKm(origin, destination);
+    }catch(_){
+      if (typeof origin==='object' && 'lat' in origin && typeof destination==='object' && 'lat' in destination){
+        km = haversineKm(origin, destination);
+      }
     }
     km = Math.max(0, Number(km||0));
 
-    // 4) 14% لهذا الستوب (كما هو)
-    const stopPrice = Number(stopData?.price || 0);
+    // 4) 14% من سعر الستوب
+    const stopPrice = Number(stopData.price || 0);
     const fee14     = Math.round(stopPrice * 0.14 * 100) / 100;
 
-    // 5) تحديث الستوب — دون كتابة delivered_addr_text إطلاقًا
-    await setDoc(sref, {
-      status:"Geliefert",
-      deliveredAt: serverTimestamp(),
-      distance_km: km,
-      deliveryFee: fee14,
-      updatedAt: serverTimestamp()
-    }, { merge:true });
+    // 5) حفظ موقع التسليم الحالي (عنوان + LL إن توفّر)
+    const delivered_addr_text = (stopData.address_text || stopData.addressText || null);
+    const delivered_ll = (lastLL && Number.isFinite(lastLL.lat) && Number.isFinite(lastLL.lng))
+      ? { lat: +Number(lastLL.lat).toFixed(6), lng: +Number(lastLL.lng).toFixed(6) }
+      : null;
 
-    // 6) تقدّم الطلب الأم + إغلاق عند آخر ستوب (منطقك الحالي)
+    // 6) تحديث وثيقة الستوب
+    const sref = doc(db, "orders", orderId, "stops", stopId);
+    await setDoc(sref, {
+      status: "Geliefert",
+      deliveredAt: serverTimestamp(),
+      distance_km: km,            // 👈 رجل تتابعية
+      deliveryFee: fee14,         // 👈 14% لهذا الستوب
+      delivered_addr_text,
+      delivered_ll,
+      updatedAt: serverTimestamp()
+    }, { merge: true });
+
+    // 7) تحديث "آخر وجهة" محليًا (اختياري للتنقّل/الـUX)
+    if(delivered_addr_text) setLastDestFromText(delivered_addr_text);
+    else if(lastLL)         setLastDestFromLL(lastLL);
+
+    // 8) عدّاد الستوبات + إن كانت الأخيرة احسب الأم
     const prevDel = Number(orderData.stops_delivered||0);
     const qty     = Number(orderData.qty||0);
     await updateDoc(doc(db,"orders", orderId), { stops_delivered: increment(1), updatedAt: serverTimestamp() });
@@ -1021,7 +1009,6 @@ async function finalizeStop(orderId, stopId, stopData, orderData){
     toast("Fehler beim Stop");
   }
 }
-
 
 
 
