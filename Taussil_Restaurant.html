@@ -1024,6 +1024,14 @@ if (qty > 1 && Array.isArray(platforms) && platforms.length) {
 });
 
 /* ===== Totals + Last list ===== */
+// === عرض رسوم التوصيل في واجهة المطعم (أولوية لـ serviceFee ثم fallback إلى deliveryFee)
+function feeForView(o){
+  const s = Number(o?.serviceFee);
+  if (Number.isFinite(s) && s >= 0) return s;
+  const d = Number(o?.deliveryFee);
+  return Number.isFinite(d) ? d : 0;
+}
+
 function attachMyTotalsAndLast(){
   if(ORDERS_UNSUB){ ORDERS_UNSUB(); ORDERS_UNSUB=null; }
   if(!RESTAURANT_ID) return;
@@ -1034,8 +1042,8 @@ snap.forEach(d=>{
   if(String(o.status||'')==='Abgebrochen') return;
 
   const p = Number(o.price || 0);
-  const isMulti = Number(o.stops_total || o.qty || 0) > 1;
-  const l = isMulti ? Number(o.serviceFee || 0) : Number(o.deliveryFee || 0);
+const l = Number(feeForView(o) || 0);
+
 
   if (Number.isFinite(p)) sumP += p;
   if (Number.isFinite(l)) sumL += l;
@@ -1143,10 +1151,10 @@ function showTripCard(oid, o){
   document.getElementById('tripOrderId').textContent  = oid;
   document.getElementById('tripStatus').textContent   = o.status || '—';
   {
-  const isMulti = Number(o.stops_total || o.qty || 0) > 1;
-  const feeVal  = isMulti ? Number(o.serviceFee || 0) : Number(o.deliveryFee || 0);
-  const el = document.getElementById('tripDeliveryFee');
-  if (el) el.textContent = money(feeVal);
+  const feeVal = feeForView(o);
+const el = document.getElementById('tripDeliveryFee');
+if (el) el.textContent = money(feeVal);
+
 }
 
   resolveDriverName(o.driver||{}).then(n=>{
@@ -1162,10 +1170,10 @@ function attachOrderListener(orderId){
     const o = ds.data() || {};
     document.getElementById('tripStatus').textContent = o.status || '—';
     {
-  const isMulti = Number(o.stops_total || o.qty || 0) > 1;
-  const feeVal  = isMulti ? Number(o.serviceFee || 0) : Number(o.deliveryFee || 0);
-  const el = document.getElementById('tripDeliveryFee');
-  if (el) el.textContent = money(feeVal);
+  const feeVal = feeForView(o);
+const el = document.getElementById('tripDeliveryFee');
+if (el) el.textContent = money(feeVal);
+
 }
 
     resolveDriverName(o.driver||{}).then(n=>{
@@ -1550,8 +1558,8 @@ qs.forEach(d=>{
   if(String(o.status||'')==='Abgebrochen') return;
 
   const p = Number(o.price || 0);
-  const isMulti = Number(o.stops_total || o.qty || 0) > 1;
-  const l = isMulti ? Number(o.serviceFee || 0) : Number(o.deliveryFee || 0);
+const l = Number(feeForView(o) || 0);
+
 
   if (Number.isFinite(p)) sumP += p; 
   if (Number.isFinite(l)) sumL += l;
@@ -1680,8 +1688,8 @@ qs.forEach(d=>{
       const plat   = Array.isArray(o.platform)? o.platform.join(' / ') : (o.platform||'—');
       const qty    = Number(o.qty||0) || 0;
       const price  = Number(o.price||0);
-      const isMulti = Number(o.stops_total || o.qty || 0) > 1;
-const fee     = isMulti ? Number(o.serviceFee || 0) : Number(o.deliveryFee || 0);
+      const fee     = Number(feeForView(o) || 0);
+
 
       const status = o.status || '—';
       const dt     = (o.updatedAt?.toDate?.() || o.createdAt?.toDate?.() || null);
@@ -1722,9 +1730,9 @@ const fee     = isMulti ? Number(o.serviceFee || 0) : Number(o.deliveryFee || 0)
       const plat = platStr(o.platform);
       const qty  = Number(o.qty||0) || 0;
       const price = money(Number(o.price||0));
-      const isMulti = Number(o.stops_total || o.qty || 0) > 1;
-const feeNum  = isMulti ? Number(o.serviceFee || 0) : Number(o.deliveryFee || 0);
+      const feeNum  = Number(feeForView(o) || 0);
 const fee     = money(feeNum);
+
 
       const st    = o.status || '—';
       const dt    = (o.updatedAt?.toDate?.() || o.createdAt?.toDate?.() || null);
