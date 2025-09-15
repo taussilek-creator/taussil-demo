@@ -942,73 +942,92 @@ const stopsUnsubs = new Map();
 function detachStopsAll(){ stopsUnsubs.forEach(u=>{try{u();}catch(_){}}); stopsUnsubs.clear(); }
 
 /* تسليم stop واحد مع حساب مسافة الرجل فقط (تراكمي عبر الرحلة) */
-async function finalizeStop(orderId, stopId, stopData, orderData){
-  try{
-    // 1) أصل الرجل: آخر ستوب مُسلَّم قبله وإلا المطعم
+async function getSequentialOriginForStop(orderId, stopData, orderData) {
+  const sref = collection(db, "orders", orderId, "stops");
+  const snap = await getDocs(sref);
+  const toMillis = t => (t?.toMillis?.() ?? (typeof t?._seconds === "number" ? t._seconds * 1000 : 0));
+
+  const deliveredStops = snap.docs
+    .map(d => ({ id: d.id, s: d.data() || {} }))
+    .filter(x => String(x.s.status || '').trim().toLowerCase() === 'geliefert'
+                 && x.id !== stopData.id)
+    .sort((a, b) => toMillis(a.s.deliveredAt) - toMillis(b.s.deliveredAt));
+
+  if (deliveredStops.length > 0) {
+    const last = deliveredStops[deliveredStops.length - 1].s;
+    if (last.delivered_ll && Number.isFinite(+last.delivered_ll.lat) && Number.isFinite(+last.delivered_ll.lng)) {
+      return { lat: +last.delivered_ll.lat, lng: +last.delivered_ll.lng };
+    } else if (last.delivered_addr_text) {
+      return last.delivered_addr_text;
+    }
+  }
+
+  return getRestaurantAddr(orderData);
+}
+
+async function finalizeStop(orderId, stopId, stopData, orderData) {
+  try {
+    // 1) الموقع السابق: آخر stop مُسلّم أو عنوان المطعم
     const origin = await getSequentialOriginForStop(orderId, stopData, orderData);
 
-    // 2) وجهة هذه الوقفة
-    let destination = (stopData.address_text || stopData.addressText || null);
-    if(!destination){
-      const ll = lastLL || await getCurrentLLOnce();
-      if(ll) destination = {lat: ll.lat, lng: ll.lng};
+    // 2) موقع السائق الحالي ← نقطة التسليم الفعلية
+    const ll = lastLL || await getCurrentLLOnce();
+    if (!origin || !ll) {
+      toast('Standort fehlt');
+      return;
     }
-    if(!origin || !destination){ toast('Adresse fehlt'); return; }
 
-    // 3) حساب km لهذه الرجل (Directions ثم fallback)
+    const destination = { lat: +ll.lat.toFixed(6), lng: +ll.lng.toFixed(6) };
+
+    // 3) حساب المسافة بين الموقع السابق و الحالي
     let km = 0;
-    try{
+    try {
       km = await routeKm(origin, destination);
-    }catch(_){
-      if (typeof origin==='object' && 'lat' in origin && typeof destination==='object' && 'lat' in destination){
-        km = haversineKm(origin, destination);
-      }
+    } catch (_) {
+      km = haversineKm(origin, destination);
     }
-    km = Math.max(0, Number(km||0));
+    km = Math.max(0, Number(km || 0));
 
-    // 4) 14% من سعر الستوب
+    // 4) حساب 14% من سعر الستوب
     const stopPrice = Number(stopData.price || 0);
-    const fee14     = Math.round(stopPrice * 0.14 * 100) / 100;
+    const fee14 = Math.round(stopPrice * 0.14 * 100) / 100;
 
-    // 5) حفظ موقع التسليم الحالي (عنوان + LL إن توفّر)
-    const delivered_addr_text = (stopData.address_text || stopData.addressText || null);
-    const delivered_ll = (lastLL && Number.isFinite(lastLL.lat) && Number.isFinite(lastLL.lng))
-      ? { lat: +Number(lastLL.lat).toFixed(6), lng: +Number(lastLL.lng).toFixed(6) }
-      : null;
-
-    // 6) تحديث وثيقة الستوب
+    // 5) تحديث الستوب
     const sref = doc(db, "orders", orderId, "stops", stopId);
     await setDoc(sref, {
       status: "Geliefert",
       deliveredAt: serverTimestamp(),
-      distance_km: km,            // 👈 رجل تتابعية
-      deliveryFee: fee14,         // 👈 14% لهذا الستوب
-      delivered_addr_text,
-      delivered_ll,
+      distance_km: km,
+      deliveryFee: fee14,
+      delivered_ll: destination,
       updatedAt: serverTimestamp()
     }, { merge: true });
 
-    // 7) تحديث "آخر وجهة" محليًا (اختياري للتنقّل/الـUX)
-    if(delivered_addr_text) setLastDestFromText(delivered_addr_text);
-    else if(lastLL)         setLastDestFromLL(lastLL);
+    // 6) حفظ الموقع مؤقتاً لاستخدامه في الستوب التالي
+    setLastDestFromLL(destination);
 
-    // 8) عدّاد الستوبات + إن كانت الأخيرة احسب الأم
-    const prevDel = Number(orderData.stops_delivered||0);
-    const qty     = Number(orderData.qty||0);
-    await updateDoc(doc(db,"orders", orderId), { stops_delivered: increment(1), updatedAt: serverTimestamp() });
+    // 7) تحديث الطلب الأم
+    const prevDel = Number(orderData.stops_delivered || 0);
+    const qty = Number(orderData.qty || 0);
+    await updateDoc(doc(db, "orders", orderId), {
+      stops_delivered: increment(1),
+      updatedAt: serverTimestamp()
+    });
 
     const justDelivered = prevDel + 1;
     if (qty > 0 && justDelivered >= qty) {
       await recalcOrderFees(orderId);
-      await patchOrder(orderId, { status:"Geliefert" });
+      await patchOrder(orderId, { status: "Geliefert" });
     }
 
-    toast(`Stop geliefert · ${km.toFixed(2)} km · 14%=${fee14.toFixed(2)}€`);
-  }catch(e){
-    console.error(e);
+    toast(`Stop geliefert · ${km.toFixed(2)} km · 14% = ${fee14.toFixed(2)}€`);
+  } catch (e) {
+    console.error('finalizeStop error', e);
     toast("Fehler beim Stop");
   }
 }
+
+
 
 
 
@@ -1414,16 +1433,19 @@ mdClose.addEventListener("click", ()=> md.classList.remove("show"));
 md.addEventListener("click",(e)=>{ if(e.target===md) md.classList.remove("show"); });
 
 /* ===== Patch order helper ===== */
-// لو أردت استخدام deliveryFee رسميًا: اسمح به في الـ Rules
-const PREFER_DELIVERY_FEE_FIELD = true;
-
 async function patchOrder(id, fields){
   const allowed = {};
-  if ('status'      in fields) allowed.status      = fields.status;
-  if ('price'       in fields) allowed.price       = Number(fields.price);
-  if ('deliveryFee' in fields) allowed.deliveryFee = Number(fields.deliveryFee);
-  if ('etmTargetMs' in fields) allowed.etmTargetMs = fields.etmTargetMs;
-  if ('ETM_Target'  in fields) allowed.ETM_Target  = fields.ETM_Target;
+  if ('status'        in fields) allowed.status        = fields.status;
+  if ('price'         in fields) allowed.price         = Number(fields.price);
+  if ('deliveryFee'   in fields) allowed.deliveryFee   = Number(fields.deliveryFee);   // للـ backward-compat
+  if ('distanceFee'   in fields) allowed.distanceFee   = Number(fields.distanceFee);   // اختياري
+  if ('serviceFee'    in fields) allowed.serviceFee    = Number(fields.serviceFee);    // 👈 المرجع لعرض البطاقة
+  if ('distance_km'   in fields) allowed.distance_km   = Number(fields.distance_km);   // اختياري
+  if ('distance_km_total'    in fields) allowed.distance_km_total    = Number(fields.distance_km_total);
+  if ('distance_km_billable' in fields) allowed.distance_km_billable = Number(fields.distance_km_billable);
+  if ('etmTargetMs'   in fields) allowed.etmTargetMs   = fields.etmTargetMs;
+  if ('ETM_Target'    in fields) allowed.ETM_Target    = fields.ETM_Target;
+
   allowed.updatedAt = serverTimestamp();
 
   const refDoc = doc(db, "orders", id);
@@ -1431,158 +1453,207 @@ async function patchOrder(id, fields){
   catch { await setDoc(refDoc, allowed, { merge:true }); }
 }
 
+
 /* كتابة الرسوم مع Fallback ليتوافق مع القواعد الحالية (للطلب المفرد) */
+/* كتابة الرسوم مع Fallback (للطلب المفرد) */
 async function writeFeeOnly(id, fee){
-  await patchOrder(id, { status:"Geliefert", deliveryFee: fee });
-  return { field:'deliveryFee', fee };
+  // fee هنا هو المجموع النهائي (serviceFee)
+  await patchOrder(id, { 
+    status: "Geliefert",
+    serviceFee: Number(fee),        // 👈 المرجع لعرض البطاقة
+    deliveryFee: Number(fee)        // للتوافق مع أي واجهة قديمة تقرأ من deliveryFee
+  });
+  return { field: 'serviceFee', fee };
 }
 
+
 /* === Recalculate order fees (Multi-Orders: 14% + distance from stops) === */
-async function recalcOrderFees(orderId){
-  try{
-    const oref  = doc(db,"orders", orderId);
+async function recalcOrderFees(orderId) {
+  try {
+    const oref = doc(db, "orders", orderId);
     const osnap = await getDoc(oref);
-    if(!osnap.exists()) return;
+    if (!osnap.exists()) return;
     const odata = osnap.data() || {};
 
-    // اقرأ الستوبات
     const sref = collection(db, "orders", orderId, "stops");
     const snap = await getDocs(sref);
     if (snap.empty) return;
 
-    // حضّر قائمة الستوبات المسلّمة مرتّبة بزمن التسليم تصاعديًا
-    const toMillis = (t)=> (t?.toMillis?.() || (typeof t?._seconds==="number" ? t._seconds*1000 : 0));
+    const toMillis = t => (t?.toMillis?.() ?? (typeof t?._seconds === "number" ? t._seconds * 1000 : 0));
     const delivered = snap.docs
-      .map(d=>({ id:d.id, s:d.data()||{} }))
-      .filter(x => String(x.s.status||'').trim().toLowerCase() === 'geliefert')
-      .sort((a,b)=> toMillis(a.s.deliveredAt) - toMillis(b.s.deliveredAt));
+      .map(d => ({ id: d.id, s: d.data() || {} }))
+      .filter(x => String(x.s.status || '').trim().toLowerCase() === 'geliefert')
+      .sort((a, b) => toMillis(a.s.deliveredAt) - toMillis(b.s.deliveredAt));
 
     const n = delivered.length;
     if (n === 0) return;
 
-    // Helper: تحقّق من LL
-    const asLL = (x)=> (x && Number.isFinite(+x.lat) && Number.isFinite(+x.lng))
+    const asLL = x => (x && Number.isFinite(+x.lat) && Number.isFinite(+x.lng))
       ? { lat:+Number(x.lat).toFixed(6), lng:+Number(x.lng).toFixed(6) } : null;
 
-    // Helper: حساب مسافة مقطع واحد (أصل قد يكون نص عنوان أو LL، وجهة LL)
-    async function segmentKm(origin, destLL){
-      if(!destLL) return 0;
-      if (origin && typeof origin==='object' && 'lat' in origin && 'lng' in origin){
+    async function segmentKm(origin, destLL) {
+      if (!destLL) return 0;
+      if (typeof origin === 'object' && origin.lat !== undefined && origin.lng !== undefined) {
         const approx = haversineKm(origin, destLL);
-        if (approx <= 0.05) return 0; // ≤ 50 متر = نفس المكان
-        try{ return await routeKm(origin, destLL); } catch { return approx; }
+        if (approx <= 0.05) return 0;
+        try { return await routeKm(origin, destLL); } catch { return approx; }
+      } else {
+        try { return await routeKm(origin, destLL); } catch { return 0; }
       }
-      try{ return await routeKm(origin, destLL); } catch { return 0; }
     }
 
-    // 1) المقطع الأول: من عنوان المطعم النصّي المخزّن في أول ستوب (delivered_addr_text) → إلى delivered_ll له
-    const first = delivered[0].s || {};
-    const firstDestLL = asLL(first.delivered_ll);
-    // إذا ما كان بالستوب عنوان المطعم، نرجع لعنوان المطعم من الطلب الأب
-    const firstOriginText = String(first.delivered_addr_text || '').trim()
-                         || String(getRestaurantAddr(odata) || '').trim();
+    const firstLL = asLL(delivered[0].s.delivered_ll);
+    const restaurantAddr = getRestaurantAddr(odata);
     let totalKm = 0;
-
-    totalKm += await segmentKm(firstOriginText || getRestaurantAddr(odata), firstDestLL);
-
-    // 2) باقي المقاطع: من delivered_ll للستوب السابق → إلى delivered_ll للستوب الحالي
-    for (let i=1; i<n; i++){
-      const prevLL = asLL(delivered[i-1].s.delivered_ll);
-      const currLL = asLL(delivered[i].s.delivered_ll);
-      totalKm += await segmentKm(prevLL, currLL);
+    if (restaurantAddr && firstLL) {
+      totalKm += await segmentKm(restaurantAddr, firstLL);
     }
 
-    // إجمالي 14% من أسعار الستوبات (أو من الحقل المكتوب على الستوب إن كان موجودًا)
+    for (let i = 1; i < n; i++) {
+      const prevLL = asLL(delivered[i - 1].s.delivered_ll);
+      const currLL = asLL(delivered[i].s.delivered_ll);
+      if (prevLL && currLL) {
+        totalKm += await segmentKm(prevLL, currLL);
+      }
+    }
+
+    totalKm = Math.max(0, Number(totalKm || 0));
+    const totalKmRounded = Math.round(totalKm * 100) / 100;
+
     let sum14 = 0;
     let itemsTotal = 0;
-    delivered.forEach(({s})=>{
+    delivered.forEach(({ s }) => {
       const s14 = Number.isFinite(+s.deliveryFee) ? +s.deliveryFee
-               : Math.round(((+s.price||0)*0.14)*100)/100;
-      sum14 += (Number.isFinite(s14)? s14 : 0);
-      itemsTotal += (Number.isFinite(+s.price)? +s.price : 0);
+                  : Math.round((Number(s.price || 0) * 0.14) * 100) / 100;
+      sum14 += s14;
+      itemsTotal += Number(s.price || 0);
     });
+    sum14 = Math.round(sum14 * 100) / 100;
 
-    // تدوير للأمان
-    totalKm = Math.max(0, Number(totalKm||0));
-    const totalKmRounded = Math.round(totalKm*100)/100;
-
-    // بعد خصم 2 كم (للتوثيق فقط)
     const billableKm = Math.max(0, totalKmRounded - 2);
-    const billableKmRounded = Math.round(billableKm*100)/100;
+    const billableKmRounded = Math.round(billableKm * 100) / 100;
 
-    // تكلفة المسافة وفق لائحة الشرائح لديك (الدالة نفسها تخصم 2 كم داخليًا)
     const distanceFee = distanceCostFromTotalKm(totalKmRounded);
-
-    // تجميع 14%
-    const deliveryFee = Math.round(sum14*100)/100;
-
-    // النهائي
-    const serviceFee  = Math.round((distanceFee + deliveryFee)*100)/100;
+    const deliveryFee = sum14;
+    const serviceFee = Math.round((distanceFee + deliveryFee) * 100) / 100;
 
     await updateDoc(oref, {
-      distance_km_total:    totalKmRounded,      // Σ مقاطع تتابعية
-      distance_km_billable: billableKmRounded,   // (Σ - 2km) للتوثيق
-      distanceFee:          distanceFee,         // شرائح على الإجمالي بعد خصم 2km
-      deliveryFee:          deliveryFee,         // Σ 14% من الستوبات
-      serviceFee:           serviceFee,          // المجموع النهائي
-      items_total_eur:      Math.round(itemsTotal*100)/100,
+      distance_km_total:    totalKmRounded,
+      distance_km_billable: billableKmRounded,
+      distanceFee:          distanceFee,
+      deliveryFee:          deliveryFee,
+      serviceFee:           serviceFee,
+      items_total_eur:      Math.round(itemsTotal * 100) / 100,
       stops_delivered:      n,
       stops_total:          snap.size,
       updatedAt:            serverTimestamp()
     });
-  }catch(e){
-    console.error('recalcOrderFees', e);
+  } catch (e) {
+    console.error('recalcOrderFees error', e);
+    toast('Fehler beim Neuberechnen der Gebühren');
   }
 }
+
 
 
 
 
 
 /* العملية الكاملة عند التسليم: route → km → Betrag → Fee → تحديث (للطلب المفرد) */
-async function finalizeOrderWithFee(id){
-  try{
-    const oref = doc(db,"orders", id);
-    const ds   = await getDoc(oref);
-    if(!ds.exists()){ toast("Auftrag nicht gefunden"); return; }
-    const o    = ds.data() || {};
+async function finalizeSingleDelivery(orderId) {
+  try {
+    const oref = doc(db, "orders", orderId);
+    const osnap = await getDoc(oref);
+    if (!osnap.exists()) return;
+    const odata = osnap.data() || {};
 
-    // 1) km مباشر مطعم → عميل
-    const km = await computeDirectKmRestaurantToDrop(o);
+    const restaurant = getRestaurantAddr(odata);
+    if (!restaurant) {
+      toast("Restaurant-Adresse fehlt");
+      return;
+    }
 
-    // 2) شرائح المسافة بعد خصم 2 كم
-    const distanceFee = distanceCostFromTotalKm(km);
+    const gps = lastLL || await getCurrentLLOnce();
+    if (!gps || !Number.isFinite(gps.lat) || !Number.isFinite(gps.lng)) {
+      toast("Standort fehlt");
+      return;
+    }
 
-    // 3) الجزء الأساسي حسب المبلغ (≤35 => 3.50€, >35 => 14%)
-    const betrag = getOrderAmount(o);
-    const baseFee = (betrag > 35) ? Math.round((betrag * 0.14)*100)/100 : 3.50;
+    const destination = {
+      lat: +gps.lat.toFixed(6),
+      lng: +gps.lng.toFixed(6)
+    };
 
-    // 4) النهائي + كتابة في الطلب
-    const serviceFee = Math.round((baseFee + distanceFee)*100)/100;
+    // المسافة بين المطعم والموقع الحالي
+    let km = 0;
+    try {
+      km = await routeKm(restaurant, destination);
+    } catch (_) {
+      km = haversineKm(restaurant, destination);
+    }
+    km = Math.max(0, Number(km || 0));
+    const kmRounded = Math.round(km * 100) / 100;
 
-    // حفظ موقع التسليم في الطلب (عنوان + LL إن توفر)
-    const delivered_addr_text = getDropAddr(o) || null;
-    const delivered_ll = (lastLL && Number.isFinite(lastLL.lat) && Number.isFinite(lastLL.lng))
-      ? { lat: +Number(lastLL.lat).toFixed(6), lng: +Number(lastLL.lng).toFixed(6) }
-      : null;
+    const billableKm = Math.max(0, km - 2);
+    const billableKmRounded = Math.round(billableKm * 100) / 100;
+
+    const items_total = Number(odata.items_total_eur || 0);
+    const deliveryFee = (items_total < 25)
+      ? 3.5
+      : Math.round(items_total * 0.14 * 100) / 100;
+
+    const distanceFee = distanceCostFromTotalKm(kmRounded);
+    const serviceFee = Math.round((distanceFee + deliveryFee) * 100) / 100;
 
     await updateDoc(oref, {
-      status:          "Geliefert",
-      distance_km:     Math.round((km||0)*100)/100,
-      distanceFee:     distanceFee,
-      deliveryFee:     baseFee,       // الجزء الأساسي (ثابت/نسبة) على المفرد
-      serviceFee:      serviceFee,    // المجموع النهائي
-      delivered_addr_text,
-      delivered_ll,
-      updatedAt:       serverTimestamp()
+      delivered_ll: destination,
+      distance_km_total: kmRounded,
+      distance_km_billable: billableKmRounded,
+      distanceFee: distanceFee,
+      deliveryFee: deliveryFee,
+      serviceFee: serviceFee,
+      updatedAt: serverTimestamp(),
+      status: "Geliefert"
     });
 
-    toast(`Geliefert · ${km.toFixed(2)} km · Base ${baseFee.toFixed(2)}€ + Dist ${distanceFee.toFixed(2)}€ = ${serviceFee.toFixed(2)}€`);
-  }catch(e){
-    console.error('finalizeOrderWithFee', e);
-    toast('Fehler beim Abschließen');
+    toast(`Geliefert · ${kmRounded} km · Gebühr: ${serviceFee}€`);
+  } catch (e) {
+    console.error("finalizeSingleDelivery error", e);
+    toast("Fehler bei der Einzellieferung");
   }
 }
+
+// تفعيل زر "Geliefert" للطلب المنفرد فقط، مع إيقاف أي مستمعات قديمة
+document.addEventListener("click", async function onSingleDeliverClick(e) {
+  // نلتقط زر الطلب المنفرد فقط: عنده data-act="delivered" وليس data-stop
+  const btn = e.target.closest("button.btn-done[data-act='delivered']");
+  if (!btn) return; // ليس زر الطلب المنفرد
+
+  // امنع أي مستمعات أقدم من التشغيل (هذا أهم شيء)
+  e.preventDefault();
+  e.stopPropagation();
+  if (typeof e.stopImmediatePropagation === "function") e.stopImmediatePropagation();
+
+  // نجيب معرّف الطلب من البطاقة
+  const card = btn.closest(".card-order");
+  const orderId = card?.dataset?.id;
+  if (!orderId) { console.warn("No orderId on card-order"); return; }
+
+  // تأكد أن الدالة موجودة
+  if (typeof finalizeSingleDelivery !== "function") {
+    console.error("finalizeSingleDelivery fehlt");
+    toast("Aktion nicht verfügbar");
+    return;
+  }
+
+  try {
+    await finalizeSingleDelivery(orderId);
+  } catch (err) {
+    console.error("finalizeSingleDelivery error:", err);
+    toast("Fehler bei der Einzellieferung");
+  }
+}, true); // ← مهم: الالتقاط (capturing) لقطع الطريق قبل المستمعات القديمة
+
 
 
 
