@@ -59,6 +59,24 @@ select, .btn, .icon{height:40px;border-radius:10px;border:1px solid rgba(0,0,0,.
 .sheet.open, .modal.open{display:flex}
 .sheet .box, .modal .box{background:#fff;color:#0b1320;border:1px solid #e5e7eb;border-radius:16px;box-shadow:0 12px 40px rgba(0,0,0,.2);padding:14px;max-width:560px;width:92%}
 .modal.right .box{max-width:420px;width:min(420px,92%);margin-inline-start:auto}
+/* ===== Order modal scrolling ===== */
+#order-modal .box{
+  max-height: 80vh;          /* ارتفاع أعظمي للصندوق */
+  overflow: auto;            /* تمكين التمرير داخل الصندوق */
+}
+
+/* ثبّت صف العنوان (زر الإغلاق) أعلى الصندوق أثناء التمرير */
+#order-modal .box > .row:first-child{
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: #fff;
+  /* تمديد الخلفية على كامل عرض الصندوق مع الحفاظ على padding الداخلي */
+  margin: -14px -14px 10px -14px;   /* يساوي padding:14px للصندوق */
+  padding: 14px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
 /* Auth overlay */
 #adminAuth{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.55);z-index:2000}
 #adminAuth .box{background:#0f1a30;color:#e6e9ef;border:1px solid rgba(255,255,255,.14);border-radius:16px;padding:14px;width:min(560px,92%)}
@@ -562,7 +580,8 @@ const i18n = {
       'kpi.processing':'In Bearbeitung','kpi.cancelled':'Abgebrochen',
       'assign.title':'Fahrer zuweisen','assign.cancel':'Abbrechen','assign.confirm':'Zuweisen',
       'order.details':'Bestelldetails','common.close':'Schließen',
-      'labels.restaurant':'Restaurant','labels.driver':'Fahrer','labels.platform':'Plattform','labels.pickup':'Abholzeit','labels.qty':'Menge','labels.price':'Preis','labels.code':'Code','labels.status':'Status',
+      'labels.restaurant':'Restaurant','labels.driver':'Fahrer','labels.platform':'Plattform','labels.pickup':'Abholzeit','labels.qty':'Menge','labels.price':'Preis','labels.code':'Code','labels.status':'Status','labels.distanceTotal':'Strecke gesamt (km)',
+'labels.distanceBillable':'Abrechnungsstrecke (km)',
       'empty.noIncoming':'Derzeit keine neuen Bestellungen.','empty.noActive':'Aktuell keine aktiven Fahrten.','map.placeholder':'Operationskarte',
       'search.placeholder':'Suche… (Name, Telefon, Code)',
       // [TAUSSIL-APPROVAL-I18N-START]
@@ -578,7 +597,8 @@ const i18n = {
       'kpi.processing':'Processing','kpi.cancelled':'Cancelled',
       'assign.title':'Assign Driver','assign.cancel':'Cancel','assign.confirm':'Confirm',
       'order.details':'Order Details','common.close':'Close',
-      'labels.restaurant':'Restaurant','labels.driver':'Driver','labels.platform':'Platform','labels.pickup':'Pickup Time','labels.qty':'Quantity','labels.price':'Price','labels.code':'Code','labels.status':'Status',
+      'labels.restaurant':'Restaurant','labels.driver':'Driver','labels.platform':'Platform','labels.pickup':'Pickup Time','labels.qty':'Quantity','labels.price':'Price','labels.code':'Code','labels.status':'Status', 'labels.distanceTotal':'Distance total (km)',
+'labels.distanceBillable':'Billable distance (km)',
       'empty.noIncoming':'No new orders right now.','empty.noActive':'No active trips at the moment.','map.placeholder':'Operations map',
       'search.placeholder':'Search… (name, phone, code)',
       // [TAUSSIL-APPROVAL-I18N-START]
@@ -594,7 +614,8 @@ const i18n = {
       'kpi.processing':'قيد المعالجة','kpi.cancelled':'ملغي',
       'assign.title':'إسناد سائق','assign.cancel':'إلغاء','assign.confirm':'تأكيد الإسناد',
       'order.details':'تفاصيل الطلب','common.close':'إغلاق',
-      'labels.restaurant':'المطعم','labels.driver':'السائق','labels.platform':'المنصة','labels.pickup':'وقت الاستلام','labels.qty':'الكمية','labels.price':'السعر','labels.code':'كود','labels.status':'الحالة',
+      'labels.restaurant':'المطعم','labels.driver':'السائق','labels.platform':'المنصة','labels.pickup':'وقت الاستلام','labels.qty':'الكمية','labels.price':'السعر','labels.code':'كود','labels.status':'الحالة', 'labels.distanceTotal':'المسافة الإجمالية (كم)',
+'labels.distanceBillable':'المسافة القابلة للفوترة (كم)',
       'empty.noIncoming':'لا توجد طلبات جديدة حالياً.','empty.noActive':'لا توجد رحلات نشطة الآن.','map.placeholder':'خريطة العمليات',
       'search.placeholder':'بحث… (اسم، هاتف، كود)',
       // [TAUSSIL-APPROVAL-I18N-START]
@@ -905,8 +926,45 @@ function startMiniCountdown(){
   },1000);
 }
 function readFee(o){
-  return o?.deliveryFee ?? o?.fee ?? o?.delivery_fee ?? o?.liefergebuehr ?? o?.lieferGebuehr ?? 0;
+  return o?.serviceFee
+      ?? o?.deliveryFee
+      ?? o?.fee
+      ?? o?.delivery_fee
+      ?? o?.liefergebuehr
+      ?? o?.lieferGebuehr
+      ?? 0;
 }
+
+/* ===== Distance & Fees helpers (safe) ===== */
+function readServiceFee(o){
+  try { return readFee(o); } catch { return 0; }
+}
+function readDistanceKm(o){
+  if(!o || typeof o !== 'object') return 0;
+  let v =
+    o.distanceKm ?? o.distance_km ?? o.km ?? o.distance ??
+    o.route?.distanceKm ?? o.route?.distance_km ?? o.route?.km ?? o.route?.distance ??
+    o.meta?.distanceKm ?? o.meta?.km ?? o.meta?.distance;
+  if (!Number.isFinite(v)) {
+    const meters =
+      o.route?.leg?.distance?.value ??
+      o.route?.distance?.meters ??
+      o.distance_m ?? o.distanceMeters;
+    if (Number.isFinite(meters)) v = meters / 1000;
+  }
+  v = Number(v);
+  return Number.isFinite(v) ? v : 0;
+}
+function readDistanceFee(o){
+  if(!o || typeof o !== 'object') return 0;
+  const v =
+    o.distanceFee ?? o.distFee ?? o.route?.distanceFee ??
+    o.pricing?.distanceFee ?? o.meta?.distanceFee;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : 0;
+}
+
+
 function renderMiniTrip(o){
   if(!o){
     elTripDriver && (elTripDriver.textContent='—');
@@ -1216,25 +1274,136 @@ function attachRowHandlers(){
 const orderModal   = $('#order-modal');
 const orderDetails = $('#order-details');
 $('#order-close')?.addEventListener('click',()=>orderModal?.classList.remove('open'));
-function openOrderModal(o){
+
+async function openOrderModal(o){
   if(!orderDetails || !orderModal) return;
+
+  const nrTxt   = (o.nr!=null? `#${o.nr}` : (o.shortCode? `#${o.shortCode}` : `#${o.id||'—'}`));
+  const price   = Number.isFinite(Number(o.price)) ? Number(o.price) : 0;
+  const sFee    = Number(readServiceFee(o)) || 0;
+  const dFee    = Number(readDistanceFee(o)) || 0;
+
+  let km = readDistanceKm(o);   // قد تكون null
+  // Placeholder إلى أن نحسب المسافة إن كانت مفقودة
+  let kmBoxHtml = `<div class="small">Distance</div><div class="mono">—</div>`;
+
+  // ملتي ستوب سنملأه بعد جلب stops
+  let stopsHtml = `<div class="small" style="opacity:.7">—</div>`;
+
+  // قالب أساسي
   orderDetails.innerHTML = `
-    <div class="grid cols-2">
-      <div><div class="small">${t('labels.code')}</div><div class="mono">#${o.nr!=null? o.nr : (o.shortCode||'—')}</div></div>
-      <div><div class="small">${t('labels.status')}</div>${statusBadge(o.status)}</div>
+        <div>
+        <div class="small" data-i18n="labels.distanceTotal">${t('labels.distanceTotal')}</div>
+        ${fmtKm(readDistanceTotalKm(o))}
+      </div>
+      <div>
+        <div class="small" data-i18n="labels.distanceBillable">${t('labels.distanceBillable')}</div>
+        ${fmtKm(readDistanceBillableKm(o))}
+      </div>
+
+    <div class="grid cols-2" style="row-gap:12px">
+      <!-- Overview -->
+      <div>
+        <div class="small">${t('labels.code')}</div>
+        <div class="mono">${nrTxt}</div>
+      </div>
+      <div>
+        <div class="small">${t('labels.status')}</div>
+        ${statusBadge(o.status)}
+      </div>
+
       <div>
         <div class="small">${t('labels.restaurant')}</div>
-        <div class="flex"><img class="logo" src="${o.restaurant?.logoUrl||''}"/><div><div style="font-weight:800">${o.restaurant?.name||'-'}</div><div class="small">${o.restaurant?.phone||''}</div></div></div>
+        <div class="flex">
+          <img class="logo" src="${o.restaurant?.logoUrl||''}"/>
+          <div>
+            <div style="font-weight:800">${o.restaurant?.name||'-'}</div>
+            <div class="small">${o.restaurant?.phone||''}</div>
+            <div class="small" title="${o.restaurant?.address_text||o.restaurant?.addressText||''}">
+              ${(o.restaurant?.address_text||o.restaurant?.addressText||'').split(',').slice(0,2).join(', ')}
+            </div>
+          </div>
+        </div>
       </div>
+
       <div>
         <div class="small">${t('labels.driver')}</div>
-        ${o.driver? `<div class="flex">${o.driver.avatarUrl? `<img class="avatar" src="${o.driver.avatarUrl}">`:''}<div><div style="font-weight:800">${o.driver.fullName||''}</div><div class="small">${o.driver.phone||''}</div></div></div>` : '<div class="small">-</div>'}
+        ${
+          o.driver
+            ? `<div class="flex">
+                 ${o.driver.avatarUrl? `<img class="avatar" src="${o.driver.avatarUrl}">`:''}
+                 <div>
+                   <div style="font-weight:800">${o.driver.fullName||''}</div>
+                   <div class="small">${o.driver.phone||''}</div>
+                 </div>
+               </div>`
+            : '<div class="small">-</div>'
+        }
       </div>
-      <div><div class="small">${t('labels.platform')}</div>${platformChips(o.platform)}</div>
-      <div><div class="small">${t('labels.pickup')}</div>${o.pickupTime||'—'}</div>
-      <div><div class="small">${t('labels.qty')}</div>x${Number(o.qty||0)}</div>
-      <div><div class="small">${t('labels.price')}</div>${Number.isFinite(Number(o.price))? Number(o.price).toFixed(2)+' €':'—'}</div>
+
+      <div>
+        <div class="small">${t('labels.platform')}</div>
+        ${platformChips(o.platform)}
+      </div>
+
+      <div>
+        <div class="small">${t('labels.pickup')}</div>
+        ${o.pickupTime||'—'}
+      </div>
+
+      <div>
+        <div class="small">${t('labels.qty')}</div>
+        <div class="mono">x${Number(o.qty||0)}</div>
+      </div>
+
+      <div>
+        <div class="small">${t('labels.price')}</div>
+        <div>${price.toFixed(2)} €</div>
+      </div>
+
+      <!-- Fees -->
+      <div>
+        <div class="small">Service Fee</div>
+        <div>${sFee.toFixed(2)} €</div>
+      </div>
+      <div>
+        <div class="small">Distance Fee</div>
+        <div>${dFee ? dFee.toFixed(2)+' €' : '—'}</div>
+      </div>
+
+      <!-- Distance (km) -->
+      <div id="od-dist-box">${kmBoxHtml}</div>
+      <div>
+        <div class="small">Total (Price + Fees)</div>
+        <div style="font-weight:800">${(price + sFee + dFee).toFixed(2)} €</div>
+      </div>
+
+      <!-- Customer / Drop-off -->
+      <div style="grid-column:1/-1; border-top:1px solid #e5e7eb; padding-top:8px">
+        <div class="row" style="gap:20px; align-items:flex-start">
+          <div style="flex:1">
+            <div class="small">Customer</div>
+            <div style="font-weight:700">${o.customer?.name || o.toName || '-'}</div>
+            <div class="small">${o.customer?.phone || o.toPhone || ''}</div>
+            <div class="small" title="${o.customer?.address_text || o.toAddress || ''}">
+              ${(o.customer?.address_text || o.toAddress || '').split(',').slice(0,2).join(', ')}
+            </div>
+          </div>
+          <div style="flex:1">
+            <div class="small">Notes</div>
+            <div class="small" style="white-space:pre-wrap">${o.notes || o.comment || '—'}</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Multi-stops (إن وجدت) -->
+      <div style="grid-column:1/-1">
+        <div class="small" style="margin-bottom:4px">Stops</div>
+        <div id="od-stops">${stopsHtml}</div>
+      </div>
     </div>
+
+    <!-- Actions -->
     <div class="row" style="justify-content:flex-end;gap:8px;margin-top:12px">
       <select id="order-status-select" style="height:40px;border-radius:10px;border:1px solid #e5e7eb">
         <option value="">${t('labels.status')}…</option>
@@ -1247,15 +1416,69 @@ function openOrderModal(o){
       </select>
       <button class="btn" id="order-status-apply" data-i18n="assign.confirm">${t('assign.confirm')}</button>
     </div>
-    <div class="small" style="margin-top:6px">${o.updatedAt?.toDate?.()? o.updatedAt.toDate().toLocaleString() : (o.createdAt?.toDate?.()? o.createdAt.toDate().toLocaleString():'')}</div>
+    <div class="small" style="margin-top:6px">
+      ${(o.updatedAt?.toDate?.()? o.updatedAt.toDate(): (o.createdAt?.toDate?.()? o.createdAt.toDate(): null))?.toLocaleString() || ''}
+    </div>
   `;
+
   orderModal.classList.add('open');
+document.body.classList.add('modal-open'); // قفل خلفية الصفحة
+
   $('#order-status-apply').onclick = async ()=>{
     const val = $('#order-status-select').value; if(!val) return;
     await changeStatus(o.id, val); orderModal.classList.remove('open');
   };
   lucide.createIcons();
+
+  // 1) حساب/عرض Distance KM (إن كانت غير موجودة بالداتا)
+  if(km == null){
+    const kmCalc = await calcRouteDistanceKm(o);
+    const kmBox = $('#od-dist-box');
+    if(kmBox){
+      kmBox.innerHTML = `
+        <div class="small">Distance</div>
+        <div class="mono">${kmCalc!=null ? kmCalc.toFixed(2)+' km' : '—'}</div>
+      `;
+    }
+  }else{
+    const kmBox = $('#od-dist-box');
+    if(kmBox){
+      kmBox.innerHTML = `
+        <div class="small">Distance</div>
+        <div class="mono">${Number(km).toFixed(2)} km</div>
+      `;
+    }
+  }
+
+  // 2) جلب Stops للملتي-أوردر (لو موجودة)
+  try{
+    const col = collection(db, 'orders', o.id, 'stops');
+    const snap = await getDocs(col);
+    const list = snap.docs.map(d => ({ id:d.id, ...d.data() }));
+    const box  = $('#od-stops');
+    if(box){
+      if(!list.length){ box.innerHTML = `<div class="small" style="opacity:.7">—</div>`; }
+      else{
+        box.innerHTML = list.map((s,i)=>`
+          <div class="tr" style="display:flex;gap:10px;align-items:flex-start;border:1px solid #e5e7eb;border-radius:10px;padding:8px;margin-bottom:8px">
+            <div class="badge gray">#${i+1}</div>
+            <div style="flex:1;min-width:0">
+              <div style="font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+                ${s.name || s.fullName || s.customerName || ('Stop '+(i+1))}
+              </div>
+              <div class="small">${s.phone || ''}</div>
+              <div class="small" title="${s.address_text || s.addressText || ''}">
+                ${(s.address_text || s.addressText || '').split(',').slice(0,2).join(', ')}
+              </div>
+            </div>
+            <div class="right small">${s.status ? statusBadge(s.status) : ''}</div>
+          </div>
+        `).join('');
+      }
+    }
+  }catch(_){}
 }
+
 
 const userModal = $('#user-modal');
 const userTitle = $('#user-title');
@@ -1644,6 +1867,30 @@ function fmtTsLatn(ts, locale='de-DE'){
     }).format(d);
   }catch(_){ return ''; }
 }
+// [DISTANCE-HELPERS-START]
+function readDistanceTotalKm(o){
+  const v = o?.distance_km_total
+        ?? o?.distance?.km_total
+        ?? o?.distanceTotalKm
+        ?? o?.distance_km
+        ?? o?.distanceKm
+        ?? null;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : 0;
+}
+function readDistanceBillableKm(o){
+  const v = o?.distance_km_billable
+        ?? o?.distance?.km_billable
+        ?? o?.distanceBillableKm
+        ?? null;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : 0;
+}
+function fmtKm(n){
+  const x = Number(n);
+  return Number.isFinite(x) ? x.toFixed(2) + ' km' : '—';
+}
+// [DISTANCE-HELPERS-END]
 
 function getAllOrdersLoaded(){ return Array.isArray(orders)? orders : []; }
 function getVisibleOrderIds(){
@@ -2210,12 +2457,17 @@ const EXPORT_COL_DEFS = [
   {key:'platform',   label:'Platform'},
   {key:'qty',        label:'Qty'},
   {key:'price',      label:'Price €'},
-  {key:'fee',        label:'Del.Fee €'},
+  {key:'fee',        label:'Service Fee €'},   // ← rename
+    {key:'distTotal', label:'Dist.Total km'},
+  {key:'distBill',  label:'Dist.Billable km'},
+  {key:'distKm',     label:'Distance km'},     // ← NEW
+  {key:'distFee',    label:'Distance Fee €'},  // ← NEW (اختياري)
   {key:'status',     label:'Status'},
   {key:'pickup',     label:'Pickup'},
   {key:'created',    label:'Created'},
   {key:'updated',    label:'Updated'},
 ];
+
 
 function openExportModal(){
   // تعبئة المطاعم
@@ -2319,6 +2571,9 @@ async function queryOrdersForExport({restaurantId, fromDate, toDate, statuses}){
 
 
 function mapRow(o){
+  const km   = readDistanceKm(o);
+  const sFee = Number(readServiceFee(o)) || 0;
+  const dFee = Number(readDistanceFee(o)) || 0;
   return {
     nr: (o.nr!=null? `#${o.nr}` : (o.shortCode||o.id||'')),
     id: o.id||'',
@@ -2329,13 +2584,18 @@ function mapRow(o){
     platform: Array.isArray(o.platform)? o.platform.join(' / ') : (o.platform||''),
     qty: Number(o.qty||0),
     price: fmtNum(o.price),
-    fee: fmtNum(readFee(o)),
+    fee: fmtNum(sFee), 	// Service Fee
+	    distTotal: fmtNum(readDistanceTotalKm(o)),
+    distBill:  fmtNum(readDistanceBillableKm(o)),
+    distKm: km!=null ? Number(km).toFixed(2) : '',  // Distance KM
+    distFee: dFee ? dFee.toFixed(2) : '',           // Distance Fee (optional)
     status: o.status||'',
     pickup: o.pickupTime||'',
-    created: fmtTsLatn(o.createdAt),   // <-- هنا
-    updated: fmtTsLatn(o.updatedAt),   // <-- وهنا
+    created: fmtTsLatn(o.createdAt),
+    updated: fmtTsLatn(o.updatedAt),
   };
 }
+
 
 
 function buildCsvCustom(rows, cols, tag){
@@ -2458,4 +2718,3 @@ document.getElementById('export-run-pdf') ?.addEventListener('click', ()=> runEx
 
 </body>
 </html>
-
