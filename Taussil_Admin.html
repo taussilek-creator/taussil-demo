@@ -297,6 +297,358 @@ body{ font-size: var(--ui-font-base); }
     justify-content:flex-start;
   }
 }
+/* ===== Restaurants split view ===== */
+.rest-split{
+  display:grid;
+  grid-template-columns: 1fr 6px 1fr; /* عمود – مقبض – عمود */
+  gap:0;
+  min-height: 520px;
+}
+.rest-sash{
+  cursor: col-resize;
+  background: repeating-linear-gradient(
+    90deg,
+    #e5e7eb, 0 3px,
+    #f3f4f6, 3px 6px
+  );
+}
+.rest-col{ min-width: 0; }
+.rest-filters{
+  display:grid; gap:8px; margin-bottom:10px;
+  grid-template-columns: 1fr 1fr;
+}
+.rest-filters .row{ display:grid; grid-template-columns: 1fr 1fr; gap:8px; }
+.rest-filters .input{
+  height: 36px; border-radius:10px; border:1px solid rgba(0,0,0,.12); padding:0 10px;
+}
+@media (max-width: 900px){
+  .rest-split{ grid-template-columns: 1fr; }
+  .rest-sash{ display:none; }
+}
+@media (max-width: 900px){
+  .rest-split{ grid-template-columns: 1fr; }
+  .rest-sash{ display:none; }
+}
+/* ===== Fleets split view (approved | pending) ===== */
+.fleet-split{
+  display:grid;
+  grid-template-columns: 1fr 6px 1fr;
+  gap:0;
+  min-height:520px;
+}
+.fleet-sash{
+  cursor: col-resize;
+  background: repeating-linear-gradient(90deg,#e5e7eb,0 3px,#f3f4f6,3px 6px);
+}
+.fleet-col{ min-width:0; }
+.fleet-filters{
+  display:grid; gap:8px; margin-bottom:10px;
+  grid-template-columns: 1fr 1fr;
+}
+.fleet-filters .input{
+  height:36px; border-radius:10px; border:1px solid rgba(0,0,0,.12); padding:0 10px;
+}
+/* internal scroll w/o visible scrollbar */
+#fleets-approved-wrap .pb, #fleets-pending-wrap .pb{
+  overflow:auto; scrollbar-width:none; -ms-overflow-style:none;
+}
+#fleets-approved-wrap .pb::-webkit-scrollbar, #fleets-pending-wrap .pb::-webkit-scrollbar{ width:0; height:0 }
+@media (max-width: 900px){
+  .fleet-split{ grid-template-columns:1fr; }
+  .fleet-sash{ display:none; }
+}
+
+/* ===== Modal: viewport-contained, internal scroll, no visible scrollbar ===== */
+.modal .box{
+  max-height: 88vh;                  /* يحتوى ضمن الشاشة */
+  overflow: auto;                    /* سكرول داخل الصندوق */
+  overscroll-behavior: contain;      /* منع ارتداد الصفحة */
+  display: flex;
+  flex-direction: column;
+  -webkit-overflow-scrolling: touch; /* سلاسة على iOS */
+
+  /* إخفاء شريط السّكرول بصريًا مع بقاء السحب */
+  scrollbar-width: none;             /* Firefox */
+  -ms-overflow-style: none;          /* IE/Edge */
+}
+.modal .box::-webkit-scrollbar{      /* WebKit (Chrome/Safari/Edge) */
+  width: 0;
+  height: 0;
+}
+
+/* هيدر ثابت داخل المودال أثناء التمرير (بدون لاينر جانبي) */
+.modal .box > .row:first-child{
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  background: #fff;
+  margin: -14px -14px 10px -14px;  /* نفس الحيلة اللي عندك لتمد الخلفية */
+  padding: 14px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+/* قفل تمرير الخلفية عند فتح المودال */
+body.modal-open{ overflow: hidden; }
+/* ===== Drivers tab: fixed 3 columns, inner scrolling w/o scrollbar line ===== */
+#drivers-cols{
+  display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px;
+  align-items:stretch;
+}
+#drivers-cols .col.card{
+  display:flex; flex-direction:column; min-height:520px;
+}
+
+/* رأس العمود */
+#drivers-cols .col .ph{
+  padding:12px 14px; border-bottom:1px solid rgba(0,0,0,.06);
+  display:flex; gap:10px; align-items:center; justify-content:space-between;
+}
+
+/* جسم العمود قابل للسّكرول داخليًا */
+#drivers-cols .col .pb{
+  padding:10px 12px;
+  overflow:auto;
+  /* اضبط الارتفاع حسب شريط العنوان والـHeader عندك */
+  max-height: calc(100vh - 220px);
+  overscroll-behavior: contain;
+}
+
+/* اخفاء خطوط السّكرول لكل المتصفحات الشائعة */
+#drivers-cols .col .pb::-webkit-scrollbar{ width:0; height:0 }
+#drivers-cols .col .pb{ scrollbar-width:none; -ms-overflow-style:none }
+
+/* صف السائق */
+.drv-row{
+  display:flex; gap:10px; align-items:center; justify-content:space-between;
+  border:1px solid #e5e7eb; border-radius:10px; padding:8px; margin-bottom:8px;
+}
+.drv-row .who{ min-width:0 }
+.drv-row .who .name{ font-weight:800; white-space:nowrap; overflow:hidden; text-overflow:ellipsis }
+.drv-row .who .meta{ font-size:12px; color:#6b7280 }
+.drv-row .actions{ display:flex; gap:6px; flex-wrap:wrap }
+.drv-row .btn{ height:32px; padding:4px 10px; border-radius:10px; border:1px solid rgba(0,0,0,.1); background:#fff; cursor:pointer }
+.drv-row .btn.primary{ background:linear-gradient(180deg,#33BBDF,#1da9cf); color:#fff; border:none }
+
+/* استجابة */
+@media (max-width:1100px){
+  #drivers-cols{ grid-template-columns:1fr; }
+  #drivers-cols .col .pb{ max-height: calc(100vh - 180px); }
+}
+/* ===== Orders Log – card-like rows, sticky header, inner scroll w/o scrollbar ===== */
+#tab-orders .card .ph{
+  position: sticky; top: 0; z-index: 2;
+  background: #fff; /* يبقي الهيدر واضح أثناء التمرير */
+}
+
+#orders-log{
+  overflow: auto;
+  max-height: calc(100vh - 230px);
+  overscroll-behavior: contain;
+  scrollbar-width: none; -ms-overflow-style: none;
+}
+#orders-log::-webkit-scrollbar{ width:0; height:0 }
+
+/* صف الطلب كـ بطاقة */
+#orders-log .tr{
+  display: grid;
+  grid-template-columns: auto 110px 1.4fr 1.2fr auto auto auto;
+  gap: var(--ui-gap);
+  align-items: center;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 8px;
+  margin-bottom: 8px;
+}
+#orders-log .tr:hover{
+  box-shadow: var(--shadow);
+  border-color: rgba(0,0,0,.1);
+}
+
+/* عناصر الصف */
+#orders-log .select input{ width:16px; height:16px }
+#orders-log .order-code{
+  font-weight:800; text-align:center;
+  background:#f8fafc; border:1px solid #e5e7eb; border-radius:8px; padding:4px 8px;
+}
+#orders-log .order-restaurant .logo{ width: var(--ui-logo); height: var(--ui-logo) }
+#orders-log .order-driver .small{ color: var(--muted) }
+#orders-log .order-platform .chip{ margin-inline:2px }
+#orders-log .order-qty{
+  justify-self:center;
+  background:#f3f4f6; border:1px solid #e5e7eb; border-radius:8px; padding:2px 8px; font-weight:700;
+}
+#orders-log .order-actions{
+  justify-self:end; display:flex; align-items:center; gap:6px; flex-wrap:wrap;
+}
+
+/* استجابة */
+@media (max-width: 1100px){
+  #orders-log .tr{
+    grid-template-columns: auto 90px 1fr auto;
+    grid-auto-rows: auto;
+  }
+  #orders-log .order-driver,
+  #orders-log .order-platform{
+    grid-column: 3 / -1;
+  }
+  #orders-log .order-actions{
+    grid-column: 1 / -1; justify-self: start;
+  }
+}
+/* ===== Dashboard – same card rows style ===== */
+#tab-dashboard .card .ph{
+  position: sticky; top: 0; z-index: 2;
+  background:#fff;
+}
+
+/* Scroll containers without visible scrollbar */
+#incoming-list, #active-list{
+  overflow:auto;
+  max-height: calc(100vh - 230px);
+  overscroll-behavior: contain;
+  scrollbar-width: none; -ms-overflow-style: none;
+}
+#incoming-list::-webkit-scrollbar, #active-list::-webkit-scrollbar{ width:0; height:0 }
+
+/* Row = card */
+#incoming-list .tr, #active-list .tr{
+  display:grid;
+  gap: var(--ui-gap);
+  align-items:center;
+  background:#fff;
+  border:1px solid #e5e7eb;
+  border-radius:10px;
+  padding:8px;
+  margin-bottom:8px;
+}
+#incoming-list .tr:hover, #active-list .tr:hover{
+  box-shadow: var(--shadow);
+  border-color: rgba(0,0,0,.1);
+}
+
+/* Grids */
+#incoming-list .tr{
+  grid-template-columns: 1.6fr auto auto auto 1fr auto;
+}
+#active-list .tr{
+  grid-template-columns: 1.4fr auto 1fr;
+}
+
+/* Bits */
+.order-qty{
+  justify-self:center;
+  background:#f3f4f6; border:1px solid #e5e7eb;
+  border-radius:8px; padding:2px 8px; font-weight:700;
+}
+.order-price{ font-weight:800; }
+.order-pickup{ display:flex; align-items:center; gap:6px; }
+.row-actions{ justify-self:end; display:flex; gap:6px; flex-wrap:wrap; }
+.order-platform .chip{ margin-inline:2px }
+
+/* Responsive */
+@media (max-width:1100px){
+  #incoming-list .tr{
+    grid-template-columns: 1fr auto;
+    grid-auto-rows:auto;
+  }
+  #incoming-list .order-platform,
+  #incoming-list .order-qty,
+  #incoming-list .order-price,
+  #incoming-list .order-pickup,
+  #incoming-list .row-actions{
+    grid-column: 1 / -1; justify-self:start;
+  }
+
+  #active-list .tr{
+    grid-template-columns: 1fr auto;
+  }
+  #active-list .row-actions{
+    grid-column: 1 / -1; justify-self:start;
+  }
+}
+/* ===== Full-screen layout (safe-area + flex fill) ===== */
+html, body { height: 100%; }
+body { min-height: 100dvh; }                   /* dvh يعالج شريط المتصفح على الموبايل */
+.app{
+  min-height: 100dvh;
+  display: flex; flex-direction: column;
+  padding-bottom: calc(14px + env(safe-area-inset-bottom, 0px));
+}
+.bar{
+  position: sticky;
+  top: env(safe-area-inset-top, 8px);          /* احترام الـ notch */
+}
+
+/* اجعل التبويبات تملأ الشاشة، والسكرول يكون داخلها */
+.tabs{ flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.tab { flex: 1; min-height: 0; overflow: auto; }
+
+/* ===== Cards with internal scroll (بدون حدود ارتفاع مقصوصة) ===== */
+/* Dashboard */
+#tab-dashboard .card{ display:flex; flex-direction:column; min-height:0; }
+#tab-dashboard .card .pb{
+  flex:1; min-height:0; overflow:auto;
+  scrollbar-width:none; -ms-overflow-style:none;
+}
+#tab-dashboard .card .pb::-webkit-scrollbar{ width:0; height:0 }
+/* ألغِ أي max-height قديمة */
+#incoming-list, #active-list{ max-height: none !important; }
+
+/* Restaurants columns */
+#tab-restaurants .card{ display:flex; flex-direction:column; min-height:0; }
+#tab-restaurants .card .pb{
+  flex:1; min-height:0; overflow:auto;
+  scrollbar-width:none; -ms-overflow-style:none;
+}
+#tab-restaurants .card .pb::-webkit-scrollbar{ width:0; height:0 }
+
+/* Drivers 3 columns */
+#drivers-cols .col.card{ display:flex; flex-direction:column; min-height:0; }
+#drivers-cols .col .pb{
+  flex:1; min-height:0; overflow:auto;
+  max-height: none !important;                 /* إزالة الحساب بـ 100vh */
+  scrollbar-width:none; -ms-overflow-style:none;
+}
+#drivers-cols .col .pb::-webkit-scrollbar{ width:0; height:0 }
+
+/* Orders log */
+#tab-orders .card{ display:flex; flex-direction:column; min-height:0; }
+#tab-orders .card .pb{
+  flex:1; min-height:0; overflow:auto;
+  scrollbar-width:none; -ms-overflow-style:none;
+}
+#tab-orders .card .pb::-webkit-scrollbar{ width:0; height:0 }
+/* ===== Fleet Ops (Bulk) — layout (isolated) ===== */
+#tab-fleetx #fleetx-grid{
+  display:grid; grid-template-columns: 1fr 6px 1fr; gap:0; min-height:520px;
+}
+#tab-fleetx .fleetx-col{ min-width:0; }
+#tab-fleetx .fleetx-sash{
+  cursor: col-resize;
+  background: repeating-linear-gradient(90deg,#e5e7eb,0 3px,#f3f4f6,3px 6px);
+}
+#tab-fleetx .fx-row{
+  display:flex; align-items:center; gap:10px;
+  border:1px solid #e5e7eb; border-radius:10px; padding:8px;
+  background:#fff;
+}
+#tab-fleetx .fx-row:hover{ box-shadow: var(--shadow); border-color: rgba(0,0,0,.1); }
+
+/* internal scroll without visible scrollbars */
+#tab-fleetx .fleetx-col{ display:flex; flex-direction:column; }
+#tab-fleetx #fleetx-orders, #tab-fleetx #fleetx-fleets{
+  overflow:auto; max-height: calc(100vh - 260px);
+  scrollbar-width:none; -ms-overflow-style:none;
+}
+#tab-fleetx #fleetx-orders::-webkit-scrollbar,
+#tab-fleetx #fleetx-fleets::-webkit-scrollbar{ width:0; height:0; }
+
+/* responsive: single column */
+@media (max-width: 900px){
+  #tab-fleetx #fleetx-grid{ grid-template-columns: 1fr; }
+  #tab-fleetx .fleetx-sash{ display:none; }
+}
 
 </style>
 </head>
@@ -324,12 +676,16 @@ body{ font-size: var(--ui-font-base); }
     </div>
 
     <div class="nav" id="nav">
-      <button class="active" data-tab="dashboard" data-i18n="nav.dashboard">Dashboard</button>
-      <button data-tab="restaurants" data-i18n="nav.restaurants">Restaurants</button>
-      <button data-tab="drivers" data-i18n="nav.drivers">Fahrer</button>
-      <button data-tab="orders" data-i18n="nav.orders">Auftragsprotokoll</button>
-      <button data-tab="map" data-i18n="nav.map">Karte</button>
-    </div>
+  <button class="active" data-tab="dashboard" data-i18n="nav.dashboard">Dashboard</button>
+  <button data-tab="restaurants" data-i18n="nav.restaurants">Restaurants</button>
+  <button data-tab="drivers" data-i18n="nav.drivers">Fahrer</button>
+  <button data-tab="fleets" data-i18n="nav.fleets">Fleets</button>
+  <!-- + Fleet Ops (Bulk) -->
+<button data-tab="fleetx" data-i18n="nav.fleetOps">Fleet Ops</button>
+  <button data-tab="orders" data-i18n="nav.orders">Auftragsprotokoll</button>
+  <button data-tab="map" data-i18n="nav.map">Karte</button>
+</div>
+
 
     <div class="controls">
       <button id="btn-mute" class="icon" title="Mute/Unmute"><i data-lucide="volume-2"></i></button>
@@ -401,19 +757,185 @@ body{ font-size: var(--ui-font-base); }
 
     <!-- ===== Restaurants ===== -->
     <section id="tab-restaurants" class="tab" hidden>
+  <div id="rest-split" class="rest-split">
+    <!-- اليسار: المعتمَدة -->
+    <div class="rest-col">
       <div class="card">
-        <div class="ph"><div style="font-weight:800" data-i18n="nav.restaurants">Restaurants</div></div>
-        <div class="pb grid" id="restaurants-grid" style="grid-template-columns:1fr 1fr"></div>
+        <div class="ph">
+          <div style="font-weight:800">Approved Restaurants</div>
+          <div class="badge" id="rest-appr-count">0</div>
+        </div>
+        <div class="pb">
+          <div class="rest-filters">
+            <input id="rest-appr-name" class="input" placeholder="Name…" />
+            <input id="rest-appr-city" class="input" placeholder="City…" />
+            <div class="row">
+              <input id="rest-appr-from" type="date" class="input" />
+              <input id="rest-appr-to"   type="date" class="input" />
+            </div>
+          </div>
+          <div id="rest-approved-list" class="grid" style="grid-template-columns:1fr 1fr; gap:10px"></div>
+        </div>
       </div>
-    </section>
+    </div>
+
+    <!-- مقبض السحب -->
+    <div id="rest-sash" class="rest-sash" title="Drag to resize"></div>
+
+    <!-- اليمين: قيد الاعتماد -->
+    <div class="rest-col">
+      <div class="card">
+        <div class="ph">
+          <div style="font-weight:800">Pending Approval</div>
+          <div class="badge" id="rest-pend-count">0</div>
+        </div>
+        <div class="pb">
+          <div class="rest-filters">
+            <input id="rest-pend-name" class="input" placeholder="Name…" />
+            <input id="rest-pend-city" class="input" placeholder="City…" />
+            <div class="row">
+              <input id="rest-pend-from" type="date" class="input" />
+              <input id="rest-pend-to"   type="date" class="input" />
+            </div>
+          </div>
+          <div id="rest-pending-list" class="grid" style="grid-template-columns:1fr; gap:10px"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
 
     <!-- ===== Drivers ===== -->
     <section id="tab-drivers" class="tab" hidden>
-      <div class="card">
-        <div class="ph"><div style="font-weight:800" data-i18n="nav.drivers">Fahrer</div></div>
-        <div class="pb grid" id="drivers-grid" style="grid-template-columns:1fr 1fr"></div>
+  <div id="drivers-cols">
+    <!-- (يسار) جميع السائقين -->
+    <div class="card col" id="drv-all-col">
+      <div class="ph">
+        <div style="font-weight:800" data-i18n="nav.drivers">Fahrer – Alle</div>
+        <span class="badge gray"><span id="drv-all-count">0</span></span>
       </div>
-    </section>
+      <div class="pb" id="drivers-all"></div>
+    </div>
+
+    <!-- (وسط) السائقون النشطون -->
+    <div class="card col" id="drv-online-col">
+      <div class="ph">
+        <div style="font-weight:800">Online</div>
+        <span class="badge green"><span id="drv-online-count">0</span></span>
+      </div>
+      <div class="pb" id="drivers-online"></div>
+    </div>
+
+    <!-- (يمين) طلبات سائقين جدد (بانتظار الموافقة) -->
+    <div class="card col" id="drv-pending-col">
+      <div class="ph">
+        <div style="font-weight:800">Pending Drivers</div>
+        <span class="badge gray"><span id="drv-pending-count">0</span></span>
+      </div>
+      <div class="pb" id="drivers-pending"></div>
+    </div>
+  </div>
+</section>
+<!-- ===== Fleets ===== -->
+<section id="tab-fleets" class="tab" hidden>
+  <div id="fleet-split" class="fleet-split">
+    <!-- يسار: الأساطيل المعتمدة -->
+    <div class="fleet-col">
+      <div class="card" id="fleets-approved-wrap">
+        <div class="ph">
+          <div style="font-weight:800">Approved Fleets</div>
+          <div class="badge" id="fleet-appr-count">0</div>
+        </div>
+        <div class="pb">
+          <div class="fleet-filters">
+            <input id="fleet-appr-name" class="input" placeholder="Name…" />
+            <input id="fleet-appr-city" class="input" placeholder="City…" />
+          </div>
+          <div id="fleet-approved-list" class="grid" style="grid-template-columns:1fr; gap:10px"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- مقبض السحب -->
+    <div id="fleet-sash" class="fleet-sash" title="Drag to resize"></div>
+
+    <!-- يمين: الأساطيل قيد الاعتماد -->
+    <div class="fleet-col">
+      <div class="card" id="fleets-pending-wrap">
+        <div class="ph">
+          <div style="font-weight:800">Pending Fleets</div>
+          <div class="badge" id="fleet-pend-count">0</div>
+        </div>
+        <div class="pb">
+          <div class="fleet-filters">
+            <input id="fleet-pend-name" class="input" placeholder="Name…" />
+            <input id="fleet-pend-city" class="input" placeholder="City…" />
+          </div>
+          <div id="fleet-pending-list" class="grid" style="grid-template-columns:1fr; gap:10px"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== Fleet Ops (Bulk Assign) ===== -->
+<section id="tab-fleetx" class="tab" hidden>
+  <div class="card">
+    <div class="ph">
+      <div style="font-weight:800" data-i18n="fleetx.title">إدارة الأساطيل – تجميع وإسناد</div>
+      <div class="right row" style="gap:8px; flex-wrap: wrap">
+        <input id="fleetx-city" class="input" style="height:36px" placeholder="City…" />
+        <label class="small" style="display:flex;align-items:center;gap:6px">
+          <input type="checkbox" id="fleetx-hide-assigned" checked>
+          <span data-i18n="fleetx.filters.hideAssigned">إخفاء المعيّنة لأسطول</span>
+        </label>
+        <select id="fleetx-status" class="input" style="height:36px">
+          <option value="Bearbeitung">Bearbeitung</option>
+          <option value="Zugewiesen">Zugewiesen</option>
+          <option value="Angenommen">Angenommen</option>
+          <option value="Unterwegs">Unterwegs</option>
+          <option value="Geliefert">Geliefert</option>
+          <option value="Abgebrochen">Abgebrochen</option>
+        </select>
+
+        <span class="small" id="fleetx-selected" style="min-width:120px;text-align:center">0 selected</span>
+
+        <select id="fleetx-fleet-select" class="input" style="height:36px; min-width:220px">
+          <option value="">— Fleet —</option>
+        </select>
+        <button id="fleetx-assign"   class="btn"           data-i18n="fleetx.assign">إسناد المحدد</button>
+        <button id="fleetx-unassign" class="btn secondary" data-i18n="fleetx.unassign">إلغاء الإسناد</button>
+        <button id="fleetx-auto"     class="btn secondary" data-i18n="fleetx.autodist">توزيع ذكي</button>
+      </div>
+    </div>
+
+    <div class="pb">
+      <div id="fleetx-grid">
+        <div class="fleetx-col">
+          <div class="row" style="justify-content:space-between; margin-bottom:6px">
+            <strong data-i18n="fleetx.orders">الطلبات</strong>
+            <label class="small" style="display:flex;align-items:center;gap:6px">
+              <input type="checkbox" id="fleetx-select-all">
+              <span>Alle wählen</span>
+            </label>
+          </div>
+          <div id="fleetx-orders" class="grid" style="gap:8px"></div>
+        </div>
+
+        <div class="fleetx-sash" title="Drag to resize"></div>
+
+        <div class="fleetx-col">
+          <div class="row" style="justify-content:space-between; margin-bottom:6px">
+            <strong data-i18n="fleetx.fleets">الأساطيل</strong>
+            <span class="badge" id="fleetx-fleet-count">0</span>
+          </div>
+          <div id="fleetx-fleets" class="grid" style="gap:8px"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
 
     <!-- ===== Orders Log ===== -->
     <section id="tab-orders" class="tab" hidden>
@@ -586,7 +1108,16 @@ const i18n = {
       'search.placeholder':'Suche… (Name, Telefon, Code)',
       // [TAUSSIL-APPROVAL-I18N-START]
       'approval.approve':'Genehmigen',
-      'approval.reject':'Ablehnen'
+      'approval.reject':'Ablehnen', 'nav.fleets':'Flotten', 'nav.fleetOps':'Fleet Ops',
+'fleetx.title':'Flotten – Sammelzuweisung',
+'fleetx.filters.hideAssigned':'Bereits zugewiesene ausblenden',
+'fleetx.assign':'Zuweisen',
+'fleetx.unassign':'Zuweisung entfernen',
+'fleetx.autodist':'Auto verteilen',
+'fleetx.orders':'Bestellungen',
+'fleetx.fleets':'Flotten',
+'fleetx.emptyOrders':'Keine passenden Bestellungen.',
+'fleetx.emptyFleets':'Keine genehmigten Flotten.',
       // [TAUSSIL-APPROVAL-I18N-END]
   },
   en:{'brand.title':'Taussil Admin','brand.subtitle':'Control Center',
@@ -603,7 +1134,17 @@ const i18n = {
       'search.placeholder':'Search… (name, phone, code)',
       // [TAUSSIL-APPROVAL-I18N-START]
       'approval.approve':'Approve',
-      'approval.reject':'Reject'
+      'approval.reject':'Reject', 'nav.fleets':'Fleets', 'nav.fleetOps':'Fleet Ops',
+'fleetx.title':'Fleets – Bulk Assignment',
+'fleetx.filters.hideAssigned':'Hide already assigned',
+'fleetx.assign':'Assign selected',
+'fleetx.unassign':'Unassign',
+'fleetx.autodist':'Auto-distribute',
+'fleetx.orders':'Orders',
+'fleetx.fleets':'Fleets',
+'fleetx.emptyOrders':'No matching orders.',
+'fleetx.emptyFleets':'No approved fleets.',
+
       // [TAUSSIL-APPROVAL-I18N-END]
   },
   ar:{'brand.title':'Taussil Admin','brand.subtitle':'لوحة التحكم',
@@ -620,7 +1161,16 @@ const i18n = {
       'search.placeholder':'بحث… (اسم، هاتف، كود)',
       // [TAUSSIL-APPROVAL-I18N-START]
       'approval.approve':'اعتماد',
-      'approval.reject':'رفض'
+      'approval.reject':'رفض', 'nav.fleets':'الأساطيل', 'nav.fleetOps':'إدارة الأساطيل',
+'fleetx.title':'إدارة الأساطيل – تجميع وإسناد',
+'fleetx.filters.hideAssigned':'إخفاء المعيّنة لأسطول',
+'fleetx.assign':'إسناد المحدد',
+'fleetx.unassign':'إلغاء الإسناد',
+'fleetx.autodist':'توزيع ذكي',
+'fleetx.orders':'الطلبات',
+'fleetx.fleets':'الأساطيل',
+'fleetx.emptyOrders':'لا توجد طلبات مطابقة.',
+'fleetx.emptyFleets':'لا توجد أساطيل معتمدة.',
       // [TAUSSIL-APPROVAL-I18N-END]
   }
 };
@@ -696,6 +1246,43 @@ try{ setMuted(localStorage.getItem(LS_MUTE_KEY)==='1'); }catch(_){}
 
 const ordersMap = new Map();
 let orders=[], restaurants=[], drivers=[];
+let fleetsApproved = [];
+let unsubFleetsApproved = null;
+
+/* NEW: source buffers + users listener */
+let __fleets_from_docs = [];
+let __fleets_from_users = [];
+let unsubFleetsUsersApproved = null;
+
+function normalizeFleetRow(id, x={}){
+  const company = x.company || {};
+  const addr    = x.address || {};
+  const status  = String(x.status || '').toLowerCase();
+  const approvedLike = (x.approved === true) || ['active','approved','enabled'].includes(status);
+  if(!approvedLike) return null;
+
+  return {
+    id,
+    name:  company.name || x.name || x.email || id,
+    owner: [company.ownerFirst||'', company.ownerLast||''].join(' ').trim(),
+    email: x.email || company.email || '',
+    phone: company.phone || '',
+    city:  addr.city || x.targetCity || x.city || '',
+    driversCount: Number(x.driversCount || 0)
+  };
+}
+
+function recomputeFleetsApproved(){
+  const map = new Map();
+  [...__fleets_from_docs, ...__fleets_from_users].forEach(r=>{
+    if(!r) return;
+    if(!map.has(r.id)) map.set(r.id, r);
+  });
+  fleetsApproved = Array.from(map.values());
+  renderFleets?.();
+}
+
+
 /* [TAUSSIL-REST-APPROVED-STATE] */
 let restaurantUsersApproved = []; // from users(role=restaurant, approved=true)
 
@@ -1129,13 +1716,34 @@ function renderDashboard(){
   if(incWrap){
     incWrap.innerHTML = incoming.map(o=>`
       <div class="tr">
-        <div class="flex"><img class="logo" src="${o.restaurant?.logoUrl||''}"/><div><div style="font-weight:700">${o.restaurant?.name||'-'}</div><div class="small">${o.restaurant?.phone||''}</div></div></div>
-        <div>${platformChips(o.platform)}</div>
-        <div class="mono" style="text-align:center">x${Number(o.qty||0)}</div>
-        <div>${Number.isFinite(Number(o.price))? Number(o.price).toFixed(2)+' €':'—'}</div>
-        <div class="flex"><i data-lucide="clock"></i> ${o.pickupTime||'—'}</div>
-        <div class="right flex">
-          <label style="display:flex;align-items:center;gap:6px"><input type="checkbox" class="order-select" data-id="${o.id}"><span class="small">Select</span></label>
+        <!-- Restaurant -->
+        <div class="flex">
+          <img class="logo" src="${o.restaurant?.logoUrl||''}"/>
+          <div>
+            <div style="font-weight:700">${o.restaurant?.name||'-'}</div>
+            <div class="small">${o.restaurant?.phone||''}</div>
+          </div>
+        </div>
+
+        <!-- Platform -->
+        <div class="order-platform">${platformChips(o.platform)}</div>
+
+        <!-- Qty -->
+        <div class="order-qty mono">x${Number(o.qty||0)}</div>
+
+        <!-- Price -->
+        <div class="order-price">
+          ${Number.isFinite(Number(o.price))? Number(o.price).toFixed(2)+' €':'—'}
+        </div>
+
+        <!-- Pickup -->
+        <div class="order-pickup"><i data-lucide="clock"></i> ${o.pickupTime||'—'}</div>
+
+        <!-- Actions -->
+        <div class="row-actions">
+          <label style="display:flex;align-items:center;gap:6px">
+            <input type="checkbox" class="order-select" data-id="${o.id}"><span class="small">Select</span>
+          </label>
           <button class="btn secondary" data-order-details="${o.id}" data-i18n="order.details">${t('order.details')}</button>
           <button class="btn" data-assign="${o.id}" data-i18n="assign.confirm">${t('assign.confirm')}</button>
         </div>
@@ -1145,60 +1753,104 @@ function renderDashboard(){
   const aWrap = $('#active-list');
   if(aWrap){
     aWrap.innerHTML = active.map(o=>`
-    <div class="tr" data-mini-map="${o.id}">
-      <div class="flex">
-        ${o.driver?.avatarUrl? `<img class="avatar" src="${o.driver.avatarUrl}">`:`<div class="avatar"></div>`}
-        <div>
-          <div style="font-weight:700">${o.driver?.fullName||'-'}</div>
-          <div class="sub">${o.driver?.phone||'—'}</div>
+      <div class="tr" data-mini-map="${o.id}">
+        <!-- Driver -->
+        <div class="flex">
+          ${o.driver?.avatarUrl? `<img class="avatar" src="${o.driver.avatarUrl}">`:`<div class="avatar"></div>`}
+          <div>
+            <div style="font-weight:700">${o.driver?.fullName||'-'}</div>
+            <div class="sub">${o.driver?.phone||'—'}</div>
+          </div>
+        </div>
+
+        <!-- Status -->
+        <div>${statusBadge(o.status)}</div>
+
+        <!-- Actions -->
+        <div class="row-actions">
+          <label style="display:flex;align-items:center;gap:6px">
+            <input type="checkbox" class="order-select" data-id="${o.id}"><span class="small">Select</span>
+          </label>
+          <button class="btn secondary" data-order-details="${o.id}">${t('order.details')}</button>
+          <div class="dropdown">
+            <select data-update-status="${o.id}">
+              <option value="">${t('labels.status')}…</option>
+              <option value="Unterwegs">Unterwegs</option>
+              <option value="Geliefert">Geliefert</option>
+              <option value="Abgebrochen">Abgebrochen</option>
+            </select>
+          </div>
         </div>
       </div>
-      <div>${statusBadge(o.status)}</div>
-      <div class="right flex">
-        <label style="display:flex;align-items:center;gap:6px"><input type="checkbox" class="order-select" data-id="${o.id}"><span class="small">Select</span></label>
-        <button class="btn secondary" data-order-details="${o.id}">${t('order.details')}</button>
-        <div class="dropdown">
-          <select data-update-status="${o.id}">
-            <option value="">${t('labels.status')}…</option>
-            <option value="Unterwegs">Unterwegs</option>
-            <option value="Geliefert">Geliefert</option>
-            <option value="Abgebrochen">Abgebrochen</option>
-          </select>
-        </div>
-      </div>
-    </div>
-  `).join('') || `<div class="sub">${t('empty.noActive')}</div>`;
+    `).join('') || `<div class="sub">${t('empty.noActive')}</div>`;
   }
 
   attachRowHandlers();
   bindMiniMapRowClicks();
   bindOrderSelectionHandlers();
-  ensureExportBar(); // NEW
+  ensureExportBar(); // كما هو
 }
 
 /* ===== [TAUSSIL-REST-APPROVED-RENDER-START] ===== */
 function renderRestaurants(){
-  const wrap = $('#restaurants-grid'); if(!wrap) return;
+  const wrap = document.getElementById('rest-approved-list');
+  const cnt  = document.getElementById('rest-appr-count');
+  if(!wrap || !cnt) return;
 
-  // مصدر 1: وثائق restaurants المجموعة الرسمية
-  const docs = Array.isArray(restaurants) ? restaurants : [];
+  // دمج مصدرين: restaurants (collection) + restaurantUsersApproved (users approved= true)
+  const base = Array.isArray(restaurants) ? restaurants : [];
+  const extras = (restaurantUsersApproved||[]).map(u=>({
+    id: u.id,
+    name: u.name || u.id,
+    phone: u.phone || '',
+    address: u.address || '',
+    logoUrl: u.logoUrl || '',
+    createdAt: u.createdAt || u.approvedAt || null
+  }));
 
-  // مصدر 2: مستخدمون role=restaurant & approved=true من users
-  const byId = new Map(docs.map(r => [r.id, r]));
-  const extras = (restaurantUsersApproved || [])
-    .filter(u => !byId.has(u.id))
-    .map(u => ({
-      id: u.id,
-      name: u.name || u.id,
-      phone: u.phone || '',
-      address: u.address || '',
-      logoUrl: u.logoUrl || ''
-    }));
+  // استخدم الخريطة لمنع التكرار
+  const byId = new Map(base.map(r => [r.id, r]));
+  const merged = base.concat(extras.filter(x => !byId.has(x.id)));
 
-  const merged = docs.concat(extras);
+  // فلاتر اليسار
+  const fName = (document.getElementById('rest-appr-name')?.value||'').trim().toLowerCase();
+  const fCity = (document.getElementById('rest-appr-city')?.value||'').trim().toLowerCase();
+  const fFrom = document.getElementById('rest-appr-from')?.value || '';
+  const fTo   = document.getElementById('rest-appr-to')?.value   || '';
 
-  wrap.innerHTML = merged.map(r=>`
-    <div class="card" style="padding:12px">
+  const fromD = fFrom ? new Date(fFrom) : null;
+  const toD   = fTo   ? new Date(fTo+'T23:59:59') : null;
+
+  const getCity = (row)=>{
+    const txt = row.address || '';
+    // محاولة بسيطة لاستخراج المدينة من نص العنوان
+    const parts = String(txt).split(',').map(s=>s.trim());
+    return (parts[parts.length-1] || '').toLowerCase();
+  };
+  const getCreatedTs = (row)=>{
+    const ts = row.createdAt || null;
+    if(!ts) return null;
+    return ts.toDate ? ts.toDate() : (ts instanceof Date ? ts : null);
+  };
+
+  let rows = merged.filter(r=>{
+    const nm = String(r.name||'').toLowerCase();
+    const city = getCity(r);
+    const inName = !fName || nm.includes(fName);
+    const inCity = !fCity || city.includes(fCity);
+
+    const ct = getCreatedTs(r);
+    const inDate = (!fromD && !toD) ||
+                   (!ct ? true :
+                     ((!fromD || ct>=fromD) && (!toD || ct<=toD)));
+
+    return inName && inCity && inDate;
+  });
+
+  cnt.textContent = rows.length;
+
+  wrap.innerHTML = rows.map(r=>`
+    <div class="card" style="padding:10px">
       <div class="flex">
         <img class="logo" src="${r.logoUrl||''}"/>
         <div>
@@ -1208,13 +1860,19 @@ function renderRestaurants(){
         </div>
         <span class="right"></span>
         <button class="btn secondary"
-                data-user-details='${JSON.stringify({kind:"restaurant",name:r.name,phone:r.phone,logoUrl:r.logoUrl||''})}'
-                data-i18n="order.details">${t('order.details')}</button>
+        data-user-details
+        data-kind="restaurant"
+        data-id="${r.id}">
+  ${t('details')}
+</button>
+
       </div>
-    </div>`).join('');
+    </div>
+  `).join('') || `<div class="small" style="opacity:.7">No approved restaurants.</div>`;
 
   attachRowHandlers();
 }
+
 /* ===== [TAUSSIL-REST-APPROVED-RENDER-END] ===== */
 
 function renderDrivers(){
@@ -1231,7 +1889,13 @@ function renderDrivers(){
           <div class="small">Status: ${online? '<b style="color:#16a34a">Online</b>' : 'Offline'}</div>
         </div>
         <span class="right"></span>
-        <button class="btn secondary" data-user-details='${JSON.stringify({kind:"driver",fullName:d.fullName,phone:d.phone,avatarUrl:d.avatarUrl||''})}' data-i18n="order.details">${t('order.details')}</button>
+        <button class="btn secondary"
+        data-user-details
+        data-kind="restaurant"
+        data-id="${r.id}">
+  ${t('details')}
+</button>
+
       </div>
     </div>`;
   }).join('');
@@ -1245,18 +1909,41 @@ function renderOrdersLog(){
   const wrap = $('#orders-log'); if(!wrap) return;
   wrap.innerHTML = orders.map(o=>`
     <div class="tr">
-      <div><input type="checkbox" class="order-select" data-id="${o.id}"></div>
-      <div class="mono">#${o.nr!=null? o.nr : (o.shortCode||'—')}</div>
-      <div class="flex"><img class="logo" src="${o.restaurant?.logoUrl||''}"/><div><div style="font-weight:700">${o.restaurant?.name||'-'}</div><div class="small">${o.restaurant?.phone||''}</div></div></div>
-      <div>${o.driver? `<div><div style="font-weight:700">${o.driver.fullName||''}</div><div class="small">${o.driver.phone||''}</div></div>` : '<span class="small">-</span>'}</div>
-      <div>${platformChips(o.platform)}</div>
-      <div class="mono" style="text-align:center">x${Number(o.qty||0)}</div>
-      <div class="flex right">${statusBadge(o.status)} <button class="btn secondary" data-order-details="${o.id}" data-i18n="order.details">${t('order.details')}</button></div>
-    </div>`).join('');
+      <div class="select"><input type="checkbox" class="order-select" data-id="${o.id}"></div>
+
+      <div class="order-code mono">#${o.nr!=null? o.nr : (o.shortCode||'—')}</div>
+
+      <div class="order-restaurant flex">
+        <img class="logo" src="${o.restaurant?.logoUrl||''}"/>
+        <div>
+          <div style="font-weight:700">${o.restaurant?.name||'-'}</div>
+          <div class="small">${o.restaurant?.phone||''}</div>
+        </div>
+      </div>
+
+      <div class="order-driver">
+        ${
+          o.driver
+           ? `<div><div style="font-weight:700">${o.driver.fullName||''}</div><div class="small">${o.driver.phone||''}</div></div>`
+           : '<span class="small">-</span>'
+        }
+      </div>
+
+      <div class="order-platform">${platformChips(o.platform)}</div>
+
+      <div class="order-qty mono">x${Number(o.qty||0)}</div>
+
+      <div class="order-actions">
+        ${statusBadge(o.status)}
+        <button class="btn secondary" data-order-details="${o.id}" data-i18n="order.details">${t('order.details')}</button>
+      </div>
+    </div>
+  `).join('');
   attachRowHandlers();
   bindOrderSelectionHandlers();
-  ensureExportBar(); // NEW
+  ensureExportBar(); // يبقى كما هو
 }
+
 function attachRowHandlers(){
   document.querySelectorAll('[data-order-details]').forEach(btn=>{
     btn.onclick=()=>{ const id=btn.getAttribute('data-order-details'); const o=orders.find(x=>x.id===id); if(o) openOrderModal(o); };
@@ -1484,18 +2171,302 @@ const userModal = $('#user-modal');
 const userTitle = $('#user-title');
 const userDetailsBox = $('#user-details');
 $('#user-close')?.addEventListener('click',()=>userModal?.classList.remove('open'));
+
+function esc(s){ return String(s ?? '').replace(/[<>&]/g, c=>({ '<':'&lt;','>':'&gt;','&':'&amp;' }[c])); }
+function fmtAny(v){
+  // تحويل Timestamps وإلا طباعة قيمة بسيطة
+  try{
+    if (v?.toDate) return v.toDate().toLocaleString();
+    if (v instanceof Date) return v.toLocaleString();
+  }catch(_){}
+  if (typeof v === 'object' && v!==null) return JSON.stringify(v, null, 2);
+  return String(v ?? '—');
+}
+function kv(label, value){
+  return `
+    <div class="row" style="align-items:flex-start; gap:8px; border-bottom:1px solid #e5e7eb; padding:6px 0">
+      <div class="small" style="min-width:140px; opacity:.7">${esc(label)}</div>
+      <div class="mono" style="white-space:pre-wrap">${esc(fmtAny(value))}</div>
+    </div>`;
+}
+// === Fleet: cascade fetch from fleet/, fleets/, users(role=fleet) ===
+async function getFleetDocCascade(id){
+  let src = '', raw = {};
+
+  // A) try 'fleet/{id}'
+  try{
+    const ds = await getDoc(doc(db,'fleet', id));
+    if(ds.exists()){ src='fleet'; raw = ds.data()||{}; }
+  }catch(_){}
+
+  // B) try 'fleets/{id}'
+  if(!src){
+    try{
+      const ds2 = await getDoc(doc(db,'fleets', id));
+      if(ds2.exists()){ src='fleets'; raw = ds2.data()||{}; }
+    }catch(_){}
+  }
+
+  // C) fallback: users/{id} with role=fleet
+  if(!src){
+    try{
+      const u = await getDoc(doc(db,'users', id));
+      if(u.exists()){
+        const usr = u.data()||{};
+        if(String(usr.role||'').toLowerCase()==='fleet'){
+          const app = usr.fleetApplication || {};
+          const company = app.company || usr.company || {};
+          raw = {
+            approved: usr.approved===true,
+            status: usr.status || (usr.approved===true ? 'active':'pending'),
+            email: usr.email || company.email || '',
+            company: {
+              name: company.name || usr.name || usr.email || id,
+              ownerFirst: company.ownerFirst || '',
+              ownerLast:  company.ownerLast  || '',
+              phone: company.phone || usr.phone || ''
+            },
+            address: app.address || { city: (app.targetCity || usr.city || '') },
+            targetCity: app.targetCity || usr.targetCity || '',
+            driversCount: Number(app.driversCount || 0),
+            createdAt: usr.createdAt || null,
+            updatedAt: usr.updatedAt || null
+          };
+          src='users';
+        }
+      }
+    }catch(_){}
+  }
+
+  return { src, data: raw };
+}
+
+async function openEntityDetails(kind, id){
+  if(!userModal || !userTitle || !userDetailsBox) return;
+
+  let ds=null, data=null, title='Details', img='', name='';
+
+  if (kind === 'driver'){
+  ds = await getDoc(doc(db,'users', id));
+  data = ds.exists()? ds.data() : null;
+  title = (currentLang==='ar'?'تفاصيل السائق': (currentLang==='de'?'Fahrerdetails':'Driver Details'));
+  img = data?.avatarUrl || '';
+  name = data?.fullName || [data?.firstName, data?.lastName].filter(Boolean).join(' ') || data?.name || data?.email || id;
+} else if (kind === 'fleet'){
+  const got = await getFleetDocCascade(id);
+  const fleetData = got?.data || null;   // ← بدل data إلى fleetData
+
+  userTitle.textContent = (currentLang==='ar'?'تفاصيل الأسطول'
+                          : (currentLang==='de'?'Flotten-Details':'Fleet Details'));
+
+  if(!fleetData){
+    userDetailsBox.innerHTML = `<div class="small" style="opacity:.7">Not found</div>`;
+    userModal.classList.add('open');
+    document.body.classList.add('modal-open');
+    return; // ← مهم
+  }
+
+  const company = fleetData.company || {};
+  const addr    = fleetData.address || {};
+  const name    = company.name || fleetData.name || fleetData.email || id;
+  const owner   = [company.ownerFirst||'', company.ownerLast||''].join(' ').trim();
+  const phone   = company.phone || fleetData.phone || fleetData.contactPhone || '';
+  const email   = fleetData.email || company.email || '';
+  const city    = addr.city || fleetData.targetCity || fleetData.city || '';
+  const drvCnt  = Number(fleetData.driversCount || 0);
+  const status  = fleetData.status || (fleetData.approved===true ? 'active' : 'pending');
+  const approved= (fleetData.approved===true) || ['active','approved','enabled'].includes(String(status||'').toLowerCase());
+  const created = fleetData.createdAt?.toDate ? fleetData.createdAt.toDate()
+                  : (fleetData.createdAt instanceof Date ? fleetData.createdAt : null);
+  const updated = fleetData.updatedAt?.toDate ? fleetData.updatedAt.toDate()
+                  : (fleetData.updatedAt instanceof Date ? fleetData.updatedAt : null);
+
+  const head = `
+    <div class="flex" style="gap:10px; align-items:center; margin-bottom:8px">
+      <div class="logo" style="width:26px;height:26px;border-radius:6px;background:#f3f4f6"></div>
+      <div>
+        <div style="font-weight:800">${esc(name)}</div>
+        ${owner ? `<div class="small" style="opacity:.8">${esc(owner)}</div>` : ''}
+        ${phone ? `<div class="small"><a href="tel:${esc(phone)}">${esc(phone)}</a></div>` : ''}
+        ${email ? `<div class="small"><a href="mailto:${esc(email)}">${esc(email)}</a></div>` : ''}
+      </div>
+    </div>`;
+
+  const common =
+      kv('Fleet ID', id) +
+      (owner   ? kv('Owner', owner) : '') +
+      (city    ? kv('City', city) : '') +
+      kv('Drivers Count', String(drvCnt)) +
+      kv('Approved', String(approved)) +
+      kv('Status', status) +
+      (fleetData.targetCity ? kv('Target City', fleetData.targetCity) : '') +
+      (created ? kv('CreatedAt', created) : '') +
+      (updated ? kv('UpdatedAt', updated) : '');
+
+  const rawDump = `
+    <div style="margin-top:10px">
+      <div class="small" style="opacity:.7; margin-bottom:4px">Raw fleet document (${esc(got.src||'—')})</div>
+      <pre class="small mono" style="background:#f8fafc; border:1px solid #e5e7eb; border-radius:8px; padding:8px; max-height:260px; overflow:auto">${esc(JSON.stringify(fleetData, null, 2))}</pre>
+    </div>`;
+
+  userDetailsBox.innerHTML = head + common + rawDump;
+  userModal.classList.add('open');
+  document.body.classList.add('modal-open');
+  return; // ← مهم جدًا كي لا يكمل للبلوك العام
+
+
+} else {
+  // restaurant: جرّب restaurants ثم users كاحتياط
+  ds = await getDoc(doc(db,'restaurants', id));
+  if(ds.exists()){
+    data = ds.data();
+  } else {
+    const u = await getDoc(doc(db,'users', id));
+    data = u.exists()? u.data() : null;
+  }
+  title = (currentLang==='ar'?'تفاصيل المطعم': (currentLang==='de'?'Restaurantdetails':'Restaurant Details'));
+  img = data?.logoUrl || '';
+  name = data?.name || data?.restName || data?.email || id;
+}
+
+
+  userTitle.textContent = title;
+  if(!data){
+    userDetailsBox.innerHTML = `<div class="small" style="opacity:.7">Not found</div>`;
+    userModal.classList.add('open'); return;
+  }
+
+  // استنباط رقم الهاتف من أشهر الحقول الممكنة
+  const phone = data.phone ?? data.contactPhone ?? data.company?.phone ?? data.ownerPhone ?? '';
+
+  // استنباط البريد
+  const email = data.email ?? data.company?.email ?? '';
+
+  // عنوان/مدينة
+  const address = data.address_text ?? data.addressText ?? data.address ?? data.company?.address ?? '';
+  const city    = data.city ?? data.address?.city ?? data.company?.address?.city ?? '';
+
+  // تواريخ / حالة
+  const approved = (data.approved === true);
+  const status   = data.status ?? '';
+  const created  = data.createdAt?.toDate ? data.createdAt.toDate() : (data.createdAt instanceof Date ? data.createdAt : null);
+  const updated  = data.updatedAt?.toDate ? data.updatedAt.toDate() : (data.updatedAt instanceof Date ? data.updatedAt : null);
+
+  // رأس المودال
+  const head = `
+    <div class="flex" style="gap:10px; align-items:center; margin-bottom:8px">
+      ${img ? `<img class="${kind==='driver'?'avatar':'logo'}" src="${esc(img)}">` : `<div class="${kind==='driver'?'avatar':'logo'}" style="background:#f3f4f6"></div>`}
+      <div>
+        <div style="font-weight:800">${esc(name)}</div>
+        ${phone ? `<div class="small"><a href="tel:${esc(phone)}">${esc(phone)}</a></div>` : ''}
+        ${email ? `<div class="small"><a href="mailto:${esc(email)}">${esc(email)}</a></div>` : ''}
+      </div>
+    </div>`;
+
+  // حقول شائعة
+  const common =
+      kv('ID', id) +
+      (phone ? kv('Phone', phone) : '') +
+      (email ? kv('Email', email) : '') +
+      (address ? kv('Address', address) : '') +
+      (city ? kv('City', city) : '') +
+      kv('Approved', String(approved)) +
+      kv('Status', status) +
+      (created ? kv('CreatedAt', created) : '') +
+      (updated ? kv('UpdatedAt', updated) : '');
+
+  // Dump كل الداتا (كما هي)
+  const jsonDump = `
+    <div style="margin-top:10px">
+      <div class="small" style="opacity:.7; margin-bottom:4px">Raw document</div>
+      <pre class="small mono" style="background:#f8fafc; border:1px solid #e5e7eb; border-radius:8px; padding:8px; max-height:260px; overflow:auto">${esc(JSON.stringify(data, null, 2))}</pre>
+    </div>`;
+
+  userDetailsBox.innerHTML = head + common + jsonDump;
+  userModal.classList.add('open');
+}
+
+/* إبقاء الدالة القديمة كـ fallback للزر القديم (لا تزيلها إن عندك أماكن لسه تستعملها) */
 function openUserModal(payload){
+  // إذا وصلنا لهون، بنعرض على الأقل الاسم/الهاتف/الصورة القديمة
   if(!userModal||!userTitle||!userDetailsBox) return;
   if(payload.kind==='driver'){
-    userTitle.textContent = currentLang==='de'?'Fahrerdetails':(currentLang==='en'?'Driver Details':'تفاصيل السائق');
-    userDetailsBox.innerHTML = `<div class="flex"><img class="avatar" src="${payload.avatarUrl||''}"/><div><div style="font-weight:800">${payload.fullName}</div><div class="small">${payload.phone||''}</div></div></div>`;
+    userTitle.textContent = currentLang==='ar'?'تفاصيل السائق':(currentLang==='de'?'Fahrerdetails':'Driver Details');
+    userDetailsBox.innerHTML = `<div class="flex"><img class="avatar" src="${payload.avatarUrl||''}"/><div><div style="font-weight:800">${payload.fullName||''}</div><div class="small">${payload.phone||''}</div></div></div>`;
   }else{
-    userTitle.textContent = currentLang==='de'?'Restaurantdetails':(currentLang==='en'?'Restaurant Details':'تفاصيل المطعم');
-    userDetailsBox.innerHTML = `<div class="flex"><img class="logo" src="${payload.logoUrl||''}"/><div><div style="font-weight:800">${payload.name}</div><div class="small">${payload.phone||''}</div></div></div>`;
+    userTitle.textContent = currentLang==='ar'?'تفاصيل المطعم':(currentLang==='de'?'Restaurantdetails':'Restaurant Details');
+    userDetailsBox.innerHTML = `<div class="flex"><img class="logo" src="${payload.logoUrl||''}"/><div><div style="font-weight:800">${payload.name||''}</div><div class="small">${payload.phone||''}</div></div></div>`;
   }
-  userModal.classList.add('open'); lucide.createIcons();
+  userModal.classList.add('open');
 }
-document.addEventListener('click',(e)=>{ const ud=e.target.closest('[data-user-details]'); if(ud){ try{ openUserModal(JSON.parse(ud.getAttribute('data-user-details')));}catch(_){} } });
+async function openFleetDriversModal(fleetId){
+  if(!userModal || !userTitle || !userDetailsBox) return;
+  userTitle.textContent = 'Fleet Drivers';
+
+  let rows = [];
+  try{
+    const qy = query(collection(db,'users'), where('role','==','driver'), where('fleetId','==', fleetId), limit(200));
+    const snap = await getDocs(qy);
+    rows = snap.docs.map(d=>({id:d.id, ...d.data()}));
+  }catch(e){
+    const snap = await getDocs(query(collection(db,'users'), where('role','==','driver'), limit(400)));
+    rows = snap.docs.map(d=>({id:d.id, ...d.data()})).filter(u=> (u.fleetId===fleetId));
+  }
+
+  if(!rows.length){
+    userDetailsBox.innerHTML = `<div class="small" style="opacity:.7">No drivers in this fleet.</div>`;
+    userModal.classList.add('open'); return;
+  }
+
+  userDetailsBox.innerHTML = rows.map(u=>{
+    const full = u.fullName || [u.firstName,u.lastName].filter(Boolean).join(' ') || u.name || u.email || u.id;
+    const phone= u.phone || '';
+    return `
+      <div class="drv-row" style="border:1px solid #e5e7eb;border-radius:10px;padding:8px;margin-bottom:8px">
+        <div class="who" style="display:flex;gap:10px;align-items:center;min-width:0">
+          ${u.avatarUrl? `<img class="avatar" src="${u.avatarUrl}">`:`<div class="avatar" style="background:#f3f4f6"></div>`}
+          <div>
+            <div class="name" style="font-weight:800">${full}</div>
+            <div class="meta">${phone}</div>
+          </div>
+        </div>
+        <div class="actions">
+          <button class="btn secondary" data-user-details data-kind="driver" data-id="${u.id}">${t('details')||'Details'}</button>
+        </div>
+      </div>
+    `;
+  }).join('');
+  userModal.classList.add('open');
+}
+
+// Click: open drivers of a fleet
+document.addEventListener('click', (e)=>{
+  const btn = e.target.closest('[data-fleet-drivers]');
+  if(btn){
+    const fid = btn.getAttribute('data-fleet-drivers');
+    openFleetDriversModal(fid);
+  }
+});
+
+document.addEventListener('click', async (e)=>{
+  const ud = e.target.closest('[data-user-details]');
+  if(!ud) return;
+
+  // الشكل الجديد: data-kind + data-id
+  const kind = ud.getAttribute('data-kind');
+  const id   = ud.getAttribute('data-id');
+  if (kind && id) {
+    openEntityDetails(kind, id);
+    return;
+  }
+
+  // fallback للشكل القديم (لو بقي شيء منه)
+  try {
+    const payload = JSON.parse(ud.getAttribute('data-user-details'));
+    openUserModal(payload);
+  } catch(_){}
+});
+
 
 /* ===== Assign Sheet (كما في ملفك) ===== */
 const assignSheet   = $('#assign-sheet');
@@ -1578,6 +2549,113 @@ async function changeStatus(orderId, next){
   if(next==='Geliefert') playSound('geliefert');
   renderAll();
 }
+function drvRowHtml(d){
+  const phone = d.phone || '';
+  const avatar = d.avatarUrl ? `<img class="avatar" src="${d.avatarUrl}">` : `<div class="avatar" style="background:#f3f4f6"></div>`;
+  return `
+    <div class="drv-row">
+      <div class="who" style="display:flex;gap:10px;align-items:center;min-width:0">
+        ${avatar}
+        <div>
+          <div class="name">${d.fullName || d.name || d.email || d.id}</div>
+          <div class="meta">${phone}</div>
+        </div>
+      </div>
+      <div class="actions">
+        <button class="btn secondary"
+                data-user-details
+                data-kind="driver"
+                data-id="${d.id}">
+          ${t('details')||'Details'}
+        </button>
+      </div>
+    </div>`;
+}
+
+
+function drvRowOnlineHtml(d){
+  const base = drvRowHtml(d);
+  return base.replace(
+    '</div></div>',
+    `<button class="btn primary" data-assign-driver="${d.id}">Assign</button></div></div>`
+  );
+}
+
+
+function drvRowPendingHtml(u){
+  const name  = u.firstName ? (u.firstName + (u.lastName? (' ' + u.lastName):'')) : (u.name||u.email||u.id);
+  const phone = u.phone || '';
+  return `
+  <div class="drv-row">
+    <div class="who" style="min-width:0">
+      <div class="name">${name}</div>
+      <div class="meta">${phone}</div>
+    </div>
+    <div class="actions">
+      <button class="btn secondary"
+              data-user-details
+              data-kind="driver"
+              data-id="${u.id}">
+        ${t('details')||'Details'}
+      </button>
+      <button class="btn" data-approve-driver="${u.id}">${t('approval.approve')||'Approve'}</button>
+      <button class="btn secondary" data-reject-driver="${u.id}">${t('approval.reject')||'Reject'}</button>
+    </div>
+  </div>`;
+}
+
+
+function renderDriversColumns(){
+  // All
+  const allEl = document.getElementById('drivers-all');
+  const allCnt= document.getElementById('drv-all-count');
+  if(allEl){
+    allEl.innerHTML = (drivers||[]).map(d=>drvRowHtml(d)).join('') || `<div class="small" style="opacity:.7">—</div>`;
+    if(allCnt) allCnt.textContent = (drivers||[]).length;
+  }
+
+  // Online
+  const onlineEl = document.getElementById('drivers-online');
+  const onlineCnt= document.getElementById('drv-online-count');
+  if(onlineEl){
+    const online = (drivers||[]).filter(d => !!presenceMap[d.id]);
+    onlineEl.innerHTML = online.map(d=>drvRowOnlineHtml(d)).join('') || `<div class="small" style="opacity:.7">—</div>`;
+    if(onlineCnt) onlineCnt.textContent = online.length;
+  }
+
+  // Pending (from pendingDrivers state)
+  const pendEl = document.getElementById('drivers-pending');
+  const pendCnt= document.getElementById('drv-pending-count');
+  if(pendEl){
+    const pendingList = (pendingDrivers||[]).filter(u => String(u.status||'pending').toLowerCase() !== 'rejected');
+    pendEl.innerHTML = pendingList.length ? pendingList.map(u=>drvRowPendingHtml(u)).join('') : `<div class="small" style="opacity:.7">No pending drivers</div>`;
+    if(pendCnt) pendCnt.textContent = pendingList.length;
+  }
+
+  lucide.createIcons?.();
+}
+
+/* استبدال renderDrivers الافتراضية بعارض الأعمدة عند وجود تبويب الأعمدة */
+const __origRenderDrivers = renderDrivers;
+renderDrivers = function(){
+  if(document.getElementById('drivers-cols')){
+    renderDriversColumns();
+  }else{
+    __origRenderDrivers.apply(this, arguments);
+  }
+};
+
+/* زر Assign (يفتح مودال الإسناد الموجود عندك سابقًا) */
+document.addEventListener('click', (e)=>{
+  const btn = e.target.closest('[data-assign-driver]');
+  if(btn){
+    const driverId = btn.getAttribute('data-assign-driver');
+    // إن كان لديك openAssignDriverModal من الخطوة السابقة استخدمه:
+    if(typeof openAssignDriverModal === 'function'){
+      openAssignDriverModal(driverId);
+    }
+  }
+});
 
 /* ===== Search ===== */
 $('#search')?.addEventListener('input',(e)=>{
@@ -1614,8 +2692,11 @@ $('#nav')?.addEventListener('click',(e)=>{
   const tab=btn.getAttribute('data-tab');
   document.querySelectorAll('.tab').forEach(t=>t.hidden=true);
   $('#tab-'+tab).hidden=false;
-  if(tab==='map') initMap();
+    if(tab==='map')   initMap();
+  if(tab==='fleets') renderFleets();
+    if(tab==='fleetx') renderFleetX_Safe();
 });
+
 
 /* ===== Login / Logout Gate ===== */
 const adminAuth = $('#adminAuth');
@@ -1653,6 +2734,23 @@ function detachRealtime(){
   try{ unsubRestaurants?.(); }catch(_){}
   try{ unsubDrivers?.(); }catch(_){}
   try{ presenceUnsub?.(); }catch(_){}
+  try{ unsubPendingFleets?.(); }catch(_){}
+unsubPendingFleets = null;
+pendingFleets = [];
+/* NEW: fleets approved listeners cleanup */
+try{ unsubFleetsApproved?.(); }catch(_){}
+try{ unsubFleetsUsersApproved?.(); }catch(_){}
+unsubFleetsApproved = null;
+unsubFleetsUsersApproved = null;
+__fleets_from_docs = [];
+__fleets_from_users = [];
+fleetsApproved = [];
+
+try{ unsubFleetsApproved?.(); }catch(_){}
+unsubFleetsApproved = null;
+fleetsApproved = [];
+
+
   /* [TAUSSIL-REST-APPROVED-DETACH] */
   try{ unsubRestaurantUsersApproved?.(); }catch(_){}
   unsubOrders=unsubRestaurants=unsubDrivers=presenceUnsub=null;
@@ -1733,6 +2831,57 @@ async function bindRealtimeOnce(){
       renderDrivers();
     }
   );
+/* ===== Fleets (approved) — docs + users fallback ===== */
+if(!unsubFleetsApproved){
+  try{
+    // 3a) من collection('fleet') أو 'fleets' بدون where (نرشّح محليًا)
+    const fleetCol1 = collection(db, 'fleet');
+    const fleetCol2 = collection(db, 'fleets'); // لو كنت تستخدم جمع بصيغة الجمع
+
+    const onSnapDocs = (snap)=>{
+      __fleets_from_docs = snap.docs
+        .map(d => normalizeFleetRow(d.id, d.data()||{}))
+        .filter(Boolean);
+      recomputeFleetsApproved();
+    };
+
+    // اسم المجموعة أيًا كان سيعيد نتيجة (فارغة أو ممتلئة) بدون خطأ
+    unsubFleetsApproved = onSnapshot(query(fleetCol1, limit(500)), onSnapDocs, (err)=>console.warn('fleet listener error:', err?.code||err));
+    // مستمع ثانٍ اختياري لـ 'fleets' إن كانت هي المجموعة الفعلية لديك
+    onSnapshot(query(fleetCol2, limit(500)), onSnapDocs, ()=>{});
+  }catch(e){ console.warn('fleets docs wiring failed', e?.code||e); }
+}
+
+if(!unsubFleetsUsersApproved){
+  try{
+    // 3b) fallback: مستخدمون role=fleet, approved=true
+    unsubFleetsUsersApproved = onSnapshot(
+      query(collection(db,'users'), where('role','==','fleet'), where('approved','==', true), limit(500)),
+      (snap)=>{
+        __fleets_from_users = snap.docs.map(d=>{
+          const u  = d.data()||{};
+          const app= u.fleetApplication || {};
+          // نولّد شكل مماثل لوثائق fleet
+          return normalizeFleetRow(d.id, {
+            approved: true,
+            email: u.email || '',
+            company: {
+              name: app.company?.name || u.company?.name || u.name || u.email || d.id,
+              ownerFirst: app.company?.ownerFirst || '',
+              ownerLast:  app.company?.ownerLast  || '',
+              phone:      app.company?.phone || u.phone || ''
+            },
+            address: app.address || { city: app.targetCity || '' },
+            driversCount: app.driversCount || 0
+          });
+        }).filter(Boolean);
+        recomputeFleetsApproved();
+      },
+      (err)=> console.warn('fleets users listener error:', err?.code||err)
+    );
+  }catch(e){ console.warn('fleets users wiring failed', e?.code||e); }
+}
+
 
   presenceUnsub = onValue(rRef(rtdb,'drivers_presence'), (snap)=>{
     const val=snap.val()||{}; const m={};
@@ -1960,6 +3109,9 @@ let pendingRestaurantUsers = [];   // users with role == 'restaurant' & approved
 let pendingRestaurantDocs  = [];   // restaurants collection with approved == false
 
 let unsubPendingDrv=null, unsubPendingRestUsers=null, unsubPendingRestDocs=null;
+// === FLEET pending state ===
+let pendingFleets = [];
+let unsubPendingFleets = null;
 
 /* UI containers (injected above drivers/restaurants grids) */
 function ensurePendingUI(){
@@ -1993,6 +3145,21 @@ function ensurePendingUI(){
     rgrid.parentElement?.insertBefore(wrap, rgrid);
   }
 }
+// === Fleet lead approvals box ===
+const fleetsGridAnchor = document.getElementById('drivers-grid') || document.getElementById('restaurants-grid');
+if (fleetsGridAnchor && !document.getElementById('pending-fleets-wrap')) {
+  const wrap = document.createElement('div');
+  wrap.id = 'pending-fleets-wrap';
+  wrap.style.cssText='margin:10px 0; padding:10px; border:1px solid #e5e7eb; border-radius:10px; background:#fff';
+  wrap.innerHTML = `
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+      <strong>Fleet lead approvals</strong>
+      <span id="pending-fleets-count" class="badge gray">0</span>
+    </div>
+    <div id="pending-fleets" style="display:grid; gap:8px"></div>
+  `;
+  fleetsGridAnchor.parentElement?.insertBefore(wrap, fleetsGridAnchor);
+}
 
 /* ===== [TAUSSIL-APPROVAL-UI-DRIVERS-START] ===== */
 function renderPendingDrivers(){
@@ -2020,54 +3187,382 @@ function renderPendingDrivers(){
 
 /* ===== [TAUSSIL-APPROVAL-UI-RESTS-START] ===== */
 function renderPendingRestaurants(){
-  const list = document.getElementById('pending-restaurants');
-  const cnt  = document.getElementById('pending-restaurants-count');
+  const list = document.getElementById('rest-pending-list');
+  const cnt  = document.getElementById('rest-pend-count');
   if(!list || !cnt) return;
 
-  const merged = [
-    ...pendingRestaurantUsers
-      .filter(u => String(u.status||'pending').toLowerCase() !== 'rejected')
-      .map(u=>({ kind:'user', id:u.id, name:u.name||u.displayName||u.email||u.id, phone:u.phone||'', email:u.email||'' })),
-    ...pendingRestaurantDocs
-      .filter(r => String(r.status||'pending').toLowerCase() !== 'rejected')
-      .map(r=>({ kind:'doc',  id:r.id, name:r.name||r.id, phone:r.phone||'',  email:r.email||'' }))
-  ];
+  // نجمع من مصدرين: users(role=restaurant, approved=false) + restaurants(approved=false)
+  const users = (pendingRestaurantUsers||[]).map(u=>({
+    kind: 'user',
+    id: u.id,
+    name: u.name || u.displayName || u.email || u.id,
+    phone: u.phone || '',
+    email: u.email || '',
+    address: u.address_text || u.address || '',
+    createdAt: u.createdAt || null
+  }));
 
-  cnt.textContent = merged.length;
-  list.innerHTML = merged.length? merged.map(x=>`
-    <div class="tr" style="display:flex;align-items:center;gap:10px;border:1px solid #e5e7eb;border-radius:10px;padding:8px">
-      <img class="logo" style="width:26px;height:26px;object-fit:cover;border-radius:6px;background:#f3f4f6">
-      <div style="flex:1;min-width:0">
-        <div style="font-weight:700">${x.name}</div>
-        <div class="small" style="opacity:.8">${x.phone||x.email||''}</div>
-      </div>
-      <div style="display:flex;gap:6px">
-        ${x.kind==='user'
-          ? `<button class="btn"           data-approve-restaurant-user="${x.id}" style="height:32px">${t('approval.approve')}</button>
-             <button class="btn secondary" data-reject-restaurant-user="${x.id}"  style="height:32px">${t('approval.reject')}</button>`
-          : `<button class="btn"           data-approve-restaurant-doc="${x.id}"  style="height:32px">${t('approval.approve')}</button>
-             <button class="btn secondary" data-reject-restaurant-doc="${x.id}"   style="height:32px">${t('approval.reject')}</button>`
+  const docs = (pendingRestaurantDocs||[]).map(r=>({
+    kind: 'doc',
+    id: r.id,
+    name: r.name || r.id,
+    phone: r.phone || '',
+    email: r.email || '',
+    address: r.address_text || r.address || '',
+    createdAt: r.createdAt || null
+  }));
+
+  let rows = users.concat(docs);
+
+  // فلاتر اليمين
+  const fName = (document.getElementById('rest-pend-name')?.value||'').trim().toLowerCase();
+  const fCity = (document.getElementById('rest-pend-city')?.value||'').trim().toLowerCase();
+  const fFrom = document.getElementById('rest-pend-from')?.value || '';
+  const fTo   = document.getElementById('rest-pend-to')?.value   || '';
+  const fromD = fFrom ? new Date(fFrom) : null;
+  const toD   = fTo   ? new Date(fTo+'T23:59:59') : null;
+
+  const getCity = (row)=>{
+    const txt = row.address || '';
+    const parts = String(txt).split(',').map(s=>s.trim());
+    return (parts[parts.length-1] || '').toLowerCase();
+  };
+  const getCreatedTs = (row)=>{
+    const ts = row.createdAt || null;
+    return ts?.toDate ? ts.toDate() : (ts instanceof Date ? ts : null);
+  };
+
+  rows = rows
+    .filter(x=>{
+      const nm = String(x.name||'').toLowerCase();
+      const city = getCity(x);
+      const inName = !fName || nm.includes(fName);
+      const inCity = !fCity || city.includes(fCity);
+      const ct = getCreatedTs(x);
+      const inDate = (!fromD && !toD) ||
+                     (!ct ? true :
+                       ((!fromD || ct>=fromD) && (!toD || ct<=toD)));
+      // استثناء من تم رفضهم
+      const status = String(x.status||'pending').toLowerCase();
+      const notRejected = status !== 'rejected';
+      return inName && inCity && inDate && notRejected;
+    });
+
+  cnt.textContent = rows.length;
+
+  list.innerHTML = rows.length ? rows.map(x=>`
+    <div class="card" style="padding:10px">
+      <div class="flex">
+        <div class="logo" style="width:26px;height:26px;border-radius:6px;background:#f3f4f6"></div>
+        <div style="min-width:0">
+          <div style="font-weight:800;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${x.name}</div>
+          <div class="small" style="opacity:.8">${x.phone || x.email || ''}</div>
+          <div class="small" style="opacity:.8">${x.address || ''}</div>
+        </div>
+        <span class="right"></span>
+        ${
+          x.kind==='user'
+          ? `
+            <button class="btn"           data-approve-restaurant-user="${x.id}" style="height:32px">Approve</button>
+            <button class="btn secondary" data-reject-restaurant-user="${x.id}"  style="height:32px">Reject</button>
+          `
+          : `
+            <button class="btn"           data-approve-restaurant-doc="${x.id}"  style="height:32px">Approve</button>
+            <button class="btn secondary" data-reject-restaurant-doc="${x.id}"   style="height:32px">Reject</button>
+          `
         }
       </div>
     </div>
-  `).join('') : `<div class="small" style="opacity:.7">No pending restaurants</div>`;
+  `).join('') : `<div class="small" style="opacity:.7">No pending restaurants.</div>`;
+}
+// Approved filters
+['rest-appr-name','rest-appr-city','rest-appr-from','rest-appr-to']
+  .forEach(id => document.getElementById(id)?.addEventListener('input', renderRestaurants));
+
+// Pending filters
+['rest-pend-name','rest-pend-city','rest-pend-from','rest-pend-to']
+  .forEach(id => document.getElementById(id)?.addEventListener('input', renderPendingRestaurants));
+  // Fleets filters
+['fleet-appr-name','fleet-appr-city','fleet-pend-name','fleet-pend-city']
+  .forEach(id => document.getElementById(id)?.addEventListener('input', renderFleets));
+
+// Splitter drag (Restaurants tab)
+(function enableRestaurantSplitter(){
+  const host = document.getElementById('rest-split');
+  const sash = document.getElementById('rest-sash');
+  if(!host || !sash) return;
+
+  let down=false, startX=0, startLeft=0, total=0;
+
+  function parseCols(){
+    const cs = getComputedStyle(host).gridTemplateColumns.split(' ');
+    // نتوقع: [colLeft, '6px', colRight]
+    return cs;
+  }
+
+  sash.addEventListener('pointerdown', (e)=>{
+    down = true;
+    sash.setPointerCapture(e.pointerId);
+    startX = e.clientX;
+    const rect = host.getBoundingClientRect();
+    total = rect.width;
+    // احصل على عرض العمود الأيسر الحالي
+    const leftEl = host.children[0];
+    startLeft = leftEl.getBoundingClientRect().width;
+  });
+
+  sash.addEventListener('pointermove', (e)=>{
+    if(!down) return;
+    const dx = e.clientX - startX;
+    let newLeft = Math.max(200, Math.min(total-200, startLeft + dx)); // حدود دنيا
+    const leftFr = (newLeft/total)*100;
+    host.style.gridTemplateColumns = `${leftFr}% 6px ${100-leftFr}%`;
+  });
+
+  const stop = ()=>{ down=false; try{ sash.releasePointerCapture?.(); }catch(_){ } };
+  sash.addEventListener('pointerup', stop);
+  sash.addEventListener('pointercancel', stop);
+})();
+// Splitter drag (Fleets tab)
+(function enableFleetSplitter(){
+  const host = document.getElementById('fleet-split');
+  const sash = document.getElementById('fleet-sash');
+  if(!host || !sash) return;
+
+  let down=false, startX=0, startLeft=0, total=0;
+
+  sash.addEventListener('pointerdown', (e)=>{
+    down = true;
+    sash.setPointerCapture(e.pointerId);
+    startX = e.clientX;
+    const rect = host.getBoundingClientRect();
+    total = rect.width;
+    const leftEl = host.children[0];
+    startLeft = leftEl.getBoundingClientRect().width;
+  });
+
+  sash.addEventListener('pointermove', (e)=>{
+    if(!down) return;
+    const dx = e.clientX - startX;
+    let newLeft = Math.max(200, Math.min(total-200, startLeft + dx));
+    const leftFr = (newLeft/total)*100;
+    host.style.gridTemplateColumns = `${leftFr}% 6px ${100-leftFr}%`;
+  });
+
+  const stop = ()=>{ down=false; try{ sash.releasePointerCapture?.(); }catch(_){ } };
+  sash.addEventListener('pointerup', stop);
+  sash.addEventListener('pointercancel', stop);
+})();
+
+// === Fleet pending renderer ===
+function renderPendingFleets(){
+  const list = document.getElementById('pending-fleets');
+  const cnt  = document.getElementById('pending-fleets-count');
+  if(!list || !cnt) return;
+
+  const rows = (pendingFleets||[]);
+  cnt.textContent = rows.length;
+
+  list.innerHTML = rows.length ? rows.map(u => {
+    const app = u.fleetApplication || {};
+    const company = app.company || {};
+    const addr = app.address || {};
+    const orgName = company.name || '(—)';
+    const owner   = [company.ownerFirst||'', company.ownerLast||''].join(' ').trim();
+    const email   = u.email || company.email || '';
+    const phone   = company.phone || '';
+    const city    = addr.city || '';
+    const drivers = Number(app.driversCount||0);
+
+    return `
+      <div class="tr" style="display:flex;align-items:center;gap:10px;border:1px solid #e5e7eb;border-radius:10px;padding:8px">
+        <div style="flex:1;min-width:0">
+          <div style="font-weight:700">${orgName}${owner? ' — '+owner : ''}</div>
+          <div class="small" style="opacity:.8">${email}${phone? ' · '+phone : ''}</div>
+          <div class="small" style="opacity:.8">${city} • Drivers: ${drivers}</div>
+        </div>
+        <div style="display:flex;gap:6px">
+          <button class="btn"           data-approve-fleet="${u.id}" style="height:32px">${t('approval.approve')||'Approve'}</button>
+          <button class="btn secondary" data-reject-fleet="${u.id}"  style="height:32px">${t('approval.reject')||'Reject'}</button>
+        </div>
+      </div>
+    `;
+  }).join('') : `<div class="small" style="opacity:.7">No pending fleet leads</div>`;
+}
+function renderFleetsApproved(){
+  const list = document.getElementById('fleet-approved-list');
+  const cnt  = document.getElementById('fleet-appr-count');
+  if(!list || !cnt) return;
+  const fName = (document.getElementById('fleet-appr-name')?.value||'').trim().toLowerCase();
+  const fCity = (document.getElementById('fleet-appr-city')?.value||'').trim().toLowerCase();
+  const rows = (fleetsApproved||[]).filter(f=>{
+    const inName = !fName || String(f.name||'').toLowerCase().includes(fName);
+    const inCity = !fCity || String(f.city||'').toLowerCase().includes(fCity);
+    return inName && inCity;
+  });
+  cnt.textContent = rows.length;
+  list.innerHTML = rows.length ? rows.map(f=>`
+    <div class="card" style="padding:10px">
+      <div class="flex" style="align-items:flex-start">
+        <div style="flex:1;min-width:0">
+          <div style="font-weight:800;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${f.name}</div>
+          <div class="small" style="opacity:.8">${[f.owner, f.phone].filter(Boolean).join(' · ')}</div>
+          <div class="small" style="opacity:.8">${[f.email, f.city].filter(Boolean).join(' · ')}</div>
+        </div>
+        <span class="right"></span>
+        <div class="row" style="gap:6px;flex-wrap:wrap">
+          <button class="btn secondary" data-user-details data-kind="fleet" data-id="${f.id}">${t('details')||'Details'}</button>
+          <button class="btn" data-fleet-drivers="${f.id}">Drivers</button>
+        </div>
+      </div>
+    </div>
+  `).join('') : `<div class="small" style="opacity:.7">No approved fleets.</div>`;
+}
+function renderFleetsPending(){
+  const list = document.getElementById('fleet-pending-list');
+  const cnt  = document.getElementById('fleet-pend-count');
+  if(!list || !cnt) return;
+  const fName = (document.getElementById('fleet-pend-name')?.value||'').trim().toLowerCase();
+  const fCity = (document.getElementById('fleet-pend-city')?.value||'').trim().toLowerCase();
+  const rows = (pendingFleets||[]).filter(u=>{
+    const app = u.fleetApplication || {};
+    const company = app.company || {};
+    const addr = app.address || {};
+    const name = company.name || u.name || u.email || u.id;
+    const city = addr.city || app.targetCity || '';
+    const inName = !fName || String(name||'').toLowerCase().includes(fName);
+    const inCity = !fCity || String(city||'').toLowerCase().includes(fCity);
+    const notRejected = String(u.status||'pending').toLowerCase() !== 'rejected';
+    return inName && inCity && notRejected;
+  });
+  cnt.textContent = rows.length;
+  list.innerHTML = rows.length ? rows.map(u=>{
+    const app = u.fleetApplication || {};
+    const company = app.company || {};
+    const addr = app.address || {};
+    const orgName = company.name || u.name || u.email || u.id;
+    const owner   = [company.ownerFirst||'', company.ownerLast||''].join(' ').trim();
+    const email   = u.email || company.email || '';
+    const phone   = company.phone || '';
+    const city    = addr.city || app.targetCity || '';
+    const drivers = Number(app.driversCount||0);
+    return `
+      <div class="card" style="padding:10px">
+        <div class="flex">
+          <div style="flex:1;min-width:0">
+            <div style="font-weight:800;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${orgName}${owner? ' — '+owner : ''}</div>
+            <div class="small" style="opacity:.8">${[email, phone].filter(Boolean).join(' · ')}</div>
+            <div class="small" style="opacity:.8">${city} • Drivers: ${drivers}</div>
+          </div>
+          <span class="right"></span>
+          <div class="row" style="gap:6px;flex-wrap:wrap">
+            <button class="btn"           data-approve-fleet="${u.id}">${t('approval.approve')||'Approve'}</button>
+            <button class="btn secondary" data-reject-fleet="${u.id}">${t('approval.reject')||'Reject'}</button>
+            <button class="btn secondary" data-user-details data-kind="fleet" data-id="${u.id}">${t('details')||'Details'}</button>
+          </div>
+        </div>
+      </div>
+    `;
+  }).join('') : `<div class="small" style="opacity:.7">No pending fleets.</div>`;
+}
+function renderFleets(){
+  if(!document.getElementById('tab-fleets')) return;
+  renderFleetsApproved();
+  renderFleetsPending();
 }
 /* ===== [TAUSSIL-APPROVAL-UI-RESTS-END] ===== */
-
 /* ===== Approve/Reject actions (WRITE BOTH approved + status) ===== */
 /* ===== [TAUSSIL-APPROVAL-REPO-START] ===== */
 async function approveDriver(uid){
   const adminUid = auth.currentUser?.uid || null;
-  const payload = {
+  const basePayload = {
     approved: true,
     status: 'active',
     approvedAt: serverTimestamp(),
     approvedBy: adminUid,
     updatedAt: serverTimestamp()
   };
-  try{ await updateDoc(doc(db,'users', uid), payload); }
-  catch(_){ await setDoc(doc(db,'users', uid), payload, { merge:true }); }
+
+  try {
+    // (1) فعّل المستخدم
+    try { await updateDoc(doc(db,'users', uid), basePayload); }
+    catch(_) { await setDoc(doc(db,'users', uid), basePayload, { merge:true }); }
+
+    // (2) اقرأ المستخدم لمعرفة الإيميل وربما fleetId
+    const uSnap = await getDoc(doc(db,'users', uid));
+    if(!uSnap.exists()){
+      console.warn('approveDriver: user not found', uid);
+      alert('لم يتم العثور على المستخدم.');
+      return;
+    }
+    const u = uSnap.data() || {};
+    let fleetId = u.fleetId || null;
+
+    // (3) إن لم يوجد fleetId على المستخدم، استخرجه من driversIndex (بالبريد)
+    if(!fleetId){
+      const eLower = emailNorm(u.email || '');
+      if(!eLower){
+        alert('لا يوجد fleetId ولا بريد على المستخدم. تعذر تحديد الأسطول.');
+        return;
+      }
+      const key = await sha256Hex(eLower);
+      const idxSnap = await getDoc(doc(db,'driversIndex', key));
+      if(idxSnap.exists()){
+        const idx = idxSnap.data() || {};
+        if (idx.fleetId) fleetId = idx.fleetId;
+      }
+      if(!fleetId){
+        alert('تعذر تحديد الأسطول من driversIndex. تأكد أن الدعوة أنشأت driversIndex بشكل صحيح.');
+        return;
+      }
+      // حفظ fleetId على المستخدم لمرات قادمة
+      await setDoc(doc(db,'users', uid), { fleetId, updatedAt: serverTimestamp() }, { merge:true });
+    }
+
+    // (4) مرآة السائق تحت وثيقة الأسطول
+    await setDoc(
+      doc(db,'fleet', fleetId, 'drivers', uid),
+      {
+        uid,
+        firstName: u.firstName ?? null,
+        lastName:  u.lastName  ?? null,
+        phone:     u.phone     ?? null,
+        email:     u.email     ?? null,
+        approved:  true,
+        active:    true,
+        deleted:   false,
+        createdAt: u.createdAt ?? serverTimestamp(),
+        updatedAt: serverTimestamp()
+      },
+      { merge:true }
+    );
+
+    // (5) حدّث driversIndex → active
+    const eLower = emailNorm(u.email || '');
+    if(eLower){
+      const key = await sha256Hex(eLower);
+      await setDoc(
+        doc(db,'driversIndex', key),
+        {
+          emailLower: eLower,
+          fleetId,
+          uid,
+          state: 'active',
+          lock: { type:'approval', ref:`fleet/${fleetId}/drivers/${uid}`, updatedAt: serverTimestamp() }
+        },
+        { merge:true }
+      );
+    }
+
+    console.log('approveDriver done → fleet/%s/drivers/%s', fleetId, uid);
+    alert('تمت الموافقة وربط السائق بأسطوله بنجاح.');
+  } catch (e) {
+    console.error('approveDriver failed:', (e && e.code) || e);
+    alert('فشل التفعيل: ' + (e?.code || e?.message || e));
+  }
 }
+
+
 async function rejectDriver(uid){
   const adminUid = auth.currentUser?.uid || null;
   const payload = {
@@ -2080,7 +3575,6 @@ async function rejectDriver(uid){
   try{ await updateDoc(doc(db,'users', uid), payload); }
   catch(_){ await setDoc(doc(db,'users', uid), payload, { merge:true }); }
 }
-
 async function approveRestaurantUser(uid){
   const adminUid = auth.currentUser?.uid || null;
   const payload = {
@@ -2124,7 +3618,324 @@ async function approveRestaurantUser(uid){
   }
   // END
 }
+// ===== Helpers: email normalize + sha256 (للـ driversIndex) =====
+const emailNorm = (s)=> String(s||'').trim().toLowerCase();
+async function sha256Hex(str){
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
+  return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+}
 
+/* ===================== Fleet Ops (Bulk) — BEGIN ===================== */
+/* state (isolated) */
+const fleetx = {
+  selected: new Set(),   // order IDs
+  lastRenderTag: 0
+};
+const $fx = (s)=>document.querySelector(s);
+
+/* small utils (isolated) */
+function fleetx_normCity(txt){
+  return String(txt||'').trim().toLowerCase();
+}
+function fleetx_cityFromOrder(o){
+  const a = o?.restaurant?.address_text || o?.restaurant?.addressText || '';
+  const parts = String(a).split(',').map(s=>s.trim());
+  return parts.length ? parts[parts.length-1] : '';
+}
+function fleetx_orderCode(o){
+  return (o.nr!=null? '#'+o.nr : (o.shortCode? '#'+o.shortCode : '#'+(o.id||'—')));
+}
+function fleetx_updateSelectedBadge(){
+  const el = $fx('#fleetx-selected');
+  if(el) el.textContent = `${fleetx.selected.size} selected`;
+}
+function fleetx_resetSelection(){
+  fleetx.selected.clear();
+  const box = $fx('#fleetx-orders');
+  if(box) box.querySelectorAll('input[type=checkbox][data-oid]').forEach(ch=> ch.checked=false);
+  const all = $fx('#fleetx-select-all'); if(all) all.checked=false;
+  fleetx_updateSelectedBadge();
+}
+
+/* filters read */
+function fleetx_filters(){
+  return {
+    city: fleetx_normCity($fx('#fleetx-city')?.value||''),
+    status: ($fx('#fleetx-status')?.value || 'Bearbeitung'),
+    hideAssigned: !!$fx('#fleetx-hide-assigned')?.checked,
+  };
+}
+
+/* data builders (read from existing global state: orders, fleetsApproved) */
+function fleetx_visibleOrders(){
+  const f = fleetx_filters();
+  let rows = Array.isArray(orders) ? orders.slice() : [];
+  // status filter
+  rows = rows.filter(o => String(o.status||'').toLowerCase() === f.status.toLowerCase());
+  // city filter (optional)
+  if(f.city){
+    rows = rows.filter(o => fleetx_normCity(fleetx_cityFromOrder(o)).includes(f.city));
+  }
+  // hide assigned to a fleet
+  if(f.hideAssigned){
+    rows = rows.filter(o => !o.fleet || !o.fleet.id);
+  }
+  // newest first (already sorted globally, but keep)
+  return rows;
+}
+
+function fleetx_visibleFleets(){
+  // fleetsApproved موجودة مسبقًا (موحّدة من وثائق ومستخدمين)
+  return Array.isArray(fleetsApproved) ? fleetsApproved.slice() : [];
+}
+
+/* rendering */
+function fleetx_renderOrders(){
+  const host = $fx('#fleetx-orders'); if(!host) return;
+  const rows = fleetx_visibleOrders();
+  if(!rows.length){
+    host.innerHTML = `<div class="small" style="opacity:.7" data-i18n="fleetx.emptyOrders">لا توجد طلبات مطابقة.</div>`;
+    return;
+  }
+  host.innerHTML = rows.map(o=>{
+    const rid = o?.restaurant?.id || '';
+    const name= o?.restaurant?.name || rid || '—';
+    const city= fleetx_cityFromOrder(o) || '—';
+    const plat= Array.isArray(o.platform)? o.platform.join(' / ') : (o.platform||'—');
+    const qty = Number(o.qty||0);
+    const fee = Number(o.price||0);
+    const assigned = o?.fleet?.name ? `<span class="chip">Fleet: ${o.fleet.name}</span>` : '';
+    return `
+      <div class="fx-row">
+        <input type="checkbox" data-oid="${o.id}">
+        <div class="mono" style="min-width:84px">${fleetx_orderCode(o)}</div>
+        <div style="flex:1;min-width:0">
+          <div style="font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${name}</div>
+          <div class="small" style="opacity:.8">${city} · ${plat} ${assigned}</div>
+        </div>
+        <div class="badge">${'x'+qty}</div>
+        <div class="mono" style="min-width:70px;text-align:right">${fee.toFixed? fee.toFixed(2): fee} €</div>
+      </div>`;
+  }).join('');
+
+  // bind selection
+  host.querySelectorAll('input[type=checkbox][data-oid]').forEach(ch=>{
+    ch.onchange = ()=> {
+      const id = ch.getAttribute('data-oid');
+      if(ch.checked) fleetx.selected.add(id); else fleetx.selected.delete(id);
+      fleetx_updateSelectedBadge();
+    };
+  });
+}
+
+function fleetx_renderFleets(){
+  const host = $fx('#fleetx-fleets'); if(!host) return;
+  const rows = fleetx_visibleFleets();
+  const cnt  = $fx('#fleetx-fleet-count'); if(cnt) cnt.textContent = rows.length;
+
+  // عداد الطلبات المعيّنة لكل أسطول (عملي، محليًا)
+  const assignedMap = new Map();
+  (Array.isArray(orders)? orders: []).forEach(o=>{
+    const fid = o?.fleet?.id;
+    if(!fid) return;
+    assignedMap.set(fid, 1 + (assignedMap.get(fid)||0));
+  });
+
+  // تعبئة قائمة اختيار الأسطول في الشريط
+  const sel = $fx('#fleetx-fleet-select');
+  if(sel && sel.options.length<=1){
+    rows.forEach(f=>{
+      const opt = document.createElement('option');
+      opt.value = f.id; opt.textContent = `${f.name || f.id}${f.city? (' · '+f.city):''}`;
+      sel.appendChild(opt);
+    });
+  }
+
+  if(!rows.length){
+    host.innerHTML = `<div class="small" style="opacity:.7" data-i18n="fleetx.emptyFleets">لا توجد أساطيل معتمدة.</div>`;
+    return;
+  }
+
+  host.innerHTML = rows.map(f=>{
+    const asg = assignedMap.get(f.id)||0;
+    return `
+      <div class="fx-row" style="justify-content:space-between">
+        <div style="min-width:0">
+          <div style="font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${f.name||f.id}</div>
+          <div class="small" style="opacity:.8">${[f.city, f.email, f.phone].filter(Boolean).join(' · ')}</div>
+        </div>
+        <div class="row" style="gap:6px;align-items:center">
+          <span class="badge">Orders: ${asg}</span>
+          <button class="btn secondary" data-user-details data-kind="fleet" data-id="${f.id}">${t('details')||'Details'}</button>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+function renderFleetX(){
+  if($fx('#tab-fleetx')?.hidden) return;  // لا ترسم إن التبويب مخفي
+  fleetx_renderOrders();
+  fleetx_renderFleets();
+  fleetx_updateSelectedBadge();
+  // icons
+  try{ lucide.createIcons(); }catch(_){}
+}
+
+/* actions */
+async function fleetx_assignSelected(){
+  const ids = [...fleetx.selected];
+  if(!ids.length){ alert('No orders selected'); return; }
+  const sel = $fx('#fleetx-fleet-select');
+  const fid = sel?.value || '';
+  if(!fid){ alert('Select a fleet'); return; }
+
+  const f = (Array.isArray(fleetsApproved)? fleetsApproved: []).find(x=>x.id===fid);
+  const payload = {
+    fleet: { id: fid, name: f?.name || null, city: f?.city || null },
+    updatedAt: serverTimestamp()
+  };
+
+  // تعيين جماعي (بدون writeBatch لتجنّب تعديل الاستيرادات)
+  await Promise.all(ids.map(id => 
+    updateDoc(doc(db,'orders', id), payload).catch(()=>
+      setDoc(doc(db,'orders', id), payload, {merge:true})
+    )
+  ));
+  fleetx_resetSelection();
+  renderFleetX();
+}
+
+async function fleetx_unassignSelected(){
+  const ids = [...fleetx.selected];
+  if(!ids.length){ alert('No orders selected'); return; }
+
+  // نستخدم fleet:null (لا نضيف deleteField لتجنّب تغيير الاستيرادات)
+  const payload = { fleet: null, updatedAt: serverTimestamp() };
+  await Promise.all(ids.map(id => 
+    updateDoc(doc(db,'orders', id), payload).catch(()=>
+      setDoc(doc(db,'orders', id), payload, {merge:true})
+    )
+  ));
+  fleetx_resetSelection();
+  renderFleetX();
+}
+
+function fleetx_roundRobin(arr, k){ // مولّد indices 0..k-1
+  let i=0; return ()=> { if(!k) return -1; const r = arr[i%k]; i++; return r; };
+}
+
+async function fleetx_autoDistribute(){
+  // 1) اختر الطلبات المرئية كمدخل (مع احترام الفلاتر)
+  const rows = fleetx_visibleOrders();
+  if(!rows.length){ alert('No orders to distribute'); return; }
+
+  // 2) جهّز الأساطيل حسب المدينة
+  const fleets = fleetx_visibleFleets();
+  if(!fleets.length){ alert('No fleets available'); return; }
+
+  // group orders by city
+  const byCity = new Map();
+  rows.forEach(o=>{
+    const c = fleetx_normCity(fleetx_cityFromOrder(o));
+    if(!byCity.has(c)) byCity.set(c, []);
+    byCity.get(c).push(o);
+  });
+
+  // 3) توزيع بسيط Round-Robin داخل كل مدينة
+  const plan = []; // {orderId, fleet}
+  const citySumm = []; // preview summary
+  byCity.forEach((ordersInCity, cityKey)=>{
+    const cityFleets = fleets.filter(f => fleetx_normCity(f.city) === cityKey);
+    const pool = cityFleets.length ? cityFleets : fleets; // fallback: كل الأساطيل
+    const take = fleetx_roundRobin(pool, pool.length);
+    const counts = new Map();
+    ordersInCity.forEach(o=>{
+      const f = take();
+      if(!f) return;
+      plan.push({ oid:o.id, fleet: f });
+      counts.set(f.id, 1 + (counts.get(f.id)||0));
+    });
+    // summary
+    const line = `${cityKey || '(no city)'} → ` + (pool.length
+      ? [...counts.entries()].map(([fid,cnt])=>{
+          const fn = pool.find(x=>x.id===fid)?.name || fid;
+          return `${fn}: ${cnt}`;
+        }).join(' · ')
+      : 'No fleets');
+    citySumm.push(line);
+  });
+
+  if(!plan.length){ alert('No distribution could be prepared'); return; }
+
+  // 4) تأكيد بسيط
+  const ok = confirm(`Auto-distribute preview:\n\n` + citySumm.join('\n') + `\n\nApply?`);
+  if(!ok) return;
+
+  // 5) تنفيذ
+  await Promise.all(plan.map(p=>{
+    const payload = {
+      fleet: { id: p.fleet.id, name: p.fleet.name || null, city: p.fleet.city || null },
+      updatedAt: serverTimestamp()
+    };
+    return updateDoc(doc(db,'orders', p.oid), payload).catch(()=>
+      setDoc(doc(db,'orders', p.oid), payload, {merge:true})
+    );
+  }));
+
+  fleetx_resetSelection();
+  renderFleetX();
+}
+
+/* events wiring (isolated) */
+['#fleetx-city','#fleetx-status','#fleetx-hide-assigned'].forEach(sel=>{
+  document.addEventListener('input', (e)=>{
+    if(e.target && e.target.matches(sel)) renderFleetX();
+  });
+});
+document.addEventListener('change', (e)=>{
+  if(e.target && e.target.matches('#fleetx-select-all')){
+    const check = e.target.checked;
+    const box = $fx('#fleetx-orders');
+    if(box){
+      box.querySelectorAll('input[type=checkbox][data-oid]').forEach(ch=>{
+        ch.checked = check;
+        const id = ch.getAttribute('data-oid');
+        if(check) fleetx.selected.add(id); else fleetx.selected.delete(id);
+      });
+    }
+    fleetx_updateSelectedBadge();
+  }
+});
+
+$fx('#fleetx-assign')   ?.addEventListener('click', fleetx_assignSelected);
+$fx('#fleetx-unassign') ?.addEventListener('click', fleetx_unassignSelected);
+$fx('#fleetx-auto')     ?.addEventListener('click', fleetx_autoDistribute);
+
+/* splitter drag (same pattern as others) */
+(function fleetx_enableSplitter(){
+  const host = $fx('#fleetx-grid'); const sash = host?.querySelector('.fleetx-sash');
+  if(!host || !sash) return;
+  let down=false, startX=0, startLeft=0, total=0;
+  sash.addEventListener('pointerdown', (e)=>{
+    down=true; sash.setPointerCapture(e.pointerId);
+    startX=e.clientX; const rect=host.getBoundingClientRect(); total=rect.width;
+    const leftEl = host.children[0]; startLeft = leftEl.getBoundingClientRect().width;
+  });
+  sash.addEventListener('pointermove', (e)=>{
+    if(!down) return; const dx=e.clientX-startX;
+    let newLeft = Math.max(200, Math.min(total-200, startLeft+dx));
+    const leftFr=(newLeft/total)*100; host.style.gridTemplateColumns = `${leftFr}% 6px ${100-leftFr}%`;
+  });
+  const stop=()=>{ down=false; try{sash.releasePointerCapture?.();}catch(_){ } };
+  sash.addEventListener('pointerup', stop);
+  sash.addEventListener('pointercancel', stop);
+})();
+
+/* expose renderer into global cycle safely */
+function renderFleetX_Safe(){
+  try{ renderFleetX(); }catch(_){}
+}
+/* ====================== Fleet Ops (Bulk) — END ====================== */
 
 async function rejectRestaurantUser(uid){
   const adminUid = auth.currentUser?.uid || null;
@@ -2138,7 +3949,6 @@ async function rejectRestaurantUser(uid){
   try{ await updateDoc(doc(db,'users', uid), payload); }
   catch(_){ await setDoc(doc(db,'users', uid), payload, { merge:true }); }
 }
-
 async function approveRestaurantDoc(id){
   const adminUid = auth.currentUser?.uid || null;
   const payload = {
@@ -2163,49 +3973,111 @@ async function rejectRestaurantDoc(id){
   try{ await updateDoc(doc(db,'restaurants', id), payload); }
   catch(_){ await setDoc(doc(db,'restaurants', id), payload, { merge:true }); }
 }
+// === Fleet lead approval actions ===
+async function approveFleet(uid){
+  try{
+    const userRef = doc(db,'users', uid);
+    const uSnap = await getDoc(userRef);
+    if(!uSnap.exists()){ alert('User not found'); return; }
+    const u = uSnap.data() || {};
+    const app = u.fleetApplication || {};
+    const company = app.company || null;
+    const address = app.address || null;
+    // إنشاء/دمج بطاقة الأسطول
+    await setDoc(doc(db,'fleet', uid), {
+      uid,
+      email: u.email || (company && company.email) || null,
+      status: 'active',
+      driversCount: Number(app.driversCount||0),
+      company,
+      address,
+      targetCity: app.targetCity || null,
+      createdAt: u.createdAt || serverTimestamp(),
+      approvedAt: serverTimestamp(),
+      updatedAt: serverTimestamp()
+    }, { merge:true });
+    // تحديث المستخدم للموافقة
+    await updateDoc(userRef, {
+      approved: true,
+      status: 'active',
+      updatedAt: serverTimestamp()
+    });
+    alert('Fleet approved.');
+  }catch(e){
+    console.error(e);
+    alert('Approve failed: ' + (e?.message || e));
+  }
+}
+async function rejectFleet(uid){
+  try{
+    await setDoc(doc(db,'users', uid), {
+      approved: false,
+      status: 'rejected',
+      rejectedAt: serverTimestamp(),
+      rejectedBy: auth.currentUser?.uid || null,
+      updatedAt: serverTimestamp()
+    }, { merge:true });
+    alert('Fleet rejected.');
+  }catch(e){
+    console.error(e);
+    alert('Reject failed: ' + (e?.message || e));
+  }
+}
 /* ===== [TAUSSIL-APPROVAL-REPO-END] ===== */
-
 /* Click handlers (delegated) */
 /* ===== [TAUSSIL-APPROVAL-BIND-START] ===== */
 document.addEventListener('click', (e)=>{
   const b1 = e.target.closest('[data-approve-driver]');
   if(b1){ approveDriver(b1.getAttribute('data-approve-driver')); }
-
   const b1r = e.target.closest('[data-reject-driver]');
   if(b1r){ rejectDriver(b1r.getAttribute('data-reject-driver')); }
-
   const b2 = e.target.closest('[data-approve-restaurant-user]');
   if(b2){ approveRestaurantUser(b2.getAttribute('data-approve-restaurant-user')); }
-
   const b2r = e.target.closest('[data-reject-restaurant-user]');
   if(b2r){ rejectRestaurantUser(b2r.getAttribute('data-reject-restaurant-user')); }
-
   const b3 = e.target.closest('[data-approve-restaurant-doc]');
   if(b3){ approveRestaurantDoc(b3.getAttribute('data-approve-restaurant-doc')); }
-
   const b3r = e.target.closest('[data-reject-restaurant-doc]');
   if(b3r){ rejectRestaurantDoc(b3r.getAttribute('data-reject-restaurant-doc')); }
+  // Fleet buttons
+// Fleet buttons
+const af = e.target.closest('[data-approve-fleet]');
+if(af){ approveFleet(af.getAttribute('data-approve-fleet')); }
+const rf = e.target.closest('[data-reject-fleet]');
+if(rf){ rejectFleet(rf.getAttribute('data-reject-fleet')); }
 });
 /* ===== [TAUSSIL-APPROVAL-BIND-END] ===== */
-
 /* Realtime listeners for pending */
 async function bindPendingRealtime(){
   ensurePendingUI();
-
   if(!unsubPendingDrv){
-    unsubPendingDrv = onSnapshot(
-      query(collection(db,'users'), where('role','==','driver'), where('approved','==', false), limit(200)),
-      (snap)=>{
-        /* ===== [TAUSSIL-APPROVAL-FILTER-PENDING-START] ===== */
-        pendingDrivers = snap.docs
-          .map(d=>({id:d.id, ...d.data()}))
-          .filter(u => String(u.status||'pending').toLowerCase() !== 'rejected');
-        /* ===== [TAUSSIL-APPROVAL-FILTER-PENDING-END] ===== */
-        renderPendingDrivers();
-        snap.docChanges().forEach(ch=>{ if(ch.type==='added') playSound('driver'); });
-      }
-    );
-  }
+  unsubPendingDrv = onSnapshot(
+    // لا نقيّد approved == false — نجلب كل السائقين ثم نرشّح محلياً
+    query(collection(db,'users'), where('role','==','driver'), limit(200)),
+    (snap)=>{
+      const all = snap.docs.map(d=>({id:d.id, ...d.data()}));
+      // pending = كل من ليس approved === true (واستبعاد المرفوضين)
+      pendingDrivers = all.filter(u =>
+        u.approved !== true &&
+        String(u.status||'pending').toLowerCase() !== 'rejected'
+      );
+
+      // التحديث الصحيح للواجهة: هذا يرسم عمود "Pending Drivers" (#drivers-pending)
+      renderDrivers();
+
+      // رن جرس فقط عندما يدخل سجل جديد ضمن فئة pending
+      snap.docChanges().forEach(ch=>{
+        if(ch.type==='added'){
+          const u = { id: ch.doc.id, ...ch.doc.data() };
+          if(u.approved !== true &&
+             String(u.status||'pending').toLowerCase() !== 'rejected'){
+            playSound('driver');
+          }
+        }
+      });
+    }
+  );
+}
 
   if(!unsubPendingRestUsers){
     unsubPendingRestUsers = onSnapshot(
@@ -2221,7 +4093,6 @@ async function bindPendingRealtime(){
       }
     );
   }
-
   if(!unsubPendingRestDocs){
     try{
       unsubPendingRestDocs = onSnapshot(
@@ -2240,23 +4111,64 @@ async function bindPendingRealtime(){
       // إذا ما في حقل approved بالمجموعة، تجاهل هذا السماع
     }
   }
+  // Fleet applications (pending)
+// Fleet users pending (from users: role=fleet, approved=false)
+// Fleet users pending (client-side filter; no approved==false in query)
+if(!unsubPendingFleets){
+  const likeFleet = (role)=>{
+    const r = String(role||'').toLowerCase();
+    return r==='fleet' || r==='fleet_lead' || r==='lead';
+  };
+
+  unsubPendingFleets = onSnapshot(
+    // نأتي بآخر المستخدمين (بدون شرط approved) ثم نرشّح محليًا
+    query(collection(db,'users'), orderBy('createdAt','desc'), limit(400)),
+    (snap)=>{
+      const all = snap.docs.map(d => ({ id:d.id, ...d.data() }));
+
+      // pending = دور أسطول & not approved===true & ليس مرفوض
+      pendingFleets = all.filter(u =>
+        likeFleet(u.role) &&
+        u.approved !== true &&
+        String(u.status||'pending').toLowerCase() !== 'rejected'
+      );
+
+      // حدّث واجهة تبويب الأساطيل (Approved + Pending)
+      renderFleets();
+
+      // رن الجرس فقط عند دخول سجل جديد ضمن pending
+      snap.docChanges().forEach(ch=>{
+        if(ch.type === 'added'){
+          const u = { id: ch.doc.id, ...ch.doc.data() };
+          if(likeFleet(u.role) &&
+             u.approved !== true &&
+             String(u.status||'pending').toLowerCase() !== 'rejected'){
+            playSound('restaurant'); // نفس صوت المطاعم
+          }
+        }
+      });
+    },
+    (err)=> console.warn('fleets listener error:', err?.code||err)
+  );
 }
 
+
+}
 /* دمج مع دورة الرسم الحالية */
 const _origRenderDrivers = renderDrivers;
 renderDrivers = function(){
   _origRenderDrivers.apply(this, arguments);
   ensurePendingUI();
   renderPendingDrivers();
+  renderPendingFleets(); 
 };
-
 const _origRenderRestaurants = renderRestaurants;
 renderRestaurants = function(){
   _origRenderRestaurants.apply(this, arguments);
   ensurePendingUI();
   renderPendingRestaurants();
+  renderPendingFleets(); 
 };
-
 /* ===== Auth guard ===== */
 onAuthStateChanged(auth, async (user)=>{
   if(!user){ detachRealtime(); showAdminAuth(true); return; }
@@ -2278,15 +4190,16 @@ onAuthStateChanged(auth, async (user)=>{
   bindRealtimeOnce();
   bindPendingRealtime(); // NEW: attach pending approvals listeners
 });
-
 /* ===== Init ===== */
 function renderAll(){
   renderDashboard();
   renderRestaurants();
   renderDrivers();
+  renderFleets();        // ← NEW
   renderOrdersLog();
   ensureOrdersBulkUI();
   ensureExportBar(); // NEW
+  renderFleetX_Safe();
 }
 setMuted(isMuted);
 translatePage();
@@ -2314,8 +4227,6 @@ async function loadXLSX(){
     }
   }
 }
-
-
 /* 2) دالة البناء (لا تعتمد على متغيّر عام؛ نمرّر XLSX صراحةً) */
 function buildXlsxCustom(mappedRows, cols, metaText, fileTag, XLSX){
   if(!XLSX || !XLSX.utils){
@@ -2323,18 +4234,15 @@ function buildXlsxCustom(mappedRows, cols, metaText, fileTag, XLSX){
     if (typeof exportMsg !== 'undefined' && exportMsg) exportMsg.textContent = 'Excel engine failed to load';
     return;
   }
-
   // AoA = meta + blank + headers + data + totals
   const headerLine = [metaText || ''];
   const blank = [''];
   const headers = cols.map(c => c.label);
   const dataRows = mappedRows.map(r => cols.map(c => r[c.key] ?? ''));
-
   // Totals (مرتبطة بالأعمدة المختارة)
   const ordersCount = mappedRows.length;
   let sumQty=0, sumPrice=0, sumFee=0;
   mappedRows.forEach(r=>{ sumQty+=Number(r.qty||0); sumPrice+=Number(r.price||0); sumFee+=Number(r.fee||0); });
-
   const totalsRow = cols.map((c, idx)=>{
     if(idx===0)          return 'Totals';
     if(c.key==='id')     return ordersCount;
@@ -2343,12 +4251,9 @@ function buildXlsxCustom(mappedRows, cols, metaText, fileTag, XLSX){
     if(c.key==='fee')    return Number(sumFee.toFixed(2));   // سننسّق € لاحقًا
     return '';
   });
-
   const aoa = [headerLine, blank, headers, ...dataRows, totalsRow];
-
   // إنشاء الورقة
   const ws = XLSX.utils.aoa_to_sheet(aoa);
-
   // عرض أعمدة منطقي
   const colWidths = cols.map(c=>{
     if(c.key==='created') return { wch: 22 };
@@ -2358,7 +4263,6 @@ function buildXlsxCustom(mappedRows, cols, metaText, fileTag, XLSX){
   });
   // ميتا + سطر فاصل + أعمدة البيانات
   ws['!cols'] = [{ wch: 40 }, { wch: 6 }, ...colWidths];
-
   // تنسيق € لصف التوتال للأعمدة المالية
   const range = XLSX.utils.decode_range(ws['!ref']);
   const lastRow = range.e.r; // صف التوتال
@@ -2368,23 +4272,19 @@ function buildXlsxCustom(mappedRows, cols, metaText, fileTag, XLSX){
       if(ws[cellAddr]) ws[cellAddr].z = '#,##0.00 "€"';
     }
   });
-
   // إنشاء Workbook وحفظ الملف
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Billing');
   const tag = fileTag || new Date().toISOString().slice(0,10);
   XLSX.writeFile(wb, `taussil_billing_${tag}.xlsx`, { bookType:'xlsx' });
 }
-
 /* 3) مستمع زر Excel — يُحمّل XLSX عند الطلب ثم يصدّر */
 document.getElementById('export-run-xlsx')?.addEventListener('click', async ()=>{
   // يفترض وجود عناصر ودوال منظومة التصدير لديك:
   // exportMsg, exportRest, exportFrom, exportTo
   // readSelectedStatuses, readSelectedCols
   // queryOrdersForExport, mapRow, fmtTsLatn, getRestaurantDisplayName
-
   if (typeof exportMsg !== 'undefined' && exportMsg) exportMsg.textContent = 'Building Excel…';
-
   // التحقق من الفترة
   const rid   = exportRest?.value || '';
   const fromD = exportFrom?.value ? new Date(exportFrom.value) : null;
@@ -2393,7 +4293,6 @@ document.getElementById('export-run-xlsx')?.addEventListener('click', async ()=>
     if (exportMsg) exportMsg.textContent='Bitte Zeitraum wählen';
     return;
   }
-
   // قراءة الفلاتر والأعمدة
   const sts   = readSelectedStatuses();
   const cols  = readSelectedCols();
@@ -2401,14 +4300,12 @@ document.getElementById('export-run-xlsx')?.addEventListener('click', async ()=>
     if (exportMsg) exportMsg.textContent='Select at least one column';
     return;
   }
-
   // تحميل XLSX كسولًا
   const XLSX = await loadXLSX();
   if(!XLSX){
     if (exportMsg) exportMsg.textContent='Excel engine failed to load';
     return;
   }
-
   // جلب البيانات من Firestore (الدالة موجودة سابقًا عندك)
   const rows = await queryOrdersForExport({
     restaurantId: rid || null,
@@ -2417,14 +4314,12 @@ document.getElementById('export-run-xlsx')?.addEventListener('click', async ()=>
     statuses: sts
   });
   const mapped = rows.map(mapRow);
-
   // ميتا التقرير (عنوان أعلى الشيت)
   const restName = getRestaurantDisplayName(rid || '');
   const fromTxt  = fmtTsLatn(fromD);
   const toTxt    = fmtTsLatn(toD);
   const stsLabel = sts.length ? sts.join(', ') : 'All';
   const meta = `Restaurant: ${restName} • Period: ${fromTxt} → ${toTxt} • Status: ${stsLabel}`;
-
   // بناء وحفظ Excel
   buildXlsxCustom(
     mapped,
@@ -2437,7 +4332,6 @@ document.getElementById('export-run-xlsx')?.addEventListener('click', async ()=>
   if (exportMsg) exportMsg.textContent = `Excel generated: ${mapped.length} rows`;
 });
 /* ===== End XLSX Export ===== */
-
 const exportModal = document.getElementById('export-modal');
 const exportClose = document.getElementById('export-close');
 const exportRest  = document.getElementById('export-restaurant');
@@ -2446,7 +4340,6 @@ const exportFrom  = document.getElementById('export-from');
 const exportTo    = document.getElementById('export-to');
 const exportCols  = document.getElementById('export-cols');
 const exportMsg   = document.getElementById('export-msg');
-
 const EXPORT_COL_DEFS = [
   {key:'nr',         label:'Nr/Code'},
   {key:'id',         label:'OrderId'},
@@ -2467,8 +4360,6 @@ const EXPORT_COL_DEFS = [
   {key:'created',    label:'Created'},
   {key:'updated',    label:'Updated'},
 ];
-
-
 function openExportModal(){
   // تعبئة المطاعم
   if(exportRest && exportRest.options.length <= 1){
@@ -2484,7 +4375,6 @@ function openExportModal(){
         exportRest.appendChild(opt);
       });
   }
-
   // تعبئة الأعمدة (مع اختيار افتراضي)
   if(exportCols && !exportCols.dataset.ready){
     exportCols.dataset.ready = '1';
@@ -2497,13 +4387,11 @@ function openExportModal(){
       exportCols.appendChild(wrap);
     });
   }
-
   // افتراض الفترة = هذا الشهر
   const today = new Date();
   const y = today.getFullYear(), m = String(today.getMonth()+1).padStart(2,'0');
   exportFrom.value = `${y}-${m}-01`;
   exportTo.value   = `${y}-${m}-${String(new Date(y, Number(m), 0).getDate()).padStart(2,'0')}`;
-
   exportMsg.textContent = 'Select filters then export.';
   exportModal.classList.add('open');
 }
@@ -2520,9 +4408,7 @@ function readSelectedCols(){
   });
   return picks;
 }
-
 function toEndOfDay(ts){ const d = new Date(ts); d.setHours(23,59,59,999); return d; }
-
 async function queryOrdersForExport({restaurantId, fromDate, toDate, statuses}){
   const colRef = collection(db,'orders');
   // الأساس: مدى التاريخ + ترتيب
@@ -2532,13 +4418,11 @@ async function queryOrdersForExport({restaurantId, fromDate, toDate, statuses}){
     where('createdAt','<=', Timestamp.fromDate(toDate)),
     orderBy('createdAt','asc')
   );
-
   // إن وُجد مطعم، فلتر بالسيرفر أولاً (الأفضل) – قد يطلب Index
   let qy = baseQ;
   if (restaurantId) {
     qy = query(baseQ, where('restaurant.id','==', restaurantId));
   }
-
   try {
     const snap = await getDocs(qy);
     let rows = snap.docs.map(d => ({ id: d.id, ...d.data() }));
@@ -2549,7 +4433,6 @@ async function queryOrdersForExport({restaurantId, fromDate, toDate, statuses}){
       rows = rows.filter(o => want.has(String(o.status||'').toLowerCase()));
     }
     return rows;
-
   } catch (e) {
     // إذا احتاج Index، نعمل Fallback: نجلب بالمدى فقط ثم نفلتر المطعم محليًا
     if (e?.code === 'failed-precondition') {
@@ -2568,8 +4451,6 @@ async function queryOrdersForExport({restaurantId, fromDate, toDate, statuses}){
     throw e;
   }
 }
-
-
 function mapRow(o){
   const km   = readDistanceKm(o);
   const sFee = Number(readServiceFee(o)) || 0;
@@ -2595,9 +4476,6 @@ function mapRow(o){
     updated: fmtTsLatn(o.updatedAt),
   };
 }
-
-
-
 function buildCsvCustom(rows, cols, tag){
   const headers = cols.map(c=>c.label).join(',');
   const esc = v => {
@@ -2614,17 +4492,13 @@ function buildCsvCustom(rows, cols, tag){
   document.body.appendChild(a); a.click(); a.remove();
   URL.revokeObjectURL(url);
 }
-
 function buildPrintableReportCustom(mappedRows, cols, metaText){
   ensurePrintStyles();
-
   let host = document.getElementById('print-report');
   if(host) host.remove();
   host = document.createElement('div');
   host.id = 'print-report';
-
   const esc = s => String(s ?? '').replace(/[<>&]/g, c=>({ '<':'&lt;','>':'&gt;','&':'&amp;' }[c]));
-
   // حساب الإجماليات
   const ordersCount = mappedRows.length;
   let sumQty = 0, sumPrice = 0, sumFee = 0;
@@ -2633,10 +4507,8 @@ function buildPrintableReportCustom(mappedRows, cols, metaText){
     sumPrice += Number(r.price||0);
     sumFee   += Number(r.fee||0);
   });
-
   // الرؤوس
   const thead = `<tr>${cols.map(c=>`<th${(['qty','price','fee'].includes(c.key)?' class="num"':'')}>${esc(c.label)}</th>`).join('')}</tr>`;
-
   // الجسم
   const tbody = mappedRows.map(r=>`<tr>${
     cols.map(c=>{
@@ -2645,7 +4517,6 @@ function buildPrintableReportCustom(mappedRows, cols, metaText){
       return `<td${cls}>${esc(val)}</td>`;
     }).join('')
   }</tr>`).join('');
-
   // تذييل: Totals ديناميكي لكل الأعمدة المختارة
   const tfootCells = cols.map((c, idx)=>{
     if(idx===0){
@@ -2657,7 +4528,6 @@ function buildPrintableReportCustom(mappedRows, cols, metaText){
     return `<td></td>`;
   }).join('');
   const tfoot = `<tr>${tfootCells}</tr>`;
-
   // تجميع
   host.innerHTML = `
     <h1>${esc(currentLang==='ar' ? 'تقرير الفوترة' : (currentLang==='de' ? 'Abrechnungsbericht' : 'Billing Report'))}</h1>
@@ -2669,13 +4539,10 @@ function buildPrintableReportCustom(mappedRows, cols, metaText){
     </table>
   `;
   document.body.appendChild(host);
-
   const cleanup = ()=>{ host?.remove(); window.removeEventListener('afterprint', cleanup); };
   window.addEventListener('afterprint', cleanup);
   window.print();
 }
-
-
 async function runExport(kind){
   try{
     exportMsg.textContent = 'Loading…';
@@ -2686,17 +4553,13 @@ async function runExport(kind){
     const sts   = readSelectedStatuses();
     const cols  = readSelectedCols();
     if(!cols.length){ exportMsg.textContent='Select at least one column'; return; }
-
     const rows = await queryOrdersForExport({ restaurantId: rid || null, fromDate: fromD, toDate: toD, statuses: sts });
     const mapped = rows.map(mapRow);
-
     const restName = getRestaurantDisplayName(rid || '');
 const stsLabel = sts.length ? sts.join(', ') : 'All';
 const fromTxt  = fmtTsLatn(fromD);
 const toTxt    = fmtTsLatn(toD);
 const meta = `Restaurant: ${restName} • Period: ${fromTxt} → ${toTxt} • Status: ${stsLabel}`;
-
-
     if(kind==='csv'){
       buildCsvCustom(mapped, cols, `${exportFrom.value}_${exportTo.value}${rid?('_'+rid):''}`);
       exportMsg.textContent = `CSV generated: ${mapped.length} rows`;
@@ -2709,12 +4572,8 @@ const meta = `Restaurant: ${restName} • Period: ${fromTxt} → ${toTxt} • St
     exportMsg.textContent = 'Export failed. Check console.';
   }
 }
-
 document.getElementById('export-run-csv')?.addEventListener('click', ()=> runExport('csv'));
 document.getElementById('export-run-pdf') ?.addEventListener('click', ()=> runExport('pdf'));
-
 </script>
-
-
 </body>
 </html>
