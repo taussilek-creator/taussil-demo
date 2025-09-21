@@ -297,6 +297,48 @@ const db = getFirestore(app);
 const rtdb = getDatabase(app);
 const auth = getAuth(app);
 await setPersistence(auth, browserSessionPersistence).catch(()=>{});
+/* ===== Invite Mode — helpers & loader ===== */
+const trim  = s => String(s||'').trim();
+const lower = s => trim(s).toLowerCase();
+const eqStrict = (a,b)=> trim(a) === trim(b);
+const eqEmail  = (a,b)=> lower(a) === lower(b);
+
+const urlq = new URLSearchParams(location.search);
+let inviteCtx = null;  // { fleetId, invId, invRef, inv }
+
+async function loadInviteIfAny(){
+  const fleetId = urlq.get('fleet') || '';
+  const invId   = urlq.get('inv')   || '';
+  if(!fleetId || !invId) return null;
+
+  try{
+    const invRef = doc(db, 'fleet', fleetId, 'invites', invId);
+    const snap   = await getDoc(invRef);
+    if(!snap.exists()){ regMsg.textContent='Einladung nicht gefunden.'; return null; }
+
+    const inv = snap.data() || {};
+
+    // صلاحية/حالة أساسية (التحقق النهائي يتم بالقواعد)
+    if(inv.status !== 'pending'){ regMsg.textContent='Einladung bereits verwendet/abgebrochen.'; return null; }
+    const expMs = inv.expiresAt?.toMillis?.()
+               ?? (typeof inv.expiresAt?._seconds==='number' ? inv.expiresAt._seconds*1000 : Date.parse(inv.expiresAt));
+    if(expMs && Date.now() >= expMs){ regMsg.textContent='Einladungslink abgelaufen (48h).'; return null; }
+
+    // تعبئة الحقول لمساعدة السائق (المطابقة ستكون صارمة عند الضغط تسجيل)
+    regFirst.value = inv.firstName || '';
+    regLast.value  = inv.lastName  || '';
+    regPhone.value = inv.phone     || '';
+    regEmail.value = inv.email     || '';
+
+    inviteCtx = { fleetId, invId, invRef, inv };
+    switchPane('register'); // افتح تبويب التسجيل تلقائيًا
+    return inviteCtx;
+  }catch(e){
+    console.error('loadInviteIfAny', e);
+    regMsg.textContent='Einladung konnte nicht geladen werden.';
+    return null;
+  }
+}
 
 /* ===== Address + Distance + Pricing Helpers ===== */
 
@@ -692,45 +734,101 @@ loginBtn.addEventListener('click', async (e)=>{
 registerBtn.addEventListener('click', async (e)=>{
   e.preventDefault();
   regMsg.textContent=''; registerBtn.disabled=true; regInFlight = true;
-  const first=(regFirst?.value||'').trim();
-  const last =(regLast ?.value||'').trim();
-  const phone=(regPhone?.value||'').trim();
-  const email=(regEmail?.value||'').trim();
-  const pass =(regPass ?.value||'');
+
+  const first = (regFirst?.value||'').trim();
+  const last  = (regLast ?.value||'').trim();
+  const phone = (regPhone?.value||'').trim();
+  const email = (regEmail?.value||'').trim();
+  const pass  = (regPass ?.value||'');
+
+  // فحوصات عامة
   if(first.length<2){ regMsg.textContent='Bitte Vornamen (≥2)'; registerBtn.disabled=false; regInFlight=false; return; }
   if(last.length<2){  regMsg.textContent='Bitte Nachnamen (≥2)'; registerBtn.disabled=false; regInFlight=false; return; }
   if(!/\S+@\S+\.\S+/.test(email)){ regMsg.textContent='E-Mail ungültig'; registerBtn.disabled=false; regInFlight=false; return; }
   if((pass||'').length<6){ regMsg.textContent='Passwort zu kurz'; registerBtn.disabled=false; regInFlight=false; return; }
   if(!regTerms?.checked){ regMsg.textContent='Bitte AGB & Datenschutz akzeptieren.'; registerBtn.disabled=false; regInFlight=false; return; }
+
+  // إن كنا في وضع الدعوة: شدّد المطابقة مع وثيقة الدعوة
+  if(inviteCtx){
+    const inv = inviteCtx.inv || {};
+    if(!eqEmail(email, inv.emailLower || inv.email)){
+      regMsg.textContent='E-Mail stimmt nicht mit der Einladung überein.'; registerBtn.disabled=false; regInFlight=false; return;
+    }
+    if(!eqStrict(first, inv.firstName||'')){
+      regMsg.textContent='Vorname stimmt nicht mit der Einladung überein.'; registerBtn.disabled=false; regInFlight=false; return;
+    }
+    if(!eqStrict(last, inv.lastName||'')){
+      regMsg.textContent='Nachname stimmt nicht mit der Einladung überein.'; registerBtn.disabled=false; regInFlight=false; return;
+    }
+    if(!eqStrict(phone, inv.phone||'')){
+      regMsg.textContent='Telefon stimmt nicht mit der Einladung überein.'; registerBtn.disabled=false; regInFlight=false; return;
+    }
+  }
+
   try{
-    const cred=await createUserWithEmailAndPassword(auth,email,pass);
-    const user=cred.user;
+    // إنشاء حساب Auth
+    const cred = await createUserWithEmailAndPassword(auth, email, pass);
+    const user = cred.user;
     await user.getIdToken(true);
-    const tokenRes=await user.getIdTokenResult(true);
-    const claimsEmail=(tokenRes?.claims?.email ?? user.email ?? email).toString().trim();
-    const uref=doc(db,'users', user.uid);
-    const ex=await getDoc(uref);
+
+    // users/{uid}
+    const uref = doc(db,'users', user.uid);
+    const ex   = await getDoc(uref);
     if(ex.exists()){
       regMsg.textContent='Konto existiert bereits. Bitte anmelden.';
       await signOut(auth).catch(()=>{});
       switchPane('login');
       return;
     }
+
     const nowTs = Timestamp.now();
-    await setDoc(uref,{
-      email: claimsEmail, role:'driver', approved:false, status:'pending',
-      firstName:first, lastName:last, phone: phone||null,
-      createdAt: nowTs, updatedAt: nowTs
-    },{merge:false});
-    regMsg.textContent='Konto erstellt. Wird geprüft…';
+    const baseUser = {
+      email: user.email || email,
+      role:'driver',
+      approved:false,
+      status:'pending',
+      firstName:first,
+      lastName:last,
+      phone: phone || null,
+      createdAt: nowTs,
+      updatedAt: nowTs
+    };
+    if(inviteCtx) baseUser.fleetId = inviteCtx.fleetId; // ربط بالأسطول الداعي
+
+    await setDoc(uref, baseUser, { merge:false });
+
+    // إن كانت دعوة: أعلم الدعوة بأنها استُخدمت (مرة واحدة)
+    if(inviteCtx){
+      await setDoc(inviteCtx.invRef, {
+        status: 'used',
+        consumedAt: serverTimestamp(),
+        consumedBy: user.uid,
+        updatedAt: serverTimestamp()
+      }, { merge:true });
+    }
+
+    regMsg.textContent = inviteCtx
+      ? 'Einladung angenommen. Konto erstellt. Wartet auf Admin-Freigabe.'
+      : 'Konto erstellt. Wird geprüft…';
+
+    // نرجع لواجهة الدخول
     await signOut(auth).catch(()=>{});
     switchPane('login');
   }catch(e){
     console.error(e);
-    const map = {'permission-denied': 'Berechtigung verweigert (Rules).','auth/email-already-in-use':'E-Mail bereits vergeben.','auth/invalid-email':'E-Mail ungültig.','auth/weak-password':'Passwort zu schwach (6+).','auth/network-request-failed':'Netzwerkfehler.'};
+    const map = {
+      'permission-denied': 'Berechtigung verweigert (Rules).',
+      'auth/email-already-in-use':'E-Mail bereits vergeben.',
+      'auth/invalid-email':'E-Mail ungültig.',
+      'auth/weak-password':'Passwort zu schwach (6+).',
+      'auth/network-request-failed':'Netzwerkfehler.'
+    };
     regMsg.textContent = map[e?.code] || ('Registrierung fehlgeschlagen: '+(e?.code||''));
-  }finally{ registerBtn.disabled=false; regInFlight=false; }
+  }finally{
+    registerBtn.disabled=false; regInFlight=false;
+  }
 });
+
 
 /* ===== Online toggle ===== */
 onlineToggle.addEventListener("click", (e)=>{ e.preventDefault(); setOnline(!online); });function setOnline(flag){
@@ -1697,10 +1795,12 @@ window.addEventListener("online", ()=>setNet(true));
 window.addEventListener("offline", ()=>setNet(false));
 
 /* ===== Init ===== */
-document.addEventListener('DOMContentLoaded', ()=>{
+document.addEventListener('DOMContentLoaded', async ()=>{
   authModal.style.display='flex';
   switchPane(lastAuthTab==='register' ? 'register' : 'login');
+  await loadInviteIfAny(); // ← يفعل وضع الدعوة ويملأ الحقول إن كان الرابط يحتوي fleet & inv
 });
+
 </script>
 
 </body>
