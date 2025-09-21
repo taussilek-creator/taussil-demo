@@ -297,6 +297,12 @@ const db = getFirestore(app);
 const rtdb = getDatabase(app);
 const auth = getAuth(app);
 await setPersistence(auth, browserSessionPersistence).catch(()=>{});
+// التسجيل عبر الدعوة فقط:
+const INVITE_REQUIRED = true;
+
+// مظهر خطأ بسيط للحقل
+function markErr(el, on){ if(!el) return; el.style.borderColor = on? 'var(--err)' : ''; }
+
 /* ===== Invite Mode — helpers & loader ===== */
 const trim  = s => String(s||'').trim();
 const lower = s => trim(s).toLowerCase();
@@ -735,43 +741,65 @@ registerBtn.addEventListener('click', async (e)=>{
   e.preventDefault();
   regMsg.textContent=''; registerBtn.disabled=true; regInFlight = true;
 
+  // امسح تمييز الأخطاء القديم
+  [regFirst,regLast,regPhone,regEmail].forEach(i=>markErr(i,false));
+
   const first = (regFirst?.value||'').trim();
   const last  = (regLast ?.value||'').trim();
   const phone = (regPhone?.value||'').trim();
   const email = (regEmail?.value||'').trim();
   const pass  = (regPass ?.value||'');
 
-  // فحوصات عامة
+  // فحوصات عامة أولية
   if(first.length<2){ regMsg.textContent='Bitte Vornamen (≥2)'; registerBtn.disabled=false; regInFlight=false; return; }
   if(last.length<2){  regMsg.textContent='Bitte Nachnamen (≥2)'; registerBtn.disabled=false; regInFlight=false; return; }
   if(!/\S+@\S+\.\S+/.test(email)){ regMsg.textContent='E-Mail ungültig'; registerBtn.disabled=false; regInFlight=false; return; }
   if((pass||'').length<6){ regMsg.textContent='Passwort zu kurz'; registerBtn.disabled=false; regInFlight=false; return; }
   if(!regTerms?.checked){ regMsg.textContent='Bitte AGB & Datenschutz akzeptieren.'; registerBtn.disabled=false; regInFlight=false; return; }
 
-  // إن كنا في وضع الدعوة: شدّد المطابقة مع وثيقة الدعوة
-  if(inviteCtx){
-    const inv = inviteCtx.inv || {};
-    if(!eqEmail(email, inv.emailLower || inv.email)){
-      regMsg.textContent='E-Mail stimmt nicht mit der Einladung überein.'; registerBtn.disabled=false; regInFlight=false; return;
-    }
-    if(!eqStrict(first, inv.firstName||'')){
-      regMsg.textContent='Vorname stimmt nicht mit der Einladung überein.'; registerBtn.disabled=false; regInFlight=false; return;
-    }
-    if(!eqStrict(last, inv.lastName||'')){
-      regMsg.textContent='Nachname stimmt nicht mit der Einladung überein.'; registerBtn.disabled=false; regInFlight=false; return;
-    }
-    if(!eqStrict(phone, inv.phone||'')){
-      regMsg.textContent='Telefon stimmt nicht mit der Einladung überein.'; registerBtn.disabled=false; regInFlight=false; return;
-    }
+  // لو اشترطنا الدعوة: ممنوع التسجيل بدون رابط دعوة صالح
+  if (INVITE_REQUIRED && !inviteCtx){
+    regMsg.textContent = 'Bitte registriere dich über den Einladungslink deines Fuhrparks.';
+    registerBtn.disabled=false; regInFlight=false; return;
   }
 
   try{
-    // إنشاء حساب Auth
+    // تحقّق صارم من الدعوة (حديث/طازج قبل الإنشاء لمنع السباقات)
+    let fleetIdFromInvite=null, invRef=null, inv=null, allMatch=false;
+    if(inviteCtx){
+      invRef = inviteCtx.invRef;
+      const latest = await getDoc(invRef);
+      if(!latest.exists()){ throw new Error('invite-not-found'); }
+      inv = latest.data()||{};
+      const expMs = inv.expiresAt?.toMillis?.()
+                 ?? (typeof inv.expiresAt?._seconds==='number' ? inv.expiresAt._seconds*1000 : Date.parse(inv.expiresAt));
+      const stillValid = (inv.status==='pending') && inv.singleUse===true && (!expMs || Date.now()<expMs);
+      if(!stillValid){ throw new Error('invite-invalid'); }
+
+      // المطابقة الحرفية المطلوبة
+      const eqTrim  = (a,b)=> String(a||'').trim() === String(b||'').trim();
+      const eqEmail = (a,b)=> String(a||'').trim().toLowerCase() === String(b||'').trim().toLowerCase();
+
+      const mismatches = [];
+      if(!eqEmail(email, inv.emailLower || inv.email)){ mismatches.push('E-Mail'); markErr(regEmail,true); }
+      if(!eqTrim(first, inv.firstName)){ mismatches.push('Vorname'); markErr(regFirst,true); }
+      if(!eqTrim(last,  inv.lastName )){ mismatches.push('Nachname'); markErr(regLast,true); }
+      if(!eqTrim(phone, inv.phone    )){ mismatches.push('Telefon');  markErr(regPhone,true); }
+
+      allMatch = (mismatches.length===0);
+      if(!allMatch){
+        regMsg.textContent = 'Daten stimmen nicht mit der Einladung überein: ' + mismatches.join(', ') + '. Bitte korrigieren.';
+        registerBtn.disabled=false; regInFlight=false; return; // 🔴 إفشال التسجيل هنا
+      }
+
+      fleetIdFromInvite = inviteCtx.fleetId;
+    }
+
+    // إنشاء الحساب الآن بعد اجتياز المطابقة
     const cred = await createUserWithEmailAndPassword(auth, email, pass);
     const user = cred.user;
     await user.getIdToken(true);
 
-    // users/{uid}
     const uref = doc(db,'users', user.uid);
     const ex   = await getDoc(uref);
     if(ex.exists()){
@@ -782,7 +810,7 @@ registerBtn.addEventListener('click', async (e)=>{
     }
 
     const nowTs = Timestamp.now();
-    const baseUser = {
+    await setDoc(uref, {
       email: user.email || email,
       role:'driver',
       approved:false,
@@ -790,16 +818,14 @@ registerBtn.addEventListener('click', async (e)=>{
       firstName:first,
       lastName:last,
       phone: phone || null,
+      ...(fleetIdFromInvite ? { fleetId: fleetIdFromInvite } : {}),
       createdAt: nowTs,
       updatedAt: nowTs
-    };
-    if(inviteCtx) baseUser.fleetId = inviteCtx.fleetId; // ربط بالأسطول الداعي
+    }, { merge:false });
 
-    await setDoc(uref, baseUser, { merge:false });
-
-    // إن كانت دعوة: أعلم الدعوة بأنها استُخدمت (مرة واحدة)
-    if(inviteCtx){
-      await setDoc(inviteCtx.invRef, {
+    // استهلاك الدعوة (مرة واحدة) — بعد نجاح الإنشاء
+    if(inviteCtx && invRef){
+      await setDoc(invRef, {
         status: 'used',
         consumedAt: serverTimestamp(),
         consumedBy: user.uid,
@@ -807,27 +833,30 @@ registerBtn.addEventListener('click', async (e)=>{
       }, { merge:true });
     }
 
-    regMsg.textContent = inviteCtx
-      ? 'Einladung angenommen. Konto erstellt. Wartet auf Admin-Freigabe.'
-      : 'Konto erstellt. Wird geprüft…';
-
-    // نرجع لواجهة الدخول
+    regMsg.textContent = 'Registrierung erfolgreich. Konto wird vom Admin geprüft.';
     await signOut(auth).catch(()=>{});
     switchPane('login');
+
   }catch(e){
     console.error(e);
-    const map = {
-      'permission-denied': 'Berechtigung verweigert (Rules).',
-      'auth/email-already-in-use':'E-Mail bereits vergeben.',
-      'auth/invalid-email':'E-Mail ungültig.',
-      'auth/weak-password':'Passwort zu schwach (6+).',
-      'auth/network-request-failed':'Netzwerkfehler.'
-    };
-    regMsg.textContent = map[e?.code] || ('Registrierung fehlgeschlagen: '+(e?.code||''));
+    const code = e?.code || e?.message || '';
+    if(String(code).includes('invite-not-found')) regMsg.textContent='Einladung nicht gefunden.';
+    else if(String(code).includes('invite-invalid')) regMsg.textContent='Einladung ungültig/abgelaufen.';
+    else {
+      const map = {
+        'permission-denied': 'Berechtigung verweigert (Rules).',
+        'auth/email-already-in-use':'E-Mail bereits vergeben.',
+        'auth/invalid-email':'E-Mail ungültig.',
+        'auth/weak-password':'Passwort zu schwach (6+).',
+        'auth/network-request-failed':'Netzwerkfehler.'
+      };
+      regMsg.textContent = map[e?.code] || ('Registrierung fehlgeschlagen: '+(e?.code||''));
+    }
   }finally{
     registerBtn.disabled=false; regInFlight=false;
   }
 });
+
 
 
 /* ===== Online toggle ===== */
