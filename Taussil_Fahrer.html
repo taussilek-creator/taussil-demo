@@ -1694,10 +1694,11 @@ async function finalizeSingleDelivery(orderId) {
     const billableKm = Math.max(0, km - 2);
     const billableKmRounded = Math.round(billableKm * 100) / 100;
 
-    const items_total = Number(odata.items_total_eur || 0);
-    const deliveryFee = (items_total < 25)
-      ? 3.5
-      : Math.round(items_total * 0.14 * 100) / 100;
+    const amountEUR = (Number.isFinite(+odata.items_total_eur) && +odata.items_total_eur > 0)
+  ? +odata.items_total_eur
+  : getOrderAmount(odata);
+const deliveryFee = amountEUR < 25 ? 3.5 : Math.round(amountEUR * 0.14 * 100) / 100;
+
 
     const distanceFee = distanceCostFromTotalKm(kmRounded);
     const serviceFee = Math.round((distanceFee + deliveryFee) * 100) / 100;
