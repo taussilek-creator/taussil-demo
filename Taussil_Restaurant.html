@@ -898,6 +898,29 @@ let TRIP_TIMER=null;
 let TRIP_TARGET_MS=null;
 let DRIVER_SUB=null;
 let lastDriverPos=null;
+// ===== Driver green arrow (icon + rotation) =====
+const DRIVER_COLOR = '#22c55e'; // أخضر
+function driverArrowIcon(rotationDeg = 0){
+  return {
+    path: google.maps.SymbolPath.FORWARD_CLOSED_ARROW,
+    scale: 6,
+    fillColor: DRIVER_COLOR,
+    fillOpacity: 1,
+    strokeColor: '#0b7d3b',
+    strokeWeight: 1.5,
+    rotation: rotationDeg,
+    anchor: new google.maps.Point(0, 2),
+  };
+}
+function headingDeg(fromLL, toLL){
+  try{
+    const from = (fromLL instanceof google.maps.LatLng) ? fromLL : new google.maps.LatLng(fromLL);
+    const to   = (toLL   instanceof google.maps.LatLng) ? toLL   : new google.maps.LatLng(toLL);
+    const h = google.maps.geometry.spherical.computeHeading(from, to);
+    return Number.isFinite(h) ? h : 0;
+  }catch{ return 0; }
+}
+
 const ORDER_CACHE=new Map();
 /* ===== Send Order ===== */
 async function computeFormQty(){
@@ -1246,8 +1269,28 @@ function updateMapAndDistance(dLat,dLng){
       }
     });
   }
-  window.__driverMarker = window.__driverMarker || new google.maps.Marker({map, label:'D'});
-  window.__driverMarker.setPosition({lat:dLat,lng:dLng});
+  // --- Driver arrow marker (rotates toward movement) ---
+const nextLL = new google.maps.LatLng(Number(dLat), Number(dLng));
+const prevLL = (lastDriverPos && Number.isFinite(lastDriverPos.lat) && Number.isFinite(lastDriverPos.lng))
+  ? new google.maps.LatLng(lastDriverPos.lat, lastDriverPos.lng)
+  : nextLL;
+
+const rot = headingDeg(prevLL, nextLL);
+
+if(!window.__driverMarker){
+  window.__driverMarker = new google.maps.Marker({
+    map,
+    position: nextLL,
+    icon: driverArrowIcon(rot),
+    title: 'Driver'
+  });
+}else{
+  window.__driverMarker.setIcon(driverArrowIcon(rot));
+  window.__driverMarker.setPosition(nextLL);
+}
+
+lastDriverPos = { lat: nextLL.lat(), lng: nextLL.lng() };
+
   function updateMapAndDistance(lat, lng){
   if(!window.__map || !window.google?.maps) return;
 
@@ -1419,7 +1462,8 @@ async function initMap(){
     const cb='__gm_'+Math.random().toString(36).slice(2);
     window[cb]=()=>{ delete window[cb]; res(); };
     const s=document.createElement('script');
-    s.src=`https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(GMAPS_API_KEY)}&v=weekly&callback=${cb}`;
+    s.src=`https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(GMAPS_API_KEY)}&v=weekly&libraries=geometry&callback=${cb}`;
+
     s.async=true; s.defer=true; s.onerror=()=>{ delete window[cb]; rej(); };
     document.head.appendChild(s);
   });
@@ -1761,37 +1805,67 @@ const fee     = money(feeNum);
   logClose && logClose.addEventListener('click', ()=> logModal.classList.remove('show'));
   logModal && logModal.addEventListener('click',(e)=>{ if(e.target===logModal) logModal.classList.remove('show'); });
 })();
-/* === Print & PDF — robust via hidden <iframe> === */
-/* === Print & PDF — Restaurant report-like table (single button) === */
+/* === Print & PDF — Smart fallback (print on desktop, PDF on Android WebView) === */
 (() => {
-  const logModal = document.getElementById('logModal');
-  const btnPDF   = document.getElementById('logPDF');
-  if (!logModal || !btnPDF) return;
+  const btnPDF = document.getElementById('logPDF');
+  if (!btnPDF) return;
 
-  const euro = n => (Number(n||0)).toLocaleString('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2}) + '€';
+  // == Helpers ==
+  const euro = n => (Number(n||0)).toLocaleString('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2})+'€';
+  const isAndroidWebView = () => {
+    const ua = navigator.userAgent || '';
+    // وجود ; wv) يشير غالبًا إلى WebView. كذلك بعض الحاويات لا تعرض الطباعة حتى لو وُجد window.print.
+    return /Android/i.test(ua) && /\bwv\b|\) wv/.test(ua);
+  };
 
-  const CSS = `
-  <style>
-    :root{ color-scheme: light; }
-    html,body{ margin:0; padding:0; background:#fff; color:#111;
-      font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; }
-    .wrap{ width:1000px; max-width:100%; margin:0 auto; padding:14px; }
-    h2{ margin:0 0 8px 0 }
-    .meta{ font-size:12px; color:#555; margin-bottom:10px }
-    table{ width:90%; border-collapse:collapse; font-size:12px }
-    th,td{ border:1px solid #e5e7eb; padding:6px 8px; text-align:left; vertical-align:top; }
-    thead th{ background:#f8fafc; font-weight:800 }
-    tfoot td{ background:#f3f4f6; font-weight:800 }
-    .num{ text-align:right; font-variant-numeric: tabular-nums; }
-    .small{ font-size:11px; color:#666 }
-    @page{ size:A4; margin:12mm; }
-  </style>`;
+  // تحميل مكتبات jsPDF و AutoTable وقت الحاجة فقط
+  function loadScript(src){
+    return new Promise((res, rej)=>{
+      const s=document.createElement('script');
+      s.src=src; s.async=true;
+      s.onload=()=>res();
+      s.onerror=()=>rej(new Error('Failed to load '+src));
+      document.head.appendChild(s);
+    });
+  }
+  async function ensureJsPDF(){
+    if (window.jspdf?.jsPDF && window.jspdf?.jsPDF.API?.autoTable) return;
+    if (!window.jspdf?.jsPDF){
+      await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js');
+    }
+    if (!window.jspdf?.jsPDF?.API?.autoTable){
+      await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js');
+    }
+  }
 
-  function buildHTML(){
-    const data = window.__restExportGetData ? window.__restExportGetData() : null;
+  // نفس الداتا التي بنبنيها للتقارير
+  function getExportData(){
+    return window.__restExportGetData ? window.__restExportGetData() : null;
+  }
+
+  // بناء HTML للطباعة (للبيئات التي تدعم نافذة الطباعة)
+  function buildPrintableHTML(){
+    const data = getExportData();
     const rows = data?.rows || [];
-    const meta = data?.meta || {restaurant:'—', period:'—', status:'All'};
-    const tot  = data?.totals || {orders:0, qty:0, price:0, fee:0};
+    const meta = data?.meta || { restaurant:'—', period:'—', status:'All' };
+    const tot  = data?.totals || { orders:0, qty:0, price:0, fee:0 };
+
+    const CSS = `
+    <style>
+      :root{ color-scheme: light; }
+      html,body{ margin:0; padding:0; background:#fff; color:#111;
+        font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; }
+      .wrap{ width:1000px; max-width:100%; margin:0 auto; padding:14px; }
+      h2{ margin:0 0 8px 0 }
+      .meta{ font-size:12px; color:#555; margin-bottom:10px }
+      table{ width:90%; border-collapse:collapse; font-size:12px }
+      th,td{ border:1px solid #e5e7eb; padding:6px 8px; text-align:left; vertical-align:top; }
+      thead th{ background:#f8fafc; font-weight:800 }
+      tfoot td{ background:#f3f4f6; font-weight:800 }
+      .num{ text-align:right; font-variant-numeric: tabular-nums; }
+      .small{ font-size:11px; color:#666 }
+      @page{ size:A4; margin:12mm; }
+    </style>`;
 
     const head = `
       <tr>
@@ -1821,10 +1895,10 @@ const fee     = money(feeNum);
     const foot = `
       <tr>
         <td colspan="3">Totals</td>
-        <td class="num">${tot.qty}</td>
-        <td class="num">${euro(tot.price)}</td>
-        <td class="num">${euro(tot.fee)}</td>
-        <td colspan="2" class="num">Orders: ${tot.orders}</td>
+        <td class="num">${tot.qty||0}</td>
+        <td class="num">${euro(tot.price||0)}</td>
+        <td class="num">${euro(tot.fee||0)}</td>
+        <td colspan="2" class="num">Orders: ${tot.orders||0}</td>
       </tr>`;
 
     return `<!doctype html>
@@ -1860,12 +1934,95 @@ const fee     = money(feeNum);
     if (ifr.contentDocument.readyState === 'complete') go(); else ifr.onload = go;
   }
 
-  btnPDF.addEventListener('click', (e)=>{
+  async function exportPDFwithJsPDF(){
+    const data = getExportData();
+    if(!data){ alert('Keine Daten zum Export.'); return; }
+    await ensureJsPDF();
+
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ orientation:'portrait', unit:'pt', format:'a4' });
+
+    const meta = data.meta || {};
+    const rows = data.rows || [];
+    const tot  = data.totals || {};
+
+    let y = 40;
+    doc.setFontSize(14);
+    doc.text('Abrechnungsbericht', 40, y); y += 16;
+
+    doc.setFontSize(10);
+    doc.text(`Restaurant: ${meta.restaurant||'—'}`, 40, y); y += 12;
+    doc.text(`Period: ${meta.period||'—'}    Status: ${meta.status||'All'}    Rows: ${rows.length}`, 40, y); y += 14;
+
+    // جدول
+    const head = [['#','OrderId','Platform','Qty','Price €','Del.Fee €','Status','Created']];
+    const body = rows.map(r=>[
+      String(r.idx||''),
+      String(r.code||''),
+      String(r.platform||'—'),
+      String(r.qty||0),
+      euro(r.price||0),
+      euro(r.fee||0),
+      String(r.status||'—'),
+      String(r.created||'—'),
+    ]);
+
+    if (doc.autoTable) {
+      doc.autoTable({
+        head,
+        body,
+        startY: y,
+        styles: { fontSize:9, cellPadding:3, overflow:'linebreak' },
+        headStyles: { fillColor: [248,250,252] },
+        columnStyles: {
+          0:{ cellWidth:24 }, 1:{ cellWidth:120 }, 3:{ halign:'right', cellWidth:36 },
+          4:{ halign:'right', cellWidth:64 }, 5:{ halign:'right', cellWidth:70 }, 7:{ cellWidth:120 }
+        },
+        foot: [[
+          {content:'Totals', colSpan:3},
+          String(tot.qty||0),
+          euro(tot.price||0),
+          euro(tot.fee||0),
+          {content:`Orders: ${tot.orders||0}`, colSpan:2, styles:{ halign:'right' }},
+        ]],
+        footStyles: { fillColor:[243,244,246], fontStyle:'bold' }
+      });
+    } else {
+      // أبسط بديل لو ما اشتغل AutoTable
+      let yy = y + 12;
+      doc.setFontSize(9);
+      body.forEach((r,i)=>{
+        if(yy>780){ doc.addPage(); yy=40; }
+        doc.text(`${r.join(' | ')}`, 40, yy);
+        yy += 12;
+      });
+      // Totals
+      if(yy>780){ doc.addPage(); yy=40; }
+      doc.setFont(undefined, 'bold');
+      doc.text(`Totals — Qty: ${tot.qty||0} | Price: ${euro(tot.price||0)} | Del.Fee: ${euro(tot.fee||0)} | Orders: ${tot.orders||0}`, 40, yy+10);
+    }
+
+    doc.save('Abrechnungsbericht.pdf');
+  }
+
+  btnPDF.addEventListener('click', async (e)=>{
     e.preventDefault();
-    const html = buildHTML();
-    printInHiddenIframe(html); // يطبع، والمستخدم يختار "Save as PDF" إذا أراد
+    // على أندرويد WebView (تطبيق ميديان): نولّد PDF مباشرة
+    if (isAndroidWebView()) {
+      try{ await exportPDFwithJsPDF(); }catch(err){ alert('PDF-Export fehlgeschlagen.'); }
+      return;
+    }
+    // غير ذلك: استخدم نافذة الطباعة الكلاسيكية
+    try{
+      const html = buildPrintableHTML();
+      printInHiddenIframe(html);
+    }catch(_){
+      // فشل؟ ارجع لــ PDF
+      try{ await exportPDFwithJsPDF(); }catch(err){ alert('PDF-Export fehlgeschlagen.'); }
+    }
   });
 })();
+
 
 </script>
 </body>
