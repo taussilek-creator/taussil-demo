@@ -304,6 +304,173 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
 .neo-driver .card-order .info .multi-stops .stop-row{
   width: 100%;
 }
+.drawer{ position:fixed; inset:0; display:none; z-index:2000; }
+.drawer.open{ display:block; }
+.drawer::before{ content:""; position:absolute; inset:0; background:rgba(0,0,0,.45); }
+.drawer-panel{
+  position:absolute; top:0; right:0; height:100%;
+  width:min(420px,92%); background:#5a5a5a; color:#e6e9ef;
+  border-left:1px solid rgba(255,255,255,.14);
+  box-shadow:0 12px 40px rgba(0,0,0,.35);
+  transform:translateX(100%); transition:transform .22s ease; padding:12px; overflow:auto;
+}
+.drawer.open .drawer-panel{ transform:translateX(0); }
+.drawer .drawer-hdr{ display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; }
+.drawer .close{
+  width:36px;height:36px;border-radius:10px;border:1px solid rgba(255,255,255,.12);
+  background:#111a2b;color:#e6e9ef;display:flex;align-items:center;justify-content:center;cursor:pointer;
+}
+/* ===== Detail Sheet — match cards + requested button colors ===== */
+.neo-driver #orderModal .sheet{
+  background: var(--card) !important;              /* نفس لون البطاقات */
+  color: #111 !important;                          /* نص أسود */
+  border: 1px solid rgba(0,0,0,.12) !important;
+}
+
+/* كل النصوص داخل الشيت سوداء… */
+.neo-driver #orderModal .sheet *{
+  color:#111 !important;
+}
+
+/* …ما عدا نصوص الأزرار: أبيض */
+.neo-driver #orderModal .sheet .btn,
+.neo-driver #orderModal .sheet a.btn{
+  color:#fff !important;
+}
+
+/* الأزرار داخل الشيت = تدرّج التبويب (أزرق فاتح) */
+.neo-driver #orderModal .sheet .btn,
+.neo-driver #orderModal .sheet a.btn,
+.neo-driver #orderModal .sheet .btn-cta,
+.neo-driver #orderModal .sheet .btn-ghost{
+  background: linear-gradient(180deg,#33BBDF,#1da9cf) !important;  /* نفس تبويب active */
+  border: none !important;
+  box-shadow: 0 6px 18px rgba(29,169,207,.32);
+}
+
+/* زر Bearbeiten أخضر مثل زر التسليم */
+.neo-driver #orderModal #md_price_edit{
+  background: linear-gradient(180deg,#a7f3d0,#34d399) !important;  /* مثل .btn-done */
+  color:#fff !important;
+  border: 1px solid rgba(0,0,0,.12) !important;
+  /* الحفاظ على ارتفاعه/تقويسه الحاليين من الـinline، ولا بأس بتركهما */
+}
+
+/* زر الإغلاق بنفس لون الشريط العلوي */
+.neo-driver #orderModal .sheet .close{
+  background: var(--bar) !important;   /* #1d2021 (لون الشريط) */
+  color:#fff !important;
+  border: 1px solid rgba(255,255,255,.12) !important;
+}
+
+/* فواصل kv سوداء خفيفة */
+.neo-driver #orderModal .sheet .kv{
+  border-top: 1px solid rgba(0,0,0,.12) !important;
+}
+
+/* تحسين صغير للمسافات */
+.neo-driver #orderModal .sheet .row{ gap:8px; }
+/* ===== Incoming popup (Neuer Auftrag) — match card style ===== */
+.neo-driver #incoming .box{
+  background: var(--card) !important;                 /* نفس لون البطاقات */
+  color: #111 !important;                             /* نص أسود */
+  border: 1px solid rgba(0,0,0,.12) !important;
+  box-shadow: 0 12px 36px rgba(0,0,0,.40) !important; /* ظل أوضح */
+  border-radius: 16px !important;
+}
+
+/* كل النصوص داخل الصندوق سوداء */
+.neo-driver #incoming .box *{
+  color:#111 !important;
+}
+
+/* زر Akzeptieren يبقى كما هو (أزرق + نص أبيض) */
+.neo-driver #incoming #in_accept{
+  /* يورّث .btn-cta الأزرق لديك — نضمن النص أبيض فقط */
+  color:#fff !important;
+  box-shadow: 0 6px 18px rgba(29,169,207,.32); /* لمسة ظل مثل التبويب المفعّل */
+}
+
+/* زر Abbrechen: خلفية مثل الصندوق، نص أحمر، وإطار أحمر */
+.neo-driver #incoming #in_reject{
+  background: var(--card) !important;
+  color: #ef4444 !important;                 /* أحمر */
+  border: 1px solid #ef4444 !important;
+  box-shadow: none !important;
+}
+
+/* مسافات الأزرار */
+.neo-driver #incoming .row{
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.neo-driver #incoming #in_reject:hover{
+  filter: brightness(1.03);
+}
+/* ===== Auth Modal (Login / Register) — match card look ===== */
+.neo-driver #authModal > div{
+  background: var(--card) !important;              /* نفس لون البطاقات */
+  border: 1px solid rgba(0,0,0,.12) !important;
+  border-radius: 16px !important;
+  box-shadow: 0 12px 36px rgba(0,0,0,.40) !important; /* ظل أوضح */
+}
+
+/* الحقول داخل منبثق الدخول/التسجيل */
+.neo-driver #authModal .input{
+  background: #ffffff !important;
+  color: #111 !important;
+  border: 1px solid rgba(0,0,0,.14) !important;      /* إطار خفيف */
+  box-shadow: 0 6px 18px rgba(0,0,0,.12) !important; /* ظل ظاهر */
+  border-radius: 12px;
+}
+
+/* لون placeholder */
+.neo-driver #authModal .input::placeholder{
+  color:#666;
+}
+
+/* لمسة تفاعل خفيفة */
+.neo-driver #authModal .input:focus{
+  outline: none;
+  border-color: rgba(0,0,0,.25) !important;
+  box-shadow: 0 8px 22px rgba(0,0,0,.18) !important;
+}
+/* ===== Auth Tabs buttons (Login / Register) ===== */
+.neo-driver #authModal #tabLogin,
+.neo-driver #authModal #tabRegister{
+  background:#ffffff !important;
+  color:#111 !important;
+  border:1px solid rgba(0,0,0,.14) !important;
+  border-radius:12px !important;
+  box-shadow:0 6px 18px rgba(0,0,0,.12) !important;
+  transition:background .18s, color .18s, box-shadow .18s, border-color .18s, transform .06s;
+}
+
+/* Hover/press */
+.neo-driver #authModal #tabLogin:hover,
+.neo-driver #authModal #tabRegister:hover{
+  box-shadow:0 8px 22px rgba(0,0,0,.18) !important;
+}
+.neo-driver #authModal #tabLogin:active,
+.neo-driver #authModal #tabRegister:active{
+  transform:scale(.99);
+}
+
+/* الحالة المفعّلة (التحديد) بنفس لون الشريط العلوي */
+.neo-driver #authModal #tabLogin.active,
+.neo-driver #authModal #tabRegister.active{
+  background: var(--bar) !important;          /* نفس لون الشريط العلوي */
+  color:#fff !important;                      /* النص أبيض */
+  border-color: rgba(255,255,255,.18) !important;
+  box-shadow:0 10px 26px rgba(0,0,0,.28) !important;
+}
+
+/* تركيز لوحة المفاتيح */
+.neo-driver #authModal #tabLogin:focus-visible,
+.neo-driver #authModal #tabRegister:focus-visible{
+  outline:2px solid var(--bar);
+  outline-offset:2px;
+}
 
 </style>
 </head>
@@ -897,9 +1064,15 @@ function switchPane(which){
   formRegister.style.display = reg ? 'block': 'none';
   tabLogin.style.opacity     = reg ? .7 : 1;
   tabRegister.style.opacity  = reg ? 1 : .7;
+
+  // NEW: فعّل/ألغِ التحديد بصريًا
+  tabLogin.classList.toggle('active', !reg);
+  tabRegister.classList.toggle('active', reg);
+
   lastAuthTab = reg? 'register':'login';
   localStorage.setItem('driver_auth_tab', lastAuthTab);
 }
+
 tabLogin.addEventListener('click', (e)=>{ e.preventDefault(); switchPane('login'); });
 tabRegister.addEventListener('click', (e)=>{ e.preventDefault(); switchPane('register'); });
 
@@ -2101,7 +2274,36 @@ $("#neoMoney")?.addEventListener("click", (e)=>{ e.preventDefault(); window.__dr
   // مثال بسيط: عتّم بطاقة معيّنة لو حالتها "Neu" (اختياري تمامًا)
   // document.querySelector('.card-order[data-status="Neu"]')?.classList.add('is-dim');
 })();
+
 </script>
+<!-- Menu Drawer (empty) -->
+<div id="menuDrawer" class="drawer" aria-hidden="true">
+  <div class="drawer-panel" role="dialog" aria-modal="true" aria-label="Menü">
+    <div class="drawer-hdr">
+      <strong>Menü</strong>
+      <button id="menuClose" class="close" aria-label="Schließen">✕</button>
+    </div>
+    <!-- محتوى السلايدر لاحقاً -->
+  </div>
+</div>
+
+<script>
+  // ===== Empty Menu Drawer wiring
+  (()=>{
+    const menuDrawer = document.getElementById('menuDrawer');
+    const menuClose  = document.getElementById('menuClose');
+    const neoGear    = document.getElementById('neoGear'); // الزر الأيمن في الشريط العلوي
+
+    function openMenuDrawer(){ menuDrawer?.classList.add('open'); }
+    function closeMenuDrawer(){ menuDrawer?.classList.remove('open'); }
+
+    neoGear?.addEventListener('click', (e)=>{ e.preventDefault(); openMenuDrawer(); });
+    menuClose?.addEventListener('click', ()=> closeMenuDrawer());
+    menuDrawer?.addEventListener('click', (e)=>{ if(e.target===menuDrawer) closeMenuDrawer(); });
+  })();
+</script>
+</body>
+</html>
 
 
 </body>
