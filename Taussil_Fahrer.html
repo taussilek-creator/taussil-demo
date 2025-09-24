@@ -669,6 +669,31 @@ const firebaseConfig = {
 };
 let app; try{ app=getApp(); }catch{ app=initializeApp(firebaseConfig); }
 const db = getFirestore(app);
+// === Restaurant logos from Firestore (simple cache) ===
+const restLogoCache = new Map();
+
+async function getFsLogoUrl(restId){
+  if (!restId) return null;
+  if (restLogoCache.has(restId)) return restLogoCache.get(restId);
+  try{
+    const snap = await getDoc(doc(db, 'restaurants', restId));
+    const url = snap.exists() ? (snap.data()?.logoUrl || null) : null;
+    restLogoCache.set(restId, url);
+    return url;
+  }catch(e){
+    console.warn('getFsLogoUrl', e);
+    restLogoCache.set(restId, null);
+    return null;
+  }
+}
+
+function applyCardLogo(cardEl, url, alt){
+  if (!cardEl || !url) return;
+  const logo = cardEl.querySelector('.logo');
+  if (!logo) return;
+  logo.innerHTML = `<img src="${url}" alt="${alt||''}">`;
+}
+
 const rtdb = getDatabase(app);
 const auth = getAuth(app);
 await setPersistence(auth, browserSessionPersistence).catch(()=>{});
@@ -1700,6 +1725,17 @@ listEl.querySelectorAll(".card-order").forEach(el=>{
 
   // ✅ تشغيل مستمع الـstops لهذا الطلب (إن وُجدت subcollection سيظهروا؛ غير ذلك يبقى المنطق القديم)
   const o = omap.get(id) || {};
+    // 🔽 لو الطلب ما فيه logoUrl، نجلبه من وثيقة المطعم
+  const restId =
+    o?.restaurant?.id || o?.restaurantId || o?.restId || o?.restaurant?.restId;
+  const hasLogoInOrder = !!(o?.restaurant?.logoUrl);
+
+  if (restId && !hasLogoInOrder) {
+    getFsLogoUrl(restId).then(url => {
+      if (url) applyCardLogo(el, url, o?.restaurant?.name);
+    });
+  }
+
   attachStopsForOrder(id, o, el);
 });
 
