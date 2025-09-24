@@ -471,6 +471,122 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
   outline:2px solid var(--bar);
   outline-offset:2px;
 }
+/* === Price Edit Modal — match card color + button borders/shadows + Abbrechen black === */
+
+/* الصندوق الداخلي للمنبثق */
+#priceModal .box,
+.price-modal .box,
+.modal.price .box,
+.modal-price .box,
+.modal[data-modal="price"] .box{
+  background: var(--card, #fff) !important;   /* نفس لون البطاقات */
+  color: #111 !important;                      /* نص أسود */
+  border: 1px solid rgba(0,0,0,.10) !important;
+  border-radius: 16px !important;
+  box-shadow: 0 12px 28px rgba(0,0,0,.18), 0 2px 8px rgba(0,0,0,.08) !important;
+}
+
+/* الحقول داخل المنبثق */
+#priceModal input, #priceModal .input,
+#priceModal select, #priceModal textarea,
+.price-modal input, .price-modal .input,
+.price-modal select, .price-modal textarea,
+.modal.price input, .modal.price .input,
+.modal.price select, .modal.price textarea,
+.modal-price input, .modal-price .input,
+.modal-price select, .modal-price textarea,
+.modal[data-modal="price"] input,
+.modal[data-modal="price"] .input,
+.modal[data-modal="price"] select,
+.modal[data-modal="price"] textarea{
+  background: var(--card, #fff) !important;    /* نفس لون البطاقة */
+  color: #111 !important;
+  border: 1px solid rgba(0,0,0,.12) !important; /* إطار خفيف */
+  border-radius: 10px !important;
+  box-shadow: 0 2px 8px rgba(0,0,0,.08) !important; /* ظل خفيف */
+}
+
+/* تمييز الحقول عند التركيز بدون تغيير اللون */
+#priceModal input:focus, #priceModal select:focus, #priceModal textarea:focus,
+.price-modal input:focus, .price-modal select:focus, .price-modal textarea:focus,
+.modal.price input:focus, .modal.price select:focus, .modal.price textarea:focus,
+.modal-price input:focus, .modal-price select:focus, .modal-price textarea:focus,
+.modal[data-modal="price"] input:focus,
+.modal[data-modal="price"] select:focus,
+.modal[data-modal="price"] textarea:focus{
+  outline: none;
+  box-shadow: 0 2px 8px rgba(0,0,0,.08), 0 0 0 2px #aee7f5 !important;
+}
+
+/* إطار + ظل للأزرار داخل منبثق السعر (بدون تغيير ألوانها الحالية) */
+#priceModal .btn, #priceModal button,
+.price-modal .btn, .price-modal button,
+.modal.price .btn, .modal.price button,
+.modal-price .btn, .modal-price button,
+.modal[data-modal="price"] .btn,
+.modal[data-modal="price"] button{
+  border: 1px solid rgba(0,0,0,.14) !important;
+  box-shadow: 0 4px 12px rgba(0,0,0,.12) !important;
+  border-radius: 12px !important;
+}
+
+/* زر Abbrechen — نص أسود (مع بقاء الخلفية كما هي) */
+#priceModal .btn-ghost,
+#priceModal .btn-cancel,
+#priceModal [data-cancel],
+.price-modal .btn-ghost,
+.modal.price .btn-ghost,
+.modal-price .btn-ghost,
+.modal[data-modal="price"] .btn-ghost,
+.modal[data-modal="price"] [data-cancel]{
+  color: #111 !important;                     /* أسود */
+  background: transparent !important;
+  border-color: rgba(0,0,0,.2) !important;    /* ينسجم مع الأزرار الأخرى */
+}
+/* === Price Edit Modal (Driver) — match card color + inputs + buttons === */
+#priceModal,
+#priceModal .box{
+  background: var(--card, #fff) !important;
+  color: #111 !important;
+  border: 1px solid rgba(0,0,0,.12) !important;
+  border-radius: 16px !important;
+  box-shadow: 0 12px 28px rgba(0,0,0,.18), 0 2px 8px rgba(0,0,0,.08) !important;
+}
+
+/* لو كان SweetAlert2 */
+.swal2-popup.price-edit{
+  background: var(--card, #fff) !important;
+  color: #111 !important;
+  box-shadow: 0 12px 28px rgba(0,0,0,.18) !important;
+}
+
+/* حقول الإدخال */
+#priceModal input, #priceModal .input,
+#priceModal select, #priceModal textarea,
+.swal2-popup.price-edit input, .swal2-popup.price-edit .input{
+  background: var(--card, #fff) !important;
+  color: #111 !important;
+  border: 1px solid rgba(0,0,0,.14) !important;
+  border-radius: 10px !important;
+  box-shadow: 0 2px 8px rgba(0,0,0,.08) !important;
+}
+
+/* أزرار عامة داخل المنبثق */
+#priceModal .btn, #priceModal button,
+.swal2-popup.price-edit .swal2-actions button{
+  border: 1px solid rgba(0,0,0,.14) !important;
+  box-shadow: 0 4px 12px rgba(0,0,0,.12) !important;
+  border-radius: 12px !important;
+}
+
+/* زر Abbrechen: نص أسود وخلفية شفافة وحدّ واضح */
+#priceModal .btn-cancel,
+.swal2-popup.price-edit .swal2-cancel{
+  color: #111 !important;
+  background: transparent !important;
+  border-color: rgba(0,0,0,.2) !important;
+  box-shadow: 0 4px 12px rgba(0,0,0,.10) !important;
+}
 
 </style>
 </head>
@@ -574,6 +690,13 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
     <div class="kv"><div class="small">Plattform</div><div class="small" id="md_platform">—</div></div>
     <div class="kv"><div class="small">Restaurant</div><div class="small" id="md_rest">—</div></div>
     <div class="kv"><div class="small">Adresse</div><div class="small" id="md_addr">—</div></div>
+	<div class="kv">
+  <div class="small">Telefon</div>
+  <div class="small">
+    <a id="md_phone_link" href="#" style="color:inherit;text-decoration:underline">—</a>
+  </div>
+</div>
+
     <div class="kv"><div class="small">Qty</div><div class="small" id="md_qty">—</div></div>
     <div class="kv"><div class="small">Abholzeit</div><div class="small" id="md_pickup">—</div></div>
     <div class="row" style="margin-top:8px">
@@ -669,31 +792,6 @@ const firebaseConfig = {
 };
 let app; try{ app=getApp(); }catch{ app=initializeApp(firebaseConfig); }
 const db = getFirestore(app);
-// === Restaurant logos from Firestore (simple cache) ===
-const restLogoCache = new Map();
-
-async function getFsLogoUrl(restId){
-  if (!restId) return null;
-  if (restLogoCache.has(restId)) return restLogoCache.get(restId);
-  try{
-    const snap = await getDoc(doc(db, 'restaurants', restId));
-    const url = snap.exists() ? (snap.data()?.logoUrl || null) : null;
-    restLogoCache.set(restId, url);
-    return url;
-  }catch(e){
-    console.warn('getFsLogoUrl', e);
-    restLogoCache.set(restId, null);
-    return null;
-  }
-}
-
-function applyCardLogo(cardEl, url, alt){
-  if (!cardEl || !url) return;
-  const logo = cardEl.querySelector('.logo');
-  if (!logo) return;
-  logo.innerHTML = `<img src="${url}" alt="${alt||''}">`;
-}
-
 const rtdb = getDatabase(app);
 const auth = getAuth(app);
 await setPersistence(auth, browserSessionPersistence).catch(()=>{});
@@ -989,6 +1087,8 @@ const navModal=$("#navModal"), navClose=$("#nav_close"), navSave=$("#nav_save");
 const listEl=$("#ordersList"), ordersInfo=$("#ordersInfo");
 const md=$("#orderModal"), mdClose=$("#md_close");
 const md_id=$("#md_id"), md_status=$("#md_status"), md_platform=$("#md_platform"), md_rest=$("#md_rest"), md_addr=$("#md_addr"), md_qty=$("#md_qty"), md_pickup=$("#md_pickup"), md_title=$("#md_title");
+const md_phone_link = document.getElementById('md_phone_link'); // قد يكون null لو ما لُصق الـHTML بعد
+
 const md_start=$("#md_start"), md_done=$("#md_done"), md_nav=$("#md_nav");
 const incoming=$("#incoming"), inText=$("#in_text"), inAccept=$("#in_accept"), inReject=$("#in_reject");
 const neoPower = document.getElementById('neoPower');
@@ -1674,7 +1774,7 @@ function renderOrders(items){
     const lower=String(stRaw).toLowerCase();
     const showStart = (lower==="angenommen" || lower==="zugewiesen" || lower==="assigned" || lower==="bearbeitung");
     const showDone  = (lower==="unterwegs");
-    const logoUrl=o.restaurant?.logoUrl||"";
+    const logoUrl = o.logoUrl || o.restaurant?.logoUrl || "";
     const logoHTML = logoUrl? `<img src="${logoUrl}" alt="${rest}">` : `<div class="ph">${(rest||"—").slice(0,2).toUpperCase()}</div>`;
     const navHref = addr ? makeNavUrl(addr) : '#';
     return `
@@ -1725,17 +1825,6 @@ listEl.querySelectorAll(".card-order").forEach(el=>{
 
   // ✅ تشغيل مستمع الـstops لهذا الطلب (إن وُجدت subcollection سيظهروا؛ غير ذلك يبقى المنطق القديم)
   const o = omap.get(id) || {};
-    // 🔽 لو الطلب ما فيه logoUrl، نجلبه من وثيقة المطعم
-  const restId =
-    o?.restaurant?.id || o?.restaurantId || o?.restId || o?.restaurant?.restId;
-  const hasLogoInOrder = !!(o?.restaurant?.logoUrl);
-
-  if (restId && !hasLogoInOrder) {
-    getFsLogoUrl(restId).then(url => {
-      if (url) applyCardLogo(el, url, o?.restaurant?.name);
-    });
-  }
-
   attachStopsForOrder(id, o, el);
 });
 
@@ -1949,6 +2038,32 @@ async function openDetail(id){
   md_rest.textContent=o.restaurant?.name||"—";
   const addr=(o.restaurant?.addressText || o.restaurant?.address_text || "").trim();
   md_addr.textContent=addr || '—';
+    // هاتف المطعم من وثيقة الطلب (نلتقط أشهر الأسماء المحتملة)
+  const phone =
+    o?.restaurant?.phone ??
+    o?.restaurant?.tel ??
+    o?.restaurant?.phoneNumber ??
+    o?.restaurant?.phone_number ??
+    o?.restaurant_phone ??
+    o?.restaurantPhone ??
+    o?.phoneRestaurant ??
+    o?.phone ?? null;
+
+  if (md_phone_link) {
+    if (phone && String(phone).trim()) {
+      const href = telHref(phone);
+      md_phone_link.textContent = String(phone).trim();
+      if (href) {
+        md_phone_link.setAttribute('href', href);
+      } else {
+        md_phone_link.removeAttribute('href'); // لو ما قدر يشكّل tel: يخليه نص فقط
+      }
+    } else {
+      md_phone_link.textContent = '—';
+      md_phone_link.removeAttribute('href');
+    }
+  }
+
   md_qty.textContent=Number(o.qty||0)||0;
   md_pickup.textContent=o.pickupTime || "—";
   md_title.textContent=o.restaurant?.name||"Auftrag";
@@ -1983,6 +2098,12 @@ md_price_edit.onclick = (e)=>{
 }
 mdClose.addEventListener("click", ()=> md.classList.remove("show"));
 md.addEventListener("click",(e)=>{ if(e.target===md) md.classList.remove("show"); });
+function telHref(raw){
+  const s = String(raw||'').trim();
+  if(!s) return null;
+  const norm = s.replace(/[^\d+]/g, ''); // أبقِ فقط الأرقام و +
+  return norm ? ('tel:' + norm) : null;
+}
 
 /* ===== Patch order helper ===== */
 async function patchOrder(id, fields){
@@ -2337,6 +2458,91 @@ $("#neoMoney")?.addEventListener("click", (e)=>{ e.preventDefault(); window.__dr
     menuClose?.addEventListener('click', ()=> closeMenuDrawer());
     menuDrawer?.addEventListener('click', (e)=>{ if(e.target===menuDrawer) closeMenuDrawer(); });
   })();
+  /* === Force style for Price Edit modal (driver) === */
+(() => {
+  const CARD_BG = getComputedStyle(document.documentElement)
+    .getPropertyValue('--card')?.trim() || '#fff';
+
+  function looksLikePriceModal(root){
+    // ابحث عن عنصر ظاهر فيه حقول/نصوص لها علاقة بالسعر
+    const popups = Array.from(root.querySelectorAll(
+      '.modal, .dialog, .popup, .sheet, .swal2-popup, dialog, [role="dialog"]'
+    )).filter(el => el.offsetParent || el.matches('.swal2-popup'));
+
+    for (const el of popups){
+      // أي وجود لكلمة Preis/Price/€ في الحقول/النص
+      const text = (el.textContent || '').toLowerCase();
+      const hint = text.includes('preis') || text.includes('price') || text.includes('€');
+      const hasInput = el.querySelector('input, textarea, [contenteditable="true"]');
+      if (hint && hasInput) return el;
+    }
+    return null;
+  }
+
+  function stylePriceModal(modal){
+    // وسم لصيد الـCSS
+    if (!modal.id) modal.id = 'priceModal';
+    modal.classList.add('price-edit');
+
+    // خلفية ونص وحدود (inline لضمان الغلبة)
+    const target = modal.querySelector('.box') || modal;
+    target.style.background = CARD_BG;
+    target.style.color = '#111';
+    target.style.border = '1px solid rgba(0,0,0,.12)';
+    target.style.borderRadius = '16px';
+    target.style.boxShadow = '0 12px 28px rgba(0,0,0,.18), 0 2px 8px rgba(0,0,0,.08)';
+
+    // الحقول
+    modal.querySelectorAll('input, .input, select, textarea').forEach(inp=>{
+      inp.style.background = CARD_BG;
+      inp.style.color = '#111';
+      inp.style.border = '1px solid rgba(0,0,0,.14)';
+      inp.style.borderRadius = '10px';
+      inp.style.boxShadow = '0 2px 8px rgba(0,0,0,.08)';
+    });
+
+    // الأزرار (ظل + إطار)
+    modal.querySelectorAll('button, .btn, [role="button"]').forEach(b=>{
+      b.style.border = '1px solid rgba(0,0,0,.14)';
+      b.style.boxShadow = '0 4px 12px rgba(0,0,0,.12)';
+      b.style.borderRadius = '12px';
+    });
+
+    // زر Abbrechen: حدده بالنص وأضف كلاس ثم لوّن النص أسود
+    const cancelBtn = Array.from(modal.querySelectorAll('button, .btn, [role="button"]'))
+      .find(b => /abbrechen/i.test(b.textContent || ''));
+    if (cancelBtn){
+      cancelBtn.classList.add('btn-cancel');
+      cancelBtn.style.color = '#111';
+      // إن كانت مكتبة SweetAlert2
+      if (cancelBtn.classList.contains('swal2-cancel')){
+        modal.classList.add('price-edit'); // ليلتقطه CSS أعلاه
+      }
+    }
+  }
+
+  // راقب أي تغييرات DOM (عند فتح المنبثق ديناميكيًا)
+  const mo = new MutationObserver(() => {
+    const m = looksLikePriceModal(document);
+    if (m) stylePriceModal(m);
+  });
+  mo.observe(document.documentElement, {subtree:true, childList:true});
+
+  // محاولة فورية (لو المنبثق مفتوح أصلًا)
+  setTimeout(() => {
+    const m = looksLikePriceModal(document);
+    if (m) stylePriceModal(m);
+  }, 50);
+
+  // لو يوجد زر يفتح المنبثق، غيّر التوقيت لالتقاطه مباشرة بعد الفتح
+  document.addEventListener('click', () => {
+    setTimeout(() => {
+      const m = looksLikePriceModal(document);
+      if (m) stylePriceModal(m);
+    }, 60);
+  });
+})();
+
 </script>
 </body>
 </html>
