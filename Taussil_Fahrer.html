@@ -276,6 +276,44 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
 /* أيقونات جديدة للدوائر */
 .neo-circle.exit{ color:#ffd1d1; border-color:#ffd1d1aa; }
 .neo-circle.menu{ color:#c7f9ff; }
+/* 1) امنع أي تمرير أفقي عام */
+html, body { max-width: 100%; overflow-x: hidden; }
+
+/* 2) خلّي الحاوية تلتزم عرض الشاشة */
+.app { width: 100%; }
+
+/* 3) حلّ مشكلة Grid overflow:
+   استخدم minmax(0,1fr) + min-width:0 حتى تسمح للأعمدة أنها تنضغط وتعمل ellipsis */
+.neo-driver .card-order {
+  grid-template-columns: 72px minmax(0,1fr) auto;
+}
+.neo-driver .card-order .info { min-width: 0; }            /* مهم جداً */
+.neo-driver .card-order .info .line,
+.neo-driver .card-order .info .small { min-width: 0; }
+
+/* نفس الفكرة لأسطر الـstops */
+.card-order .multi-stops .stop-row {
+  grid-template-columns: 56px minmax(0,1fr) 48px;
+}
+.card-order .multi-stops .info { min-width: 0; }
+
+/* الشبكات العامة اللي عندك (مثل الفورم/التبويبات) */
+.row { grid-template-columns: repeat(2, minmax(0,1fr)); }
+#tabsRow { grid-template-columns: repeat(3, minmax(0,1fr)); }
+
+/* أمان إضافي للقوائم */
+#ordersList { overflow-x: hidden; }
+
+/* 4) تحجيم أزرار وصور لما الشاشات تصغر جداً */
+@media (max-width: 380px){
+  .neo-driver .card-order {
+    grid-template-columns: 60px minmax(0,1fr) 48px;
+    gap: 8px;
+  }
+  .neo-driver .card-order .logo img,
+  .neo-driver .card-order .logo .ph { width: 60px; height: 60px; }
+  .btn-icon, .btn-icon.btn-go { width: 48px; height: 48px; }
+}
 
 
 </style>
