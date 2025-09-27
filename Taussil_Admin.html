@@ -1117,7 +1117,8 @@ const i18n = {
 'fleetx.orders':'Bestellungen',
 'fleetx.fleets':'Flotten',
 'fleetx.emptyOrders':'Keine passenden Bestellungen.',
-'fleetx.emptyFleets':'Keine genehmigten Flotten.',
+'fleetx.emptyFleets':'Keine genehmigten Flotten.','drivers.earningsToggle':'Einnahmen anzeigen',
+
       // [TAUSSIL-APPROVAL-I18N-END]
   },
   en:{'brand.title':'Taussil Admin','brand.subtitle':'Control Center',
@@ -1143,7 +1144,7 @@ const i18n = {
 'fleetx.orders':'Orders',
 'fleetx.fleets':'Fleets',
 'fleetx.emptyOrders':'No matching orders.',
-'fleetx.emptyFleets':'No approved fleets.',
+'fleetx.emptyFleets':'No approved fleets.', 'drivers.earningsToggle':'Show earnings menu',
 
       // [TAUSSIL-APPROVAL-I18N-END]
   },
@@ -1170,7 +1171,7 @@ const i18n = {
 'fleetx.orders':'الطلبات',
 'fleetx.fleets':'الأساطيل',
 'fleetx.emptyOrders':'لا توجد طلبات مطابقة.',
-'fleetx.emptyFleets':'لا توجد أساطيل معتمدة.',
+'fleetx.emptyFleets':'لا توجد أساطيل معتمدة.', 'drivers.earningsToggle':'إظهار أرباح السائق',
       // [TAUSSIL-APPROVAL-I18N-END]
   }
 };
@@ -2552,6 +2553,12 @@ async function changeStatus(orderId, next){
 function drvRowHtml(d){
   const phone = d.phone || '';
   const avatar = d.avatarUrl ? `<img class="avatar" src="${d.avatarUrl}">` : `<div class="avatar" style="background:#f3f4f6"></div>`;
+  const earningsToggle = `
+    <label class="small" style="display:flex;align-items:center;gap:6px">
+      <input type="checkbox" class="drv-earnings-toggle" data-id="${d.id}" ${d.showEarnings ? 'checked':''}>
+      <span data-i18n="drivers.earningsToggle">${t('drivers.earningsToggle')}</span>
+    </label>
+  `;
   return `
     <div class="drv-row">
       <div class="who" style="display:flex;gap:10px;align-items:center;min-width:0">
@@ -2562,6 +2569,7 @@ function drvRowHtml(d){
         </div>
       </div>
       <div class="actions">
+        ${earningsToggle}
         <button class="btn secondary"
                 data-user-details
                 data-kind="driver"
@@ -2654,6 +2662,33 @@ document.addEventListener('click', (e)=>{
     if(typeof openAssignDriverModal === 'function'){
       openAssignDriverModal(driverId);
     }
+  }
+});
+// حفظ إظهار/إخفاء الأرباح لكل سائق
+document.addEventListener('change', async (e)=>{
+  const ch = e.target.closest('.drv-earnings-toggle');
+  if(!ch) return;
+
+  const uid = ch.getAttribute('data-id');
+  const val = !!ch.checked;
+  ch.disabled = true;
+  try{
+    // نكتب للمسار الأساسي + مسارات توافق
+    await updateDoc(doc(db,'users', uid), {
+      'ui.showEarnings': val,
+      'features.earningsVisible': val,
+      showEarnings: val,
+      updatedAt: serverTimestamp()
+    });
+  }catch(_){
+    await setDoc(doc(db,'users', uid), {
+      ui: { showEarnings: val },
+      features: Object.assign({}, (await (async()=>{ try{ const s=await getDoc(doc(db,'users',uid)); return (s.exists()? s.data()?.features : {})||{}; }catch(_){ return {}; } })()), { earningsVisible: val }),
+      showEarnings: val,
+      updatedAt: serverTimestamp()
+    }, { merge:true });
+  }finally{
+    ch.disabled = false;
   }
 });
 
@@ -2820,17 +2855,29 @@ async function bindRealtimeOnce(){
   /* [TAUSSIL-REST-APPROVED-LISTENER-END] */
 
   unsubDrivers = onSnapshot(
-    query(collection(db,'users'), where('role','==','driver'), where('approved','==', true), limit(200)),
-    (snap)=>{
-      drivers = snap.docs.map(d=>{
-        const u=d.data()||{};
-        const full = (u.firstName&&u.lastName)? `${u.firstName} ${u.lastName}` : (u.name||u.email||d.id);
-        driverInfoById.set(d.id, { firstName: u.firstName || firstWord(full), fullName: full, phone: u.phone||'', email:u.email||'' });
-        return { id:d.id, fullName: full, phone:u.phone||'', avatarUrl:u.avatarUrl||'' };
-      });
-      renderDrivers();
-    }
-  );
+  query(collection(db,'users'), where('role','==','driver'), where('approved','==', true), limit(200)),
+  (snap)=>{
+    drivers = snap.docs.map(d=>{
+      const u=d.data()||{};
+      const full = (u.firstName&&u.lastName)? `${u.firstName} ${u.lastName}` : (u.name||u.email||d.id);
+      driverInfoById.set(d.id, { firstName: u.firstName || firstWord(full), fullName: full, phone: u.phone||'', email:u.email||'' });
+
+      // قراءة العلم من أكثر من مسار للتوافق للخلف
+      const showEarnings =
+        !!(u?.ui?.showEarnings ?? u?.features?.earningsVisible ?? u?.showEarnings ?? false);
+
+      return {
+        id: d.id,
+        fullName: full,
+        phone: u.phone||'',
+        avatarUrl: u.avatarUrl||'',
+        showEarnings
+      };
+    });
+    renderDrivers();
+  }
+);
+
 /* ===== Fleets (approved) — docs + users fallback ===== */
 if(!unsubFleetsApproved){
   try{
