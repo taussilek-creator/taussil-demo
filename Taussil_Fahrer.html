@@ -370,6 +370,91 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
 
 /* تحسين صغير للمسافات */
 .neo-driver #orderModal .sheet .row{ gap:8px; }
+/* ===== Earnings Modal — match cards look (kein neues Farbschema) ===== */
+.neo-driver #earningsModal .sheet{
+  background: var(--card) !important;           /* نفس لون بطاقات الطلبات */
+  color: #111 !important;                       /* نص غامق واضح */
+  border: 1px solid rgba(0,0,0,.12) !important;
+  border-radius: 16px !important;
+  box-shadow: 0 12px 28px rgba(0,0,0,.18), 0 2px 8px rgba(0,0,0,.08) !important;
+}
+/* كل النصوص داخل المنبثق داكنة لتتمايز مع الخلفية الفاتحة */
+.neo-driver #earningsModal .sheet *{
+  color:#111 !important;
+}
+/* زر الإغلاق بنفس لون الشريط العلوي */
+.neo-driver #earningsModal .sheet .close{
+  background: var(--bar) !important;
+  color:#fff !important;
+  border: 1px solid rgba(255,255,255,.12) !important;
+}
+/* فواصل السطور (kv) سوداء خفيفة مثل الـOrder Modal */
+.neo-driver #earningsModal .sheet .kv{
+  border-top: 1px solid rgba(0,0,0,.12) !important;
+}
+/* الكارد الداخلي داخل المنبثق: أعطه نفس ستايل البطاقات (لأن .neo-driver .card = transparent) */
+.neo-driver #earningsModal .sheet .card{
+  background: var(--card) !important;
+  color:#111 !important;
+  border: 1px solid rgba(0,0,0,.12) !important;
+  border-radius: 12px !important;
+  box-shadow: 0 6px 18px rgba(0,0,0,.12) !important;
+}
+/* تحسين مسافات صفوف الشبكة داخل المنبثق */
+.neo-driver #earningsModal .sheet .row{ gap:8px; }
+/* === Earnings Modal: center + hide scrollbar (mobile-friendly) === */
+.neo-driver #earningsModal{
+  /* وسط المنبثق على الشاشة بدل bottom-sheet */
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+.neo-driver #earningsModal .sheet{
+  /* عرض منطقي للهاتف + بقاء التمرير */
+  width: min(560px, 92%) !important;
+  max-height: 80vh !important;
+  overflow: auto !important;
+
+  /* إخفاء خط السكрол فقط */
+  scrollbar-width: none;        /* Firefox */
+  -ms-overflow-style: none;     /* IE/Edge legacy */
+}
+.neo-driver #earningsModal .sheet::-webkit-scrollbar{
+  width: 0;
+  height: 0;                    /* WebKit (Chrome/Safari) */
+}
+/* === Earnings Modal: floating close button (stick on scroll) === */
+.neo-driver #earningsModal .sheet{ 
+  position: relative !important;  /* مرجع للـsticky */
+}
+
+/* اجعل شريط العنوان مثبتاً أعلى المنبثق أثناء السحب */
+.neo-driver #earningsModal .sheet .hdr{
+  position: sticky !important;
+  top: 0 !important;
+  z-index: 30 !important;
+  background: var(--card) !important;                 /* يطابق لون البطاقات */
+  border-bottom: 1px solid rgba(0,0,0,.12) !important;/* خط فصل خفيف */
+  border-top-left-radius: 16px;                       /* يحافظ على زوايا الشيت */
+  border-top-right-radius: 16px;
+}
+
+/* زر الإغلاق يبقى مرئيًا دائمًا داخل الهيدر المثبّت */
+.neo-driver #earningsModal .sheet .close{
+  position: sticky !important;
+  top: 8px !important;   /* يلتصق بالحافة العلوية أثناء التمرير */
+  z-index: 40 !important;
+  /* لا نغيّر الألوان: يستخدم نفس ستايلك (var(--bar) + نص أبيض) */
+}
+/* === Earnings Modal: print button look (match header bar) === */
+.neo-driver #earningsModal .sheet #earnings_print{
+  background: var(--bar) !important;
+  color:#fff !important;
+  border: 1px solid rgba(255,255,255,.12) !important;
+  border-radius:10px;
+  display:inline-flex; align-items:center; justify-content:center;
+}
+
 /* ===== Incoming popup (Neuer Auftrag) — match card style ===== */
 .neo-driver #incoming .box{
   background: var(--card) !important;                 /* نفس لون البطاقات */
@@ -587,6 +672,9 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
   border-color: rgba(0,0,0,.2) !important;
   box-shadow: 0 4px 12px rgba(0,0,0,.10) !important;
 }
+/* [EARNINGS-CSS] */
+#menuEarningsLink{ display:none; }              /* مخفي افتراضيًا */
+html.show-earnings #menuEarningsLink{ display:block; }  /* يظهر عند السماح */
 
 </style>
 </head>
@@ -666,7 +754,8 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
   <div class="kv">
     <div class="small">Aufträge</div>
     <div class="small" id="ordersInfo">—</div>
-	<div class="eta-line">Abholung in 13 min</div>
+	<div class="eta-line" id="etaLine">Abholung —</div>
+
 <div class="small">Liefergebühr: 7.50€</div>
   </div>
   <!-- Tabs -->
@@ -760,6 +849,24 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
     </div>
   </div>
 </div>
+<!-- @earnings.modal:start -->
+<div id="earningsModal" class="modal">
+  <div class="sheet" role="dialog" aria-modal="true" style="max-width:560px;margin:0 auto">
+    <div class="hdr">
+      <div class="title">Einnahmen</div>
+	  <!-- زر طباعة/تصدير -->
+<button id="earnings_print" class="btn" style="height:36px;min-width:36px;margin-right:6px">🖨️</button>
+
+      <button class="close" id="earnings_close">✕</button>
+    </div>
+	
+    <div id="earnings_body" class="card" style="padding:12px">
+      <!-- Inhalt wird per JS gefüllt -->
+    </div>
+  </div>
+</div>
+<!-- @earnings.modal:end -->
+
 <!-- Sounds -->
 <audio id="newOrderSound" src="neu1.mp3" preload="auto"></audio>
 <div id="toast" class="toast">OK</div>
@@ -795,6 +902,7 @@ const db = getFirestore(app);
 const rtdb = getDatabase(app);
 const auth = getAuth(app);
 await setPersistence(auth, browserSessionPersistence).catch(()=>{});
+
 /* ===== Invite Mode — helpers & loader ===== */
 const trim  = s => String(s||'').trim();
 const lower = s => trim(s).toLowerCase();
@@ -860,6 +968,35 @@ async function routeKm(origin, destination){
     });
   });
 }
+// معلومات مسار كاملة: كم + زمن (ثوانٍ) مع حركة المرور لو متاحة
+async function routeInfo(origin, destination){
+  await ensureGmaps();
+  return new Promise((resolve, reject)=>{
+    const ds = new google.maps.DirectionsService();
+    ds.route({
+      origin, destination,
+      travelMode: google.maps.TravelMode.DRIVING,
+      drivingOptions: { departureTime: new Date(), trafficModel: google.maps.TrafficModel.BEST_GUESS }
+    }, (res, status)=>{
+      const leg = res?.routes?.[0]?.legs?.[0];
+      if(status==='OK' && leg?.distance?.value!=null){
+        const km  = leg.distance.value / 1000;
+        const sec = (leg.duration_in_traffic?.value ?? leg.duration?.value ?? 0);
+        resolve({ km, sec });
+      }else{
+        reject(new Error(status||'no-route'));
+      }
+    });
+  });
+}
+
+function formatETA(mins){
+  const m = Math.max(0, Math.round(mins));
+  if (m < 60) return `Abholung in ${m} min`;
+  const h = Math.floor(m/60), r = m%60;
+  return `Abholung in ${h}h ${r}m`;
+}
+
 function haversineKm(a,b){
   if(!a||!b||!isFinite(a.lat)||!isFinite(a.lng)||!isFinite(b.lat)||!isFinite(b.lng)) return 0;
   const R=6371, toRad=x=>x*Math.PI/180;
@@ -1117,6 +1254,17 @@ const SESSION_OK='driver_session_ok';
 let lastAuthTab = localStorage.getItem('driver_auth_tab') || 'login';
 
 let uid=null, approved=false, online=false, watchId=null, lastLL=null, lastSentAt=0;
+/* [EARNINGS-STATE] */
+let earningsOn = false;
+function setEarningsVisibility(on){
+  earningsOn = !!on;
+  document.documentElement.classList.toggle('show-earnings', earningsOn);
+  if(!earningsOn){
+    // أغلق المنبثق لو كان مفتوحًا
+    document.getElementById('earningsModal')?.classList.remove('show');
+  }
+}
+
 let currentTab = 'Neu';
 let lastOrders = [];
 
@@ -1144,12 +1292,20 @@ if(menuBtn && menu){
 }
 
 async function doLogout(){
+  try{
+    // أجبر الحالة على Offline قبل تسجيل الخروج
+    setOnline(false);                  // يوقّف presence + الاشتراكات + تتبّع الموقع + Median
+    localStorage.setItem(ONLINE_PREF_KEY, '0'); // لا تفتح Online تلقائيًا بالجولة القادمة
+  }catch(_){}
+
   try{ await signOut(auth); }catch(_){}
+
   sessionStorage.removeItem(SESSION_OK);
-  appRoot.style.display='none'; authModal.style.display='flex';
-  detachOrders(); stopPresence(); detachInbox(); stopIncomingAlert(); stopMedianBG();
+  appRoot.style.display='none';
+  authModal.style.display='flex';
   toast('Abgemeldet');
 }
+
 // لو القائمة القديمة موجودة، خلّيها تستخدم نفس الدالة
 if(mLogout){
   mLogout.addEventListener('click', async (e)=>{ e.preventDefault(); await doLogout(); });
@@ -1365,12 +1521,14 @@ function setOnline(flag){
     attachOrders();
     attachInbox();
     startMedianBG(uid);
+	 driverLiveStart();
   } else {
     stopPresence();
     detachOrders();
     detachInbox();
     stopIncomingAlert();
     stopMedianBG();
+	driverLiveStop();
   }
 }
 
@@ -1412,18 +1570,21 @@ function startWatch(){
       if(now-lastSentAt>=4000){
         rUpdate(ref(rtdb,`drivers_locations/${uid}`), { lat,lng, accuracy: Number.isFinite(accuracy)?accuracy:null, updatedAt: now }).catch(()=>{});
         lastSentAt=now;
+		scheduleEtaUpdate(300);
       }
     },
     _=>{},
     { enableHighAccuracy:true, maximumAge:1000, timeout:10000 }
   );
 }
+
 function stopWatch(){ if(watchId!=null){ try{ navigator.geolocation.clearWatch(watchId); }catch(_){ } watchId=null; } }
 /* === Addon: Live driver location v2 (non-invasive) === */
 let LIVE_WATCH_ID=null, LIVE_LAST_LL=null, LIVE_LAST_SENT=0, LIVE_HB=null;
 
 function driverLiveStart(){
   try{
+  if (!window.online) return;  // ← لا تُشغّل أي شيء إن كان أوفلاين
     const uid = auth?.currentUser?.uid; if(!uid || !('geolocation' in navigator)) return;
     const locRef = ref(rtdb, `drivers_locations/${uid}`);
 
@@ -1477,7 +1638,14 @@ function driverLiveStop(){
 }
 
 // أعِد تشغيل التتبّع عند رجوع التبويب للمقدمة (Safari/Android قد يوقفه بالخلفية)
-document.addEventListener('visibilitychange', ()=>{ if (!document.hidden) driverLiveStart(); });
+document.addEventListener('visibilitychange', ()=>{
+  if (!document.hidden && window.online) {
+    driverLiveStart();
+  } else if (!window.online) {
+    driverLiveStop();
+  }
+});
+
 /* ===== Median Background Location (Android/iOS) ===== */
 let MEDIAN_BG_ON = false;
 
@@ -1732,6 +1900,8 @@ return `
 }
 
 let unsubOrders=null, unsubInbox=null;
+let earningsUnsub = null; /* [EARNINGS-UNSUB] */
+
 function detachOrders(){
   unsubOrders?.(); unsubOrders=null;
   ordersInfo.textContent="—"; listEl.innerHTML="";
@@ -1753,11 +1923,68 @@ function attachOrders(){
       });
     lastOrders = items.slice();
     renderOrders(lastOrders);
+	
     snap.docChanges().forEach(ch=>{
       const now=String(ch.doc.data()?.status||'').toLowerCase();
       if(now==='zugewiesen' || now==='assigned'){ showIncoming({id:ch.doc.id, o:ch.doc.data()||{}}); }
     });
   }, ()=>{ ordersInfo.textContent="Wird geprüft…"; });
+}
+const etaEl = () => document.getElementById('etaLine');
+let etaTimer = null;
+function scheduleEtaUpdate(ms=800){ clearTimeout(etaTimer); etaTimer=setTimeout(updatePickupETA, ms); }
+
+// اختَر طلب الالتقاط (قبل التسليم)
+function choosePickupOrder(){
+  const all = Array.isArray(lastOrders) ? lastOrders : [];
+  // استبعد المُلغلَقة
+  const cand = all
+    .map(x => ({ id:x.id, o:x.o, s: String(x.o.status||'').toLowerCase() }))
+    .filter(x => x.s!=='geliefert' && x.s!=='abgebrochen');
+
+  // أولوية: Bearbeitung/Angenommen/Assigned/Zugewiesen → ثم أي neu
+  const priList = ['bearbeitung','angenommen','assigned','zugewiesen'];
+  let pick = cand.find(x => priList.includes(x.s));
+  if(!pick) pick = cand.find(x => normStatus(x.o.status)==='neu');
+  return pick || null;
+}
+
+async function updatePickupETA(){
+  try{
+    // إذا أوفلاين أو ما في طلب مناسب → فرّغ النص
+    if(!online){
+      if(etaEl()) etaEl().textContent = 'Abholung —';
+      return;
+    }
+
+    const pick = choosePickupOrder();
+    if(!pick){ if(etaEl()) etaEl().textContent='Abholung —'; return; }
+
+    const restAddr = getRestaurantAddr(pick.o);
+    if(!restAddr){ if(etaEl()) etaEl().textContent='Abholung —'; return; }
+
+    // موقع السائق الحالي
+    const here = lastLL || await getCurrentLLOnce();
+    if(!here){ if(etaEl()) etaEl().textContent='Abholung —'; return; }
+
+    // احسب الوقت الحقيقي بالـDirections (fallback على Haversine بسرعة افتراضية)
+    let mins = 0;
+    try{
+      const { km, sec } = await routeInfo(here, restAddr);
+      mins = sec/60;
+      if(!Number.isFinite(mins) || mins<=0){
+        // تقدير احتياطي 28 كم/س داخل المدينة
+        mins = (km / 28) * 60;
+      }
+    }catch(_){
+      const km = haversineKm(here, here) || 0; // لن يُستخدم، لكن نترك البناء
+      mins = 10; // تقدير ثابت احتياطي نادرًا ما يُستخدم
+    }
+
+    if(etaEl()) etaEl().textContent = formatETA(mins);
+  }catch(_){
+    if(etaEl()) etaEl().textContent = 'Abholung —';
+  }
 }
 
 function renderOrders(items){
@@ -1854,6 +2081,256 @@ listEl.querySelectorAll(".card-order").forEach(el=>{
     }
   });
 }
+// @earnings.logic:start
+function pickServiceFee(o){
+  const sf = Number(o?.serviceFee);
+  if (Number.isFinite(sf) && sf >= 0) return sf;
+  const df = Number(o?.deliveryFee), dist = Number(o?.distanceFee);
+  if (Number.isFinite(df) && Number.isFinite(dist)) return Math.max(0, df + dist);
+  if (Number.isFinite(df)) return Math.max(0, df);
+  const price = Number(o?.price);
+  if (Number.isFinite(price)) return Math.round(price * 0.14 * 100)/100; // fallback
+  return 0;
+}
+
+function closeEarningsModal(){
+  const modal = document.getElementById('earningsModal');
+  if(modal) modal.classList.remove('show');
+}
+
+async function openEarningsModal(){
+  const modal = document.getElementById('earningsModal');
+  const body  = document.getElementById('earnings_body');
+  if(!modal || !body) return;
+  if(!uid){ toast('Bitte zuerst anmelden.'); return; }
+  if(!earningsOn){ toast('Einnahmen deaktiviert'); return; } /* [EARNINGS-GUARD] */
+
+  // أغلق السايد-مينيو إن كان مفتوحًا قبل إظهار المنبثق
+  const drawer = document.getElementById('menuDrawer');
+  if (drawer) { drawer.classList.remove('open'); drawer.setAttribute('aria-hidden','true'); }
+
+  // ... (باقي منطق تحميل السجل كما هو) ...
+
+  modal.classList.add('show');
+
+  // (اختياري) نقل التركيز لزر الإغلاق لتحسين الوصولية ومنع بقاء التركيز داخل السايد-مينيو
+  setTimeout(()=> document.getElementById('earnings_close')?.focus(), 0);
+
+  // جلب حتى 500 طلب لهذا السائق ثم فلترة "Geliefert"
+  const qMine = query(collection(db,"orders"), where("driver.id","==", uid), limit(500));
+  const snap  = await getDocs(qMine);
+  const all   = snap.docs.map(d=>({ id:d.id, o:d.data()||{} }));
+  const delivered = all.filter(x => String(x.o.status||'').trim().toLowerCase() === 'geliefert');
+
+  const totalCount = delivered.length;
+  const totalFee   = Math.round(delivered.reduce((a,x)=> a + pickServiceFee(x.o), 0) * 100) / 100;
+
+  const rows = delivered
+    .sort((a,b)=>{
+      const ta=(a.o.updatedAt&&a.o.updatedAt.toMillis)?a.o.updatedAt.toMillis():0;
+      const tb=(b.o.updatedAt&&b.o.updatedAt.toMillis)?b.o.updatedAt.toMillis():0;
+      return tb - ta;
+    })
+    .map(({id,o})=>{
+      const rest = o?.restaurant?.name || '—';
+      const plat = Array.isArray(o?.platform) ? o.platform.join(' / ') : (o?.platform || '—');
+      const fee  = pickServiceFee(o);
+      const when = o?.updatedAt?.toMillis ? new Date(o.updatedAt.toMillis()) : null;
+      const whenStr = when ? new Intl.DateTimeFormat('de-DE',{dateStyle:'medium', timeStyle:'short'}).format(when) : '—';
+      return `
+        <div class="kv" style="display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center">
+          <div>
+            <div style="font-weight:800">${rest}</div>
+            <div class="small" style="opacity:.85">${plat} · <span>${whenStr}</span> · <span>ID:${id}</span></div>
+          </div>
+          <div style="font-weight:800">${formatEUR(fee)}</div>
+        </div>`;
+    }).join("");
+
+  body.innerHTML = `
+    <div class="row" style="grid-template-columns:1fr 1fr; margin-bottom:8px">
+      <div class="card">
+        <div class="small">Gesamteinnahmen</div>
+        <div style="font-weight:800;font-size:18px;margin-top:4px">${formatEUR(totalFee)}</div>
+      </div>
+      <div class="card">
+        <div class="small">Gelieferte Aufträge</div>
+        <div style="font-weight:800;font-size:18px;margin-top:4px">${totalCount}</div>
+      </div>
+    </div>
+    ${ totalCount === 0
+        ? `<div class="empty" style="display:grid;place-items:center;text-align:center;padding:32px 8px;gap:6px;color:var(--muted)">
+             <div style="font-size:28px">📭</div>
+             <div style="font-weight:600">Keine gelieferten Aufträge</div>
+           </div>`
+        : `<div class="list" style="display:flex;flex-direction:column;gap:6px">${rows}</div>` }
+  `;
+
+  modal.classList.add('show');
+  document.getElementById('earnings_close')?.addEventListener('click', closeEarningsModal, { once:true });
+  modal.addEventListener('click', (e)=>{ if(e.target===modal) closeEarningsModal(); }, { once:true });
+}
+
+// تفويض حدث النقر على النص داخل السلايدر (بدون الاعتماد على وقت إدراج العنصر)
+document.addEventListener('click', (e)=>{
+  const a = e.target.closest('#menuEarningsLink');
+  if(!a) return;
+  e.preventDefault();
+  openEarningsModal();
+});
+// @earnings.logic:end
+// @earnings.print:start
+async function exportEarningsToPrint(preWin){
+  if(!uid){ toast('Bitte zuerst anmelden.'); return; }
+
+  // 1) جلب الطلبات المسلَّمة
+  const snap = await getDocs(query(collection(db,"orders"), where("driver.id","==", uid), limit(500)));
+  const delivered = snap.docs
+    .map(d=>({ id:d.id, o:d.data()||{} }))
+    .filter(x => String(x.o.status||'').trim().toLowerCase() === 'geliefert');
+
+  // 2) اسم السائق
+  let driverName = '—';
+  try{
+    const us = await getDoc(doc(db,'users', uid));
+    const u  = us.exists()? (us.data()||{}) : {};
+    driverName = [u.firstName, u.lastName].filter(Boolean).join(' ') || u.displayName || '—';
+  }catch(_){}
+
+  // 3) تجهيز الصفوف
+  const formatE = n => (typeof formatEUR === 'function' ? formatEUR(n) : (Number(n||0)).toFixed(2)+' €');
+
+  const rows = delivered.map(({id,o})=>{
+    const price = Number(o.items_total_eur ?? o.price ?? 0) || 0;
+
+    let distFee = Number(o.distanceFee);
+    if(!Number.isFinite(distFee)){
+      const kmTot = Number(o.distance_km_total ?? 0) || 0;
+      try{ distFee = distanceCostFromTotalKm(kmTot); }catch(_){ distFee = 0; }
+    }
+
+    let delFee = Number(o.deliveryFee);
+    if(!Number.isFinite(delFee)){
+      delFee = price > 0 ? (price < 25 ? 3.50 : Math.round(price*0.14*100)/100) : 0;
+    }
+
+    let servFee = Number(o.serviceFee);
+    if(!Number.isFinite(servFee)) servFee = Math.round((distFee + delFee)*100)/100;
+
+    const cMs = o?.createdAt?.toMillis?.()
+             ?? (typeof o?.createdAt?._seconds==='number' ? o.createdAt._seconds*1000 : null);
+    const when = cMs ? new Date(cMs)
+                     : (o?.updatedAt?.toMillis?.()? new Date(o.updatedAt.toMillis()) : null);
+    const whenStr = when ? new Intl.DateTimeFormat('de-DE',{dateStyle:'medium', timeStyle:'short'}).format(when) : '—';
+
+    return `
+      <tr>
+        <td>${id}</td>
+        <td style="text-align:right">${formatE(price)}</td>
+        <td style="text-align:right">${formatE(distFee)}</td>
+        <td style="text-align:right">${formatE(delFee)}</td>
+        <td style="text-align:right">${formatE(servFee)}</td>
+        <td>${whenStr}</td>
+      </tr>`;
+  }).join('');
+
+  const totalServ = delivered.reduce((a,{o})=>{
+    const price = Number(o.items_total_eur ?? o.price ?? 0) || 0;
+    const dist  = Number.isFinite(+o.distanceFee) ? +o.distanceFee
+                 : (Number.isFinite(+o.distance_km_total) ? distanceCostFromTotalKm(+o.distance_km_total) : 0);
+    const del   = Number.isFinite(+o.deliveryFee) ? +o.deliveryFee
+                 : (price>0 ? (price<25?3.5:Math.round(price*0.14*100)/100) : 0);
+    const serv  = Number.isFinite(+o.serviceFee) ? +o.serviceFee : (dist+del);
+    return a + serv;
+  }, 0);
+
+  const html = `
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8"/>
+<title>Einnahmen – ${driverName}</title>
+<style>
+  *{box-sizing:border-box}
+  body{font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif; margin:20px; color:#111}
+  h1{font-size:18px;margin:0 0 8px}
+  .meta{margin:0 0 12px;color:#333}
+  table{width:100%; border-collapse:collapse}
+  th,td{padding:8px 10px; border:1px solid #00000022; font-size:13px}
+  th{background:#f1f1f1; text-align:left}
+  tfoot th{background:#fafafa}
+  @media print{ @page{ size:auto; margin:12mm } }
+</style>
+</head>
+<body>
+  <h1>Einnahmen</h1>
+  <div class="meta">Fahrer: <strong>${driverName}</strong> · Datum: ${new Date().toLocaleString('de-DE')}</div>
+  <table>
+    <thead>
+      <tr>
+        <th>Auftrag&nbsp;ID</th>
+        <th>Preis</th>
+        <th>Distanzkosten</th>
+        <th>Delivery&nbsp;Fee</th>
+        <th>Service&nbsp;Fee</th>
+        <th>Erstellt&nbsp;am</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${rows || `<tr><td colspan="6" style="text-align:center;padding:24px">Keine gelieferten Aufträge</td></tr>`}
+    </tbody>
+    <tfoot>
+      <tr>
+        <th style="text-align:left">Summe</th>
+        <th></th><th></th><th></th>
+        <th style="text-align:right">${formatE(totalServ)}</th>
+        <th></th>
+      </tr>
+    </tfoot>
+  </table>
+</body>
+</html>`;
+
+  // 4) حقن المحتوى في النافذة المحجوزة أو Fallback
+  try{
+    if (preWin && !preWin.closed) {
+      preWin.document.open();
+      preWin.document.write(html);
+      preWin.document.close();
+      // مهلة صغيرة لضمان جهوزية التخطيط قبل الطباعة (Safari/موبايل)
+      setTimeout(()=>{ try{ preWin.focus(); preWin.print(); }catch(_){ } }, 120);
+      return;
+    }
+
+    // Fallback: iframe مخفي (بلا تبويب جديد)
+    const iframe = document.createElement('iframe');
+    iframe.style.position='fixed'; iframe.style.right='0'; iframe.style.bottom='0';
+    iframe.style.width='0'; iframe.style.height='0'; iframe.style.border='0';
+    document.body.appendChild(iframe);
+    if ('srcdoc' in iframe) iframe.srcdoc = html;
+    else {
+      const ib = new Blob([html], {type:'text/html'});
+      iframe.src = URL.createObjectURL(ib);
+    }
+    iframe.onload = ()=> {
+      try{ iframe.contentWindow?.focus(); iframe.contentWindow?.print(); }
+      finally{ setTimeout(()=>{ try{ document.body.removeChild(iframe); }catch(_){ } }, 600); }
+    };
+  }catch(e){
+    console.error('exportEarningsToPrint error', e);
+    toast('Drucken fehlgeschlagen');
+  }
+}
+
+
+// ربط الزر (تفويض عام ليعمل دومًا)
+document.addEventListener('click', (e)=>{
+  const btn = e.target.closest('#earnings_print');
+  if(!btn) return;
+  e.preventDefault();
+  exportEarningsToPrint();
+});
+// @earnings.print:end
 
 
 /* ===== Inbox (RTDB) ===== */
@@ -2337,6 +2814,10 @@ onAuthStateChanged(auth, async (user)=>{
   if (user && sessionStorage.getItem(SESSION_OK) !== '1' && !regInFlight) {
     await signOut(auth).catch(()=>{});
     authModal.style.display='flex'; appRoot.style.display='none';
+	/* [EARNINGS-RESET-ON-LOGOUT] */
+try{ earningsUnsub?.(); }catch(_){}
+setEarningsVisibility(false);
+
     return;
   }
   if(!user){
@@ -2359,9 +2840,20 @@ onAuthStateChanged(auth, async (user)=>{
       approved=(u.approved===true && u.role==='driver');
     }
   }catch(_){}
+/* [EARNINGS-SNAPSHOT] اشترك بصفحة المستخدم لقراءة العلم */
+try{ earningsUnsub?.(); }catch(_){}
+earningsUnsub = onSnapshot(doc(db,'users', uid), (ds)=>{
+  const u = ds.data() || {};
+  // ندعم 3 مسميات شائعة (اخترت نفس اللي تشتغل فيها بالأدمن)
+  const flag = !!(u?.ui?.showEarnings ?? u?.features?.earningsVisible ?? u?.showEarnings ?? false);
+  setEarningsVisibility(flag);
+}, ()=> setEarningsVisibility(false));
 
-  authModal.style.display='none'; appRoot.style.display='block';
-  attachOrders();
+ authModal.style.display='none'; appRoot.style.display='block';
+// احترم حالة الأونلاين المخزّنة أو إبقه أوفلاين افتراضيًا
+const prefOnline = (localStorage.getItem(ONLINE_PREF_KEY) === '1');
+setOnline(!!prefOnline); // لن يَستقبل شيئًا إن بقي أوفلاين
+
 });
 
 /* ===== Network dot ===== */
@@ -2440,6 +2932,11 @@ $("#neoMoney")?.addEventListener("click", (e)=>{ e.preventDefault(); window.__dr
       <strong>Menü</strong>
       <button id="menuClose" class="close" aria-label="Schließen">✕</button>
     </div>
+	    <!-- @earnings.link:start -->
+    <a id="menuEarningsLink" href="#"
+       style="color:inherit;text-decoration:none;display:block">Einnahmen</a>
+    <!-- @earnings.link:end -->
+
     <!-- محتوى السلايدر لاحقاً -->
   </div>
 </div>
