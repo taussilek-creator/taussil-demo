@@ -2187,28 +2187,25 @@ function isMobilePrint(){
   return iOS || Android;
 }
 
-// بوابة طباعة مدمجة بداخل نفس الصفحة (تظهر فقط أثناء الطباعة على الموبايل)
 function ensurePrintPortal(){
   let portal = document.getElementById('_print_portal_');
   if (!portal){
     portal = document.createElement('div');
     portal.id = '_print_portal_';
     portal.style.cssText = 'position:fixed;inset:0;background:#fff;z-index:2147483647;display:none;overflow:auto;';
-    // حاوية المحتوى (نفس هامش الديسكتوب)
     const content = document.createElement('div');
     content.id = '_print_portal_content_';
     content.style.cssText = 'margin:20px;';
     portal.appendChild(content);
     document.body.appendChild(portal);
 
-    // ستايل طباعة يُخفي كل شيء عدا البوابة أثناء الطباعة
     const style = document.createElement('style');
     style.id = '_print_portal_css_';
     style.textContent = `
       @media print{
         body > *:not(#_print_portal_){ display:none !important; }
         #_print_portal_{ display:block !important; }
-        html, body { background:#fff !important; }
+        html, body { background:#fff !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
       }
     `;
     document.head.appendChild(style);
@@ -2216,16 +2213,42 @@ function ensurePrintPortal(){
   return portal;
 }
 
+function mm2px(mm){ return mm * 96 / 25.4; } // 96dpi قياسي
+
+function fitToSingleA4Page(){
+  const fit = document.getElementById('_print_fitbox_');
+  if(!fit) return;
+  const marginMM = 12;               // يطابق الديسكتوب
+  const innerWmm = 210 - 2*marginMM; // A4 عرض داخلي
+  const innerHmm = 297 - 2*marginMM; // A4 ارتفاع داخلي
+  const availW = mm2px(innerWmm);
+  const availH = mm2px(innerHmm);
+
+  // اضبط العرض أولًا على عرض الصفحة الداخلي
+  fit.style.width = availW + 'px';
+  fit.style.transform = 'none';
+  fit.style.transformOrigin = 'top left';
+
+  // بعد الترتيب، احسب الارتفاع الفعلي
+  const h = fit.getBoundingClientRect().height || fit.offsetHeight || 0;
+  if(h <= availH) return; // مناسب صفحة واحدة بدون تصغير
+
+  // صغّر بنسبة تكفي لاحتواء المحتوى بصفحة واحدة
+  const scale = Math.max(0.5, Math.min(1, availH / h));
+  fit.style.transform = `scale(${scale})`;
+
+  // حافظ على العرض النهائي مساويًا لعرض الصفحة (نعوّض التصغير بزيادة العرض قبل التحجيم)
+  fit.style.width = (availW / scale) + 'px';
+}
+
 async function exportEarningsToPrint(){
   if(!uid){ toast('Bitte zuerst anmelden.'); return; }
 
-  // 1) تحميل بيانات السجل كما هي
   const snap = await getDocs(query(collection(db,"orders"), where("driver.id","==", uid), limit(500)));
   const delivered = snap.docs
     .map(d=>({ id:d.id, o:d.data()||{} }))
     .filter(x => String(x.o.status||'').trim().toLowerCase() === 'geliefert');
 
-  // اسم السائق
   let driverName = '—';
   try{
     const us = await getDoc(doc(db,'users', uid));
@@ -2235,7 +2258,6 @@ async function exportEarningsToPrint(){
 
   const formatE = n => (typeof formatEUR === 'function' ? formatEUR(n) : (Number(n||0)).toFixed(2)+' €');
 
-  // صفوف الجدول
   const rows = delivered.map(({id,o})=>{
     const price = Number(o.items_total_eur ?? o.price ?? 0) || 0;
 
@@ -2280,7 +2302,6 @@ async function exportEarningsToPrint(){
     return a + serv;
   }, 0);
 
-  // 2) نفس ستايل الديسكتوب (داخل محتوى البوابة على الموبايل، وداخل نافذة جديدة على الديسكتوب)
   const tableStyles = `
     <style>
       *{box-sizing:border-box}
@@ -2291,7 +2312,11 @@ async function exportEarningsToPrint(){
       th,td{padding:8px 10px; border:1px solid #00000022; font-size:13px}
       th{background:#f1f1f1; text-align:left}
       tfoot th{background:#fafafa}
-      @media print{ @page{ size:auto; margin:12mm } }
+      @media print{
+        @page{ size:A4 portrait; margin:12mm }
+        /* لا تقطع الصفوف */
+        table, tr, td, th{ page-break-inside: avoid; }
+      }
     </style>`.trim();
 
   const header = `
@@ -2324,57 +2349,85 @@ async function exportEarningsToPrint(){
     </table>`.trim();
 
   if (isMobilePrint()){
-    // 3A) الموبايل: اطبع من نفس الصفحة عبر البوابة + CSS print لإخفاء الواجهة
+    // الموبايل: بوابة بنفس التصميم + احتواء صفحة واحدة
     const portal = ensurePrintPortal();
     const content = portal.querySelector('#_print_portal_content_');
-    content.innerHTML = tableStyles + header + tableHTML;
+
+    // صندوق قابل للتحجيم لاحتواء الصفحة الواحدة
+    content.innerHTML = tableStyles + `<div id="_print_fitbox_">${header}${tableHTML}</div>`;
     portal.style.display = 'block';
 
-    // اطبع ثم نظّف
-    const cleanup = () => {
-      try { portal.style.display = 'none'; content.innerHTML = ''; } catch(_){}
-    };
+    // اضبط الملاءمة ثم اطبع
+    setTimeout(()=>{
+      try{ fitToSingleA4Page(); }catch(_){}
+      try{ window.focus(); window.print(); }catch(_){}
+    }, 150);
+
+    // تنظيف بعد الطباعة
+    const cleanup = () => { try { portal.style.display='none'; content.innerHTML=''; }catch(_){} };
     const prev = window.onafterprint;
     window.onafterprint = function(){
       cleanup();
       if (typeof prev === 'function') { try{ prev(); }catch(_){ } }
       window.onafterprint = prev || null;
     };
-
-    // مهلة صغيرة لضمان دمج الخطوط/التدفق قبل الطباعة
-    setTimeout(()=>{ try{ window.focus(); window.print(); }catch(_){ } }, 150);
-    // احتياط لو onafterprint ما اشتغلت ببعض الأجهزة
     setTimeout(cleanup, 20000);
     return;
   }
 
-  // 3B) الديسكتوب: السلوك القديم (نافذة جديدة) للحفاظ على نفس تجربة الطباعة
+  // الديسكتوب: نفس السلوك السابق (نافذة جديدة)
   let preWin = null;
   try{ preWin = window.open('', '_blank'); }catch(_){}
   const fullHTML = `
 <!doctype html>
 <html lang="de">
 <head><meta charset="utf-8"/><title>Einnahmen – ${driverName}</title>${tableStyles}</head>
-<body>${header}${tableHTML}</body>
+<body>
+  <div id="_print_fitbox_">${header}${tableHTML}</div>
+  <script>
+    (function(){
+      function mm2px(mm){ return mm * 96 / 25.4; }
+      function fit(){
+        var fit = document.getElementById('_print_fitbox_');
+        var marginMM = 12, innerWmm = 210 - 2*marginMM, innerHmm = 297 - 2*marginMM;
+        var availW = mm2px(innerWmm), availH = mm2px(innerHmm);
+        fit.style.width = availW + 'px';
+        fit.style.transformOrigin = 'top left';
+        var h = fit.getBoundingClientRect().height || fit.offsetHeight || 0;
+        if(h > availH){
+          var s = Math.max(0.5, Math.min(1, availH / h));
+          fit.style.transform = 'scale('+s+')';
+          fit.style.width = (availW / s) + 'px';
+        }
+        setTimeout(function(){ try{ window.print(); }catch(_){ } }, 50);
+      }
+      setTimeout(fit, 50);
+    })();
+  <\/script>
+</body>
 </html>`.trim();
+
 
   if (preWin && !preWin.closed) {
     preWin.document.open(); preWin.document.write(fullHTML); preWin.document.close();
-    setTimeout(()=>{ try{ preWin.focus(); preWin.print(); }catch(_){ } }, 120);
+    try{ preWin.focus(); }catch(_){}
   } else {
-    // منع النوافذ؟ — استخدم البوابة كـ fallback على الديسكتوب
+    // fallback ديسكتوب بدون نوافذ: استخدم البوابة + نفس الملاءمة
     const portal = ensurePrintPortal();
     const content = portal.querySelector('#_print_portal_content_');
-    content.innerHTML = tableStyles + header + tableHTML;
+    content.innerHTML = tableStyles + `<div id="_print_fitbox_">${header}${tableHTML}</div>`;
     portal.style.display = 'block';
-    const cleanup = () => { try { portal.style.display='none'; content.innerHTML=''; }catch(_){ } };
+    setTimeout(()=>{
+      try{ fitToSingleA4Page(); }catch(_){}
+      try{ window.focus(); window.print(); }catch(_){}
+    }, 150);
+    const cleanup = () => { try { portal.style.display='none'; content.innerHTML=''; }catch(_){} };
     const prev = window.onafterprint;
     window.onafterprint = function(){
       cleanup();
       if (typeof prev === 'function') { try{ prev(); }catch(_){ } }
       window.onafterprint = prev || null;
     };
-    setTimeout(()=>{ try{ window.focus(); window.print(); }catch(_){ } }, 150);
     setTimeout(cleanup, 20000);
   }
 }
