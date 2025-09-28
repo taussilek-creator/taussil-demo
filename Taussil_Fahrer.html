@@ -2180,10 +2180,19 @@ document.addEventListener('click', (e)=>{
 });
 // @earnings.logic:end
 // @earnings.print:start
-async function exportEarningsToPrint(preWin){
+// @earnings.print:start
+// كشف بيئة الجوال (iOS/Android + iPadOS)
+function isMobilePrint(){
+  const ua = navigator.userAgent || navigator.vendor || '';
+  const iOS = /iPhone|iPad|iPod/i.test(ua) || (/\bMacintosh\b/.test(ua) && 'ontouchend' in document);
+  const Android = /Android/i.test(ua);
+  return iOS || Android;
+}
+
+async function exportEarningsToPrint(){
   if(!uid){ toast('Bitte zuerst anmelden.'); return; }
 
-  // 1) جلب الطلبات المسلَّمة
+  // 1) تحميل البيانات (كما السابق تمامًا)
   const snap = await getDocs(query(collection(db,"orders"), where("driver.id","==", uid), limit(500)));
   const delivered = snap.docs
     .map(d=>({ id:d.id, o:d.data()||{} }))
@@ -2197,7 +2206,7 @@ async function exportEarningsToPrint(preWin){
     driverName = [u.firstName, u.lastName].filter(Boolean).join(' ') || u.displayName || '—';
   }catch(_){}
 
-  // 3) تجهيز الصفوف
+  // 3) صفوف الجدول وحساب الإجمالي (نفس منطق الديسكتوب)
   const formatE = n => (typeof formatEUR === 'function' ? formatEUR(n) : (Number(n||0)).toFixed(2)+' €');
 
   const rows = delivered.map(({id,o})=>{
@@ -2244,38 +2253,26 @@ async function exportEarningsToPrint(preWin){
     return a + serv;
   }, 0);
 
-  // 4) HTML “ديسكتوب” ثابت + طباعة تلقائية via onload (بدون أي <script> داخل القالب)
+  // 4) نفس HTML الديسكتوب القديم بالضبط (لا تغيير مقاسات/ستايل)
   const html = `
 <!doctype html>
 <html lang="de">
 <head>
 <meta charset="utf-8"/>
 <title>Einnahmen – ${driverName}</title>
-<meta name="viewport" content="width=1200, initial-scale=1, maximum-scale=1, user-scalable=no">
 <style>
   *{box-sizing:border-box}
-  html, body{ margin:0; padding:0; }
-  @media screen{ body{ width:1200px; margin:20px auto; } }
-  body{
-    font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-    color:#111;
-    -webkit-print-color-adjust: exact;
-            print-color-adjust: exact;
-  }
+  body{font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif; margin:20px; color:#111}
   h1{font-size:18px;margin:0 0 8px}
   .meta{margin:0 0 12px;color:#333}
-  table{width:100%; border-collapse:collapse; table-layout:fixed}
-  th,td{padding:8px 10px; border:1px solid #00000022; font-size:13px; vertical-align:top; word-wrap:break-word}
+  table{width:100%; border-collapse:collapse}
+  th,td{padding:8px 10px; border:1px solid #00000022; font-size:13px}
   th{background:#f1f1f1; text-align:left}
   tfoot th{background:#fafafa}
-  @page{ size:auto; margin:12mm }
-  @media print{
-    body{ width:auto; margin:0; }
-    a[href]::after{ content:""; }
-  }
+  @media print{ @page{ size:auto; margin:12mm } }
 </style>
 </head>
-<body onload="setTimeout(function(){ try{ window.focus(); window.print(); }catch(e){} }, 250)">
+<body>
   <h1>Einnahmen</h1>
   <div class="meta">Fahrer: <strong>${driverName}</strong> · Datum: ${new Date().toLocaleString('de-DE')}</div>
   <table>
@@ -2304,50 +2301,102 @@ async function exportEarningsToPrint(preWin){
 </body>
 </html>`;
 
-  // 5) فتح نافذة/تبويب ثم حقن الـHTML
-  try{
-    if (preWin && !preWin.closed) {
-      preWin.document.open(); preWin.document.write(html); preWin.document.close();
-      try{ preWin.focus(); }catch(_){}
-      return;
-    }
-    const w = window.open('about:blank','_blank','noopener,noreferrer');
-    if (w) {
-      w.document.open(); w.document.write(html); w.document.close();
-      try{ w.focus(); }catch(_){}
-      return;
-    }
+  // 5) اختيار قناة الطباعة
+  if (isMobilePrint()){
+    // — الجوال: اطبع داخل iframe مخفي بنفس الصفحة (لا تبويب جديد)
     const iframe = document.createElement('iframe');
-    iframe.style.position='fixed'; iframe.style.right='0'; iframe.style.bottom='0';
-    iframe.style.width='0'; iframe.style.height='0'; iframe.style.border='0';
+    iframe.style.position='fixed';
+    iframe.style.right='0';
+    iframe.style.bottom='0';
+    iframe.style.width='0';
+    iframe.style.height='0';
+    iframe.style.border='0';
     document.body.appendChild(iframe);
-    if ('srcdoc' in iframe) iframe.srcdoc = html;
-    else {
+
+    // امنح الـDOM وقتًا بسيطًا للتهيؤ قبل أمر الطباعة (iOS/Safari)
+    const doPrint = () => {
+      try{
+        const w = iframe.contentWindow;
+        const finish = () => setTimeout(()=>{ try{ document.body.removeChild(iframe); }catch(_){ } }, 600);
+        const tryPrint = () => { try{ w.focus(); w.print(); } finally { finish(); } };
+
+        if (w?.document?.fonts?.ready) {
+          w.document.fonts.ready.then(()=> setTimeout(tryPrint, 120));
+        } else {
+          setTimeout(tryPrint, 180);
+        }
+      }catch(_){
+        try{ document.body.removeChild(iframe); }catch(_){}
+      }
+    };
+
+    if ('srcdoc' in iframe) {
+      iframe.srcdoc = html;
+      iframe.onload = doPrint;
+    } else {
       const ib = new Blob([html], {type:'text/html'});
       iframe.src = URL.createObjectURL(ib);
+      iframe.onload = doPrint;
     }
-    iframe.onload = ()=> {
-      try{ iframe.contentWindow?.focus(); iframe.contentWindow?.print(); }
-      finally{ setTimeout(()=>{ try{ document.body.removeChild(iframe); }catch(_){ } }, 600); }
+    return;
+  }
+
+  // — سطح المكتب: أبقِ السلوك القديم (نافذة جديدة). وإن فشل، نرجع لـ iframe.
+  let preWin = null;
+  try{ preWin = window.open('', '_blank'); }catch(_){}
+  if (preWin && !preWin.closed) {
+    preWin.document.open();
+    preWin.document.write(html);
+    preWin.document.close();
+    setTimeout(()=>{ try{ preWin.focus(); preWin.print(); }catch(_){ } }, 120);
+  } else {
+    // فallback لسطح المكتب إن مُنعت pop-up
+    const iframe = document.createElement('iframe');
+    iframe.style.position='fixed';
+    iframe.style.right='0';
+    iframe.style.bottom='0';
+    iframe.style.width='0';
+    iframe.style.height='0';
+    iframe.style.border='0';
+    document.body.appendChild(iframe);
+
+    const doPrint = () => {
+      try{
+        const w = iframe.contentWindow;
+        const finish = () => setTimeout(()=>{ try{ document.body.removeChild(iframe); }catch(_){ } }, 600);
+        const tryPrint = () => { try{ w.focus(); w.print(); } finally { finish(); } };
+
+        if (w?.document?.fonts?.ready) {
+          w.document.fonts.ready.then(()=> setTimeout(tryPrint, 120));
+        } else {
+          setTimeout(tryPrint, 150);
+        }
+      }catch(_){
+        try{ document.body.removeChild(iframe); }catch(_){}
+      }
     };
-  }catch(e){
-    console.error('exportEarningsToPrint error', e);
-    toast('Drucken fehlgeschlagen');
+
+    if ('srcdoc' in iframe) {
+      iframe.srcdoc = html;
+      iframe.onload = doPrint;
+    } else {
+      const ib = new Blob([html], {type:'text/html'});
+      iframe.src = URL.createObjectURL(ib);
+      iframe.onload = doPrint;
+    }
   }
 }
+// @earnings.print:end
 
 
 
 // ربط الزر (تفويض عام ليعمل دومًا)
-// ربط الزر (تفويض عام ليعمل دومًا) — فتح نافذة أولاً لتفادي قيود الجوال
 document.addEventListener('click', (e)=>{
   const btn = e.target.closest('#earnings_print');
   if(!btn) return;
   e.preventDefault();
-  const preWin = window.open('about:blank','_blank','noopener,noreferrer'); // يُنشأ من حدث المستخدم
-  exportEarningsToPrint(preWin);
+  exportEarningsToPrint();
 });
-
 // @earnings.print:end
 
 
