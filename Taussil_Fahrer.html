@@ -2180,75 +2180,16 @@ document.addEventListener('click', (e)=>{
 });
 // @earnings.logic:end
 // @earnings.print:start
-function isMobilePrint(){
-  const ua = navigator.userAgent || navigator.vendor || '';
-  const iOS = /iPhone|iPad|iPod/i.test(ua) || (/\bMacintosh\b/.test(ua) && 'ontouchend' in document);
-  const Android = /Android/i.test(ua);
-  return iOS || Android;
-}
-
-function ensurePrintPortal(){
-  let portal = document.getElementById('_print_portal_');
-  if (!portal){
-    portal = document.createElement('div');
-    portal.id = '_print_portal_';
-    portal.style.cssText = 'position:fixed;inset:0;background:#fff;z-index:2147483647;display:none;overflow:auto;';
-    const content = document.createElement('div');
-    content.id = '_print_portal_content_';
-    content.style.cssText = 'margin:20px;';
-    portal.appendChild(content);
-    document.body.appendChild(portal);
-
-    const style = document.createElement('style');
-    style.id = '_print_portal_css_';
-    style.textContent = `
-      @media print{
-        body > *:not(#_print_portal_){ display:none !important; }
-        #_print_portal_{ display:block !important; }
-        html, body { background:#fff !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-      }
-    `;
-    document.head.appendChild(style);
-  }
-  return portal;
-}
-
-function mm2px(mm){ return mm * 96 / 25.4; } // 96dpi قياسي
-
-function fitToSingleA4Page(){
-  const fit = document.getElementById('_print_fitbox_');
-  if(!fit) return;
-  const marginMM = 12;               // يطابق الديسكتوب
-  const innerWmm = 210 - 2*marginMM; // A4 عرض داخلي
-  const innerHmm = 297 - 2*marginMM; // A4 ارتفاع داخلي
-  const availW = mm2px(innerWmm);
-  const availH = mm2px(innerHmm);
-
-  // اضبط العرض أولًا على عرض الصفحة الداخلي
-  fit.style.width = availW + 'px';
-  fit.style.transform = 'none';
-  fit.style.transformOrigin = 'top left';
-
-  // بعد الترتيب، احسب الارتفاع الفعلي
-  const h = fit.getBoundingClientRect().height || fit.offsetHeight || 0;
-  if(h <= availH) return; // مناسب صفحة واحدة بدون تصغير
-
-  // صغّر بنسبة تكفي لاحتواء المحتوى بصفحة واحدة
-  const scale = Math.max(0.5, Math.min(1, availH / h));
-  fit.style.transform = `scale(${scale})`;
-
-  // حافظ على العرض النهائي مساويًا لعرض الصفحة (نعوّض التصغير بزيادة العرض قبل التحجيم)
-  fit.style.width = (availW / scale) + 'px';
-}
-
 async function exportEarningsToPrint(){
   if(!uid){ toast('Bitte zuerst anmelden.'); return; }
 
+  // 1) جلب الطلبات المسلَّمة
   const snap = await getDocs(query(collection(db,"orders"), where("driver.id","==", uid), limit(500)));
   const delivered = snap.docs
     .map(d=>({ id:d.id, o:d.data()||{} }))
     .filter(x => String(x.o.status||'').trim().toLowerCase() === 'geliefert');
 
+  // 2) اسم السائق
   let driverName = '—';
   try{
     const us = await getDoc(doc(db,'users', uid));
@@ -2256,9 +2197,8 @@ async function exportEarningsToPrint(){
     driverName = [u.firstName, u.lastName].filter(Boolean).join(' ') || u.displayName || '—';
   }catch(_){}
 
-  const formatE = n => (typeof formatEUR === 'function' ? formatEUR(n) : (Number(n||0)).toFixed(2)+' €');
-
-  const rows = delivered.map(({id,o})=>{
+  // 3) صفوف الجدول (نفس أعمدة سطح المكتب)
+  const rowsHTML = delivered.map(({id,o})=>{
     const price = Number(o.items_total_eur ?? o.price ?? 0) || 0;
 
     let distFee = Number(o.distanceFee);
@@ -2284,10 +2224,10 @@ async function exportEarningsToPrint(){
     return `
       <tr>
         <td>${id}</td>
-        <td style="text-align:right">${formatE(price)}</td>
-        <td style="text-align:right">${formatE(distFee)}</td>
-        <td style="text-align:right">${formatE(delFee)}</td>
-        <td style="text-align:right">${formatE(servFee)}</td>
+        <td style="text-align:right">${formatEUR(price)}</td>
+        <td style="text-align:right">${formatEUR(distFee)}</td>
+        <td style="text-align:right">${formatEUR(delFee)}</td>
+        <td style="text-align:right">${formatEUR(servFee)}</td>
         <td>${whenStr}</td>
       </tr>`;
   }).join('');
@@ -2302,26 +2242,26 @@ async function exportEarningsToPrint(){
     return a + serv;
   }, 0);
 
-  const tableStyles = `
+  // نفس ستايل سطح المكتب (بدون أي <script> داخل الـHTML)
+  const styles = `
     <style>
       *{box-sizing:border-box}
-      body{font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif; margin:20px; color:#111}
+      html,body{margin:0;padding:0}
+      body{font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif; color:#111; padding:20px}
       h1{font-size:18px;margin:0 0 8px}
-      .meta{margin:0 0 12px;color:#333}
-      table{width:100%; border-collapse:collapse}
-      th,td{padding:8px 10px; border:1px solid #00000022; font-size:13px}
+      .meta{margin:0 0 12px;color:#333;font-size:13px}
+      table{width:100%; border-collapse:collapse; table-layout:auto}
+      th,td{padding:8px 10px; border:1px solid #00000022; font-size:13px; vertical-align:top}
       th{background:#f1f1f1; text-align:left}
       tfoot th{background:#fafafa}
-      @media print{
-        @page{ size:A4 portrait; margin:12mm }
-        /* لا تقطع الصفوف */
-        table, tr, td, th{ page-break-inside: avoid; }
-      }
+      @page{ size:A4; margin:12mm }
+      @media print{ body{padding:0} }
     </style>`.trim();
 
-  const header = `
+  const headerHTML = `
     <h1>Einnahmen</h1>
-    <div class="meta">Fahrer: <strong>${driverName}</strong> · Datum: ${new Date().toLocaleString('de-DE')}</div>`;
+    <div class="meta">Fahrer: <strong>${driverName}</strong> · Datum: ${new Date().toLocaleString('de-DE')}</div>
+  `.trim();
 
   const tableHTML = `
     <table>
@@ -2336,109 +2276,91 @@ async function exportEarningsToPrint(){
         </tr>
       </thead>
       <tbody>
-        ${rows || `<tr><td colspan="6" style="text-align:center;padding:24px">Keine gelieferten Aufträge</td></tr>`}
+        ${ rowsHTML || `<tr><td colspan="6" style="text-align:center;padding:24px">Keine gelieferten Aufträge</td></tr>` }
       </tbody>
       <tfoot>
         <tr>
           <th style="text-align:left">Summe</th>
           <th></th><th></th><th></th>
-          <th style="text-align:right">${formatE(totalServ)}</th>
+          <th style="text-align:right">${formatEUR(totalServ)}</th>
           <th></th>
         </tr>
       </tfoot>
     </table>`.trim();
 
-  if (isMobilePrint()){
-    // الموبايل: بوابة بنفس التصميم + احتواء صفحة واحدة
-    const portal = ensurePrintPortal();
-    const content = portal.querySelector('#_print_portal_content_');
-
-    // صندوق قابل للتحجيم لاحتواء الصفحة الواحدة
-    content.innerHTML = tableStyles + `<div id="_print_fitbox_">${header}${tableHTML}</div>`;
-    portal.style.display = 'block';
-
-    // اضبط الملاءمة ثم اطبع
-    setTimeout(()=>{
-      try{ fitToSingleA4Page(); }catch(_){}
-      try{ window.focus(); window.print(); }catch(_){}
-    }, 150);
-
-    // تنظيف بعد الطباعة
-    const cleanup = () => { try { portal.style.display='none'; content.innerHTML=''; }catch(_){} };
-    const prev = window.onafterprint;
-    window.onafterprint = function(){
-      cleanup();
-      if (typeof prev === 'function') { try{ prev(); }catch(_){ } }
-      window.onafterprint = prev || null;
-    };
-    setTimeout(cleanup, 20000);
-    return;
-  }
-
-  // الديسكتوب: نفس السلوك السابق (نافذة جديدة)
-  let preWin = null;
-  try{ preWin = window.open('', '_blank'); }catch(_){}
-  const fullHTML = `
+  const PRINT_HTML = `
 <!doctype html>
 <html lang="de">
-<head><meta charset="utf-8"/><title>Einnahmen – ${driverName}</title>${tableStyles}</head>
+<head>
+<meta charset="utf-8"/>
+<title>Einnahmen – ${driverName}</title>
+${styles}
+</head>
 <body>
-  <div id="_print_fitbox_">${header}${tableHTML}</div>
-  <script>
-    (function(){
-      function mm2px(mm){ return mm * 96 / 25.4; }
-      function fit(){
-        var fit = document.getElementById('_print_fitbox_');
-        var marginMM = 12, innerWmm = 210 - 2*marginMM, innerHmm = 297 - 2*marginMM;
-        var availW = mm2px(innerWmm), availH = mm2px(innerHmm);
-        fit.style.width = availW + 'px';
-        fit.style.transformOrigin = 'top left';
-        var h = fit.getBoundingClientRect().height || fit.offsetHeight || 0;
-        if(h > availH){
-          var s = Math.max(0.5, Math.min(1, availH / h));
-          fit.style.transform = 'scale('+s+')';
-          fit.style.width = (availW / s) + 'px';
-        }
-        setTimeout(function(){ try{ window.print(); }catch(_){ } }, 50);
-      }
-      setTimeout(fit, 50);
-    })();
-  <\/script>
+  ${headerHTML}
+  ${tableHTML}
 </body>
 </html>`.trim();
 
+  // ——— طريقة الطباعة ———
+  const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent || '');
 
-  if (preWin && !preWin.closed) {
-    preWin.document.open(); preWin.document.write(fullHTML); preWin.document.close();
-    try{ preWin.focus(); }catch(_){}
-  } else {
-    // fallback ديسكتوب بدون نوافذ: استخدم البوابة + نفس الملاءمة
-    const portal = ensurePrintPortal();
-    const content = portal.querySelector('#_print_portal_content_');
-    content.innerHTML = tableStyles + `<div id="_print_fitbox_">${header}${tableHTML}</div>`;
-    portal.style.display = 'block';
-    setTimeout(()=>{
-      try{ fitToSingleA4Page(); }catch(_){}
-      try{ window.focus(); window.print(); }catch(_){}
-    }, 150);
-    const cleanup = () => { try { portal.style.display='none'; content.innerHTML=''; }catch(_){} };
-    const prev = window.onafterprint;
-    window.onafterprint = function(){
-      cleanup();
-      if (typeof prev === 'function') { try{ prev(); }catch(_){ } }
-      window.onafterprint = prev || null;
+  // سطح المكتب: نافذة منبثقة (بدون سكربت داخل الـHTML)، ثم نطبع من النافذة الأم بعد مهلة قصيرة
+  function tryPopupDesktop(){
+    try{
+      const win = window.open('', 'earnings_print_popup', 'noopener,noreferrer,width=900,height=1000');
+      if(!win) return false; // محظورة
+      win.document.open(); win.document.write(PRINT_HTML); win.document.close();
+      // ننتظر رسم المحتوى ثم نطلب الطباعة من هنا
+      setTimeout(()=>{ try{ win.focus(); win.print(); }catch(_){ } }, 120);
+      // إغلاق احتياطي بعد 10 ثوانٍ
+      setTimeout(()=>{ try{ win.close(); }catch(_){ } }, 10000);
+      return true;
+    }catch(_){ return false; }
+  }
+
+  if(!isMobile && tryPopupDesktop()){
+    return;
+  }
+
+  // جوال أو فشل النافذة: iframe مخفي ونطبع إطار المحتوى نفسه
+  try{
+    const iframe = document.createElement('iframe');
+    iframe.id = 'earnings_print_iframe';
+    iframe.style.position = 'fixed';
+    iframe.style.right = '0';
+    iframe.style.bottom = '0';
+    iframe.style.width = '0';
+    iframe.style.height = '0';
+    iframe.style.border = '0';
+    document.body.appendChild(iframe);
+
+    const cleanup = ()=>{ try{ iframe.remove(); }catch(_){ } };
+
+    iframe.onload = ()=>{
+      try{
+        const w = iframe.contentWindow;
+        w.focus();
+        // مهلة وجيزة لضمان اكتمال الرسم قبل الطباعة (مهم للهواتف)
+        setTimeout(()=>{ try{ w.print(); }catch(_){ } }, 80);
+      }catch(_){}
+      // تنظيف احتياطي
+      setTimeout(cleanup, 10000);
     };
-    setTimeout(cleanup, 20000);
+
+    if ('srcdoc' in iframe){
+      iframe.srcdoc = PRINT_HTML;
+    } else {
+      const idoc = iframe.contentWindow?.document || iframe.contentDocument;
+      idoc.open(); idoc.write(PRINT_HTML); idoc.close();
+    }
+  }catch(e){
+    console.error('print iframe error', e);
+    toast('Drucken fehlgeschlagen');
   }
 }
-// @earnings.print:end
 
-
-// @earnings.print:end
-
-
-
-// ربط الزر (تفويض عام ليعمل دومًا)
+// ربط الزر (تفويض عام)
 document.addEventListener('click', (e)=>{
   const btn = e.target.closest('#earnings_print');
   if(!btn) return;
@@ -2446,6 +2368,9 @@ document.addEventListener('click', (e)=>{
   exportEarningsToPrint();
 });
 // @earnings.print:end
+
+
+
 
 
 /* ===== Inbox (RTDB) ===== */
