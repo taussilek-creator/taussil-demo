@@ -2180,7 +2180,6 @@ document.addEventListener('click', (e)=>{
 });
 // @earnings.logic:end
 // @earnings.print:start
-// @earnings.print:start
 function isMobilePrint(){
   const ua = navigator.userAgent || navigator.vendor || '';
   const iOS = /iPhone|iPad|iPod/i.test(ua) || (/\bMacintosh\b/.test(ua) && 'ontouchend' in document);
@@ -2188,15 +2187,45 @@ function isMobilePrint(){
   return iOS || Android;
 }
 
+// بوابة طباعة مدمجة بداخل نفس الصفحة (تظهر فقط أثناء الطباعة على الموبايل)
+function ensurePrintPortal(){
+  let portal = document.getElementById('_print_portal_');
+  if (!portal){
+    portal = document.createElement('div');
+    portal.id = '_print_portal_';
+    portal.style.cssText = 'position:fixed;inset:0;background:#fff;z-index:2147483647;display:none;overflow:auto;';
+    // حاوية المحتوى (نفس هامش الديسكتوب)
+    const content = document.createElement('div');
+    content.id = '_print_portal_content_';
+    content.style.cssText = 'margin:20px;';
+    portal.appendChild(content);
+    document.body.appendChild(portal);
+
+    // ستايل طباعة يُخفي كل شيء عدا البوابة أثناء الطباعة
+    const style = document.createElement('style');
+    style.id = '_print_portal_css_';
+    style.textContent = `
+      @media print{
+        body > *:not(#_print_portal_){ display:none !important; }
+        #_print_portal_{ display:block !important; }
+        html, body { background:#fff !important; }
+      }
+    `;
+    document.head.appendChild(style);
+  }
+  return portal;
+}
+
 async function exportEarningsToPrint(){
   if(!uid){ toast('Bitte zuerst anmelden.'); return; }
 
-  // === 1) تحميل بيانات السجل كما هي (لا تغيّر المنطق) ===
+  // 1) تحميل بيانات السجل كما هي
   const snap = await getDocs(query(collection(db,"orders"), where("driver.id","==", uid), limit(500)));
   const delivered = snap.docs
     .map(d=>({ id:d.id, o:d.data()||{} }))
     .filter(x => String(x.o.status||'').trim().toLowerCase() === 'geliefert');
 
+  // اسم السائق
   let driverName = '—';
   try{
     const us = await getDoc(doc(db,'users', uid));
@@ -2206,6 +2235,7 @@ async function exportEarningsToPrint(){
 
   const formatE = n => (typeof formatEUR === 'function' ? formatEUR(n) : (Number(n||0)).toFixed(2)+' €');
 
+  // صفوف الجدول
   const rows = delivered.map(({id,o})=>{
     const price = Number(o.items_total_eur ?? o.price ?? 0) || 0;
 
@@ -2250,156 +2280,106 @@ async function exportEarningsToPrint(){
     return a + serv;
   }, 0);
 
-  // === 2) نفس HTML الطباعة القديم (بدون تغيير مقاسات/ستايلات) + سكربت للـiframe فقط ===
-  const baseHTML = `
-<!doctype html>
-<html lang="de">
-<head>
-<meta charset="utf-8"/>
-<title>Einnahmen – ${driverName}</title>
-<style>
-  *{box-sizing:border-box}
-  body{font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif; margin:20px; color:#111}
-  h1{font-size:18px;margin:0 0 8px}
-  .meta{margin:0 0 12px;color:#333}
-  table{width:100%; border-collapse:collapse}
-  th,td{padding:8px 10px; border:1px solid #00000022; font-size:13px}
-  th{background:#f1f1f1; text-align:left}
-  tfoot th{background:#fafafa}
-  @media print{ @page{ size:auto; margin:12mm } }
-</style>
-</head>
-<body>
-  <h1>Einnahmen</h1>
-  <div class="meta">Fahrer: <strong>${driverName}</strong> · Datum: ${new Date().toLocaleString('de-DE')}</div>
-  <table>
-    <thead>
-      <tr>
-        <th>Auftrag&nbsp;ID</th>
-        <th>Preis</th>
-        <th>Distanzkosten</th>
-        <th>Delivery&nbsp;Fee</th>
-        <th>Service&nbsp;Fee</th>
-        <th>Erstellt&nbsp;am</th>
-      </tr>
-    </thead>
-    <tbody>
-      ${rows || `<tr><td colspan="6" style="text-align:center;padding:24px">Keine gelieferten Aufträge</td></tr>`}
-    </tbody>
-    <tfoot>
-      <tr>
-        <th style="text-align:left">Summe</th>
-        <th></th><th></th><th></th>
-        <th style="text-align:right">${formatE(totalServ)}</th>
-        <th></th>
-      </tr>
-    </tfoot>
-  </table>
-</body>
-</html>`.trim();
+  // 2) نفس ستايل الديسكتوب (داخل محتوى البوابة على الموبايل، وداخل نافذة جديدة على الديسكتوب)
+  const tableStyles = `
+    <style>
+      *{box-sizing:border-box}
+      body{font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif; margin:20px; color:#111}
+      h1{font-size:18px;margin:0 0 8px}
+      .meta{margin:0 0 12px;color:#333}
+      table{width:100%; border-collapse:collapse}
+      th,td{padding:8px 10px; border:1px solid #00000022; font-size:13px}
+      th{background:#f1f1f1; text-align:left}
+      tfoot th{background:#fafafa}
+      @media print{ @page{ size:auto; margin:12mm } }
+    </style>`.trim();
 
-  // نحقن سكربت صغير داخل الـiframe ليطبع من داخله (ضروري للجوال)
-  const htmlWithAutoPrint = baseHTML.replace(
-    /<\/body>\s*<\/html>\s*$/i,
-    `<script>
-      document.addEventListener('DOMContentLoaded', function(){
-        function doPrint(){
-          try { window.focus(); window.print(); } catch(e){}
-        }
-        if (document.fonts && document.fonts.ready) {
-          document.fonts.ready.then(function(){ setTimeout(doPrint, 120); });
-        } else {
-          setTimeout(doPrint, 150);
-        }
-        window.onafterprint = function(){
-          try { parent.postMessage({type:'__earnings_iframe_done__'}, '*'); } catch(e){}
-        };
-      });
-    <\/script></body></html>`
-  );
+  const header = `
+    <h1>Einnahmen</h1>
+    <div class="meta">Fahrer: <strong>${driverName}</strong> · Datum: ${new Date().toLocaleString('de-DE')}</div>`;
 
-  // === 3) قناة الطباعة ===
+  const tableHTML = `
+    <table>
+      <thead>
+        <tr>
+          <th>Auftrag&nbsp;ID</th>
+          <th>Preis</th>
+          <th>Distanzkosten</th>
+          <th>Delivery&nbsp;Fee</th>
+          <th>Service&nbsp;Fee</th>
+          <th>Erstellt&nbsp;am</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${rows || `<tr><td colspan="6" style="text-align:center;padding:24px">Keine gelieferten Aufträge</td></tr>`}
+      </tbody>
+      <tfoot>
+        <tr>
+          <th style="text-align:left">Summe</th>
+          <th></th><th></th><th></th>
+          <th style="text-align:right">${formatE(totalServ)}</th>
+          <th></th>
+        </tr>
+      </tfoot>
+    </table>`.trim();
+
   if (isMobilePrint()){
-    // الجوال: iframe مخفي + الطباعة من داخل iframe
-    const iframe = document.createElement('iframe');
-    iframe.style.position='fixed';
-    iframe.style.right='0';
-    iframe.style.bottom='0';
-    iframe.style.width='1px';        // 1px أفضل من 0 لبعض المتصفحات
-    iframe.style.height='1px';
-    iframe.style.opacity='0';
-    iframe.style.pointerEvents='none';
-    iframe.style.border='0';
-    document.body.appendChild(iframe);
+    // 3A) الموبايل: اطبع من نفس الصفحة عبر البوابة + CSS print لإخفاء الواجهة
+    const portal = ensurePrintPortal();
+    const content = portal.querySelector('#_print_portal_content_');
+    content.innerHTML = tableStyles + header + tableHTML;
+    portal.style.display = 'block';
 
-    const cleanup = () => { try{ window.removeEventListener('message', onMsg); }catch(_){} try{ document.body.removeChild(iframe); }catch(_){} };
-    const onMsg = (ev)=>{
-      if (ev?.data && ev.data.type === '__earnings_iframe_done__' && ev.source === iframe.contentWindow){
-        // أُغلِق مربع الطباعة — نظّف iframe
-        setTimeout(cleanup, 300);
-      }
+    // اطبع ثم نظّف
+    const cleanup = () => {
+      try { portal.style.display = 'none'; content.innerHTML = ''; } catch(_){}
     };
-    window.addEventListener('message', onMsg, false);
+    const prev = window.onafterprint;
+    window.onafterprint = function(){
+      cleanup();
+      if (typeof prev === 'function') { try{ prev(); }catch(_){ } }
+      window.onafterprint = prev || null;
+    };
 
-    if ('srcdoc' in iframe) {
-      iframe.srcdoc = htmlWithAutoPrint;
-    } else {
-      const ib = new Blob([htmlWithAutoPrint], {type:'text/html'});
-      iframe.src = URL.createObjectURL(ib);
-    }
-
-    // احتياط: نظّف بعد 20 ثانية حتى لو ما وصل حدث onafterprint (سلوك بعض هواتف أندرويد)
+    // مهلة صغيرة لضمان دمج الخطوط/التدفق قبل الطباعة
+    setTimeout(()=>{ try{ window.focus(); window.print(); }catch(_){ } }, 150);
+    // احتياط لو onafterprint ما اشتغلت ببعض الأجهزة
     setTimeout(cleanup, 20000);
     return;
   }
 
-  // سطح المكتب: السلوك القديم (نافذة جديدة)، مع fallback للـiframe إن مُنِعت النوافذ
+  // 3B) الديسكتوب: السلوك القديم (نافذة جديدة) للحفاظ على نفس تجربة الطباعة
   let preWin = null;
   try{ preWin = window.open('', '_blank'); }catch(_){}
+  const fullHTML = `
+<!doctype html>
+<html lang="de">
+<head><meta charset="utf-8"/><title>Einnahmen – ${driverName}</title>${tableStyles}</head>
+<body>${header}${tableHTML}</body>
+</html>`.trim();
+
   if (preWin && !preWin.closed) {
-    preWin.document.open();
-    preWin.document.write(baseHTML);
-    preWin.document.close();
+    preWin.document.open(); preWin.document.write(fullHTML); preWin.document.close();
     setTimeout(()=>{ try{ preWin.focus(); preWin.print(); }catch(_){ } }, 120);
   } else {
-    // منع popup → fallback iframe (لكن بدون سكربت postMessage)
-    const iframe = document.createElement('iframe');
-    iframe.style.position='fixed';
-    iframe.style.right='0';
-    iframe.style.bottom='0';
-    iframe.style.width='1px';
-    iframe.style.height='1px';
-    iframe.style.opacity='0';
-    iframe.style.pointerEvents='none';
-    iframe.style.border='0';
-    document.body.appendChild(iframe);
-
-    const doPrint = () => {
-      try{
-        const w = iframe.contentWindow;
-        const finish = () => setTimeout(()=>{ try{ document.body.removeChild(iframe); }catch(_){ } }, 600);
-        const tryPrint = () => { try{ w.focus(); w.print(); } finally { finish(); } };
-        if (w?.document?.fonts?.ready) {
-          w.document.fonts.ready.then(()=> setTimeout(tryPrint, 120));
-        } else {
-          setTimeout(tryPrint, 150);
-        }
-      }catch(_){
-        try{ document.body.removeChild(iframe); }catch(_){}
-      }
+    // منع النوافذ؟ — استخدم البوابة كـ fallback على الديسكتوب
+    const portal = ensurePrintPortal();
+    const content = portal.querySelector('#_print_portal_content_');
+    content.innerHTML = tableStyles + header + tableHTML;
+    portal.style.display = 'block';
+    const cleanup = () => { try { portal.style.display='none'; content.innerHTML=''; }catch(_){ } };
+    const prev = window.onafterprint;
+    window.onafterprint = function(){
+      cleanup();
+      if (typeof prev === 'function') { try{ prev(); }catch(_){ } }
+      window.onafterprint = prev || null;
     };
-
-    if ('srcdoc' in iframe) {
-      iframe.srcdoc = baseHTML;
-      iframe.onload = doPrint;
-    } else {
-      const ib = new Blob([baseHTML], {type:'text/html'});
-      iframe.src = URL.createObjectURL(ib);
-      iframe.onload = doPrint;
-    }
+    setTimeout(()=>{ try{ window.focus(); window.print(); }catch(_){ } }, 150);
+    setTimeout(cleanup, 20000);
   }
 }
 // @earnings.print:end
+
 
 // @earnings.print:end
 
