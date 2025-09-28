@@ -2181,7 +2181,6 @@ document.addEventListener('click', (e)=>{
 // @earnings.logic:end
 // @earnings.print:start
 // @earnings.print:start
-// كشف بيئة الجوال (iOS/Android + iPadOS)
 function isMobilePrint(){
   const ua = navigator.userAgent || navigator.vendor || '';
   const iOS = /iPhone|iPad|iPod/i.test(ua) || (/\bMacintosh\b/.test(ua) && 'ontouchend' in document);
@@ -2192,13 +2191,12 @@ function isMobilePrint(){
 async function exportEarningsToPrint(){
   if(!uid){ toast('Bitte zuerst anmelden.'); return; }
 
-  // 1) تحميل البيانات (كما السابق تمامًا)
+  // === 1) تحميل بيانات السجل كما هي (لا تغيّر المنطق) ===
   const snap = await getDocs(query(collection(db,"orders"), where("driver.id","==", uid), limit(500)));
   const delivered = snap.docs
     .map(d=>({ id:d.id, o:d.data()||{} }))
     .filter(x => String(x.o.status||'').trim().toLowerCase() === 'geliefert');
 
-  // 2) اسم السائق
   let driverName = '—';
   try{
     const us = await getDoc(doc(db,'users', uid));
@@ -2206,7 +2204,6 @@ async function exportEarningsToPrint(){
     driverName = [u.firstName, u.lastName].filter(Boolean).join(' ') || u.displayName || '—';
   }catch(_){}
 
-  // 3) صفوف الجدول وحساب الإجمالي (نفس منطق الديسكتوب)
   const formatE = n => (typeof formatEUR === 'function' ? formatEUR(n) : (Number(n||0)).toFixed(2)+' €');
 
   const rows = delivered.map(({id,o})=>{
@@ -2253,8 +2250,8 @@ async function exportEarningsToPrint(){
     return a + serv;
   }, 0);
 
-  // 4) نفس HTML الديسكتوب القديم بالضبط (لا تغيير مقاسات/ستايل)
-  const html = `
+  // === 2) نفس HTML الطباعة القديم (بدون تغيير مقاسات/ستايلات) + سكربت للـiframe فقط ===
+  const baseHTML = `
 <!doctype html>
 <html lang="de">
 <head>
@@ -2299,64 +2296,81 @@ async function exportEarningsToPrint(){
     </tfoot>
   </table>
 </body>
-</html>`;
+</html>`.trim();
 
-  // 5) اختيار قناة الطباعة
+  // نحقن سكربت صغير داخل الـiframe ليطبع من داخله (ضروري للجوال)
+  const htmlWithAutoPrint = baseHTML.replace(
+    /<\/body>\s*<\/html>\s*$/i,
+    `<script>
+      document.addEventListener('DOMContentLoaded', function(){
+        function doPrint(){
+          try { window.focus(); window.print(); } catch(e){}
+        }
+        if (document.fonts && document.fonts.ready) {
+          document.fonts.ready.then(function(){ setTimeout(doPrint, 120); });
+        } else {
+          setTimeout(doPrint, 150);
+        }
+        window.onafterprint = function(){
+          try { parent.postMessage({type:'__earnings_iframe_done__'}, '*'); } catch(e){}
+        };
+      });
+    <\/script></body></html>`
+  );
+
+  // === 3) قناة الطباعة ===
   if (isMobilePrint()){
-    // — الجوال: اطبع داخل iframe مخفي بنفس الصفحة (لا تبويب جديد)
+    // الجوال: iframe مخفي + الطباعة من داخل iframe
     const iframe = document.createElement('iframe');
     iframe.style.position='fixed';
     iframe.style.right='0';
     iframe.style.bottom='0';
-    iframe.style.width='0';
-    iframe.style.height='0';
+    iframe.style.width='1px';        // 1px أفضل من 0 لبعض المتصفحات
+    iframe.style.height='1px';
+    iframe.style.opacity='0';
+    iframe.style.pointerEvents='none';
     iframe.style.border='0';
     document.body.appendChild(iframe);
 
-    // امنح الـDOM وقتًا بسيطًا للتهيؤ قبل أمر الطباعة (iOS/Safari)
-    const doPrint = () => {
-      try{
-        const w = iframe.contentWindow;
-        const finish = () => setTimeout(()=>{ try{ document.body.removeChild(iframe); }catch(_){ } }, 600);
-        const tryPrint = () => { try{ w.focus(); w.print(); } finally { finish(); } };
-
-        if (w?.document?.fonts?.ready) {
-          w.document.fonts.ready.then(()=> setTimeout(tryPrint, 120));
-        } else {
-          setTimeout(tryPrint, 180);
-        }
-      }catch(_){
-        try{ document.body.removeChild(iframe); }catch(_){}
+    const cleanup = () => { try{ window.removeEventListener('message', onMsg); }catch(_){} try{ document.body.removeChild(iframe); }catch(_){} };
+    const onMsg = (ev)=>{
+      if (ev?.data && ev.data.type === '__earnings_iframe_done__' && ev.source === iframe.contentWindow){
+        // أُغلِق مربع الطباعة — نظّف iframe
+        setTimeout(cleanup, 300);
       }
     };
+    window.addEventListener('message', onMsg, false);
 
     if ('srcdoc' in iframe) {
-      iframe.srcdoc = html;
-      iframe.onload = doPrint;
+      iframe.srcdoc = htmlWithAutoPrint;
     } else {
-      const ib = new Blob([html], {type:'text/html'});
+      const ib = new Blob([htmlWithAutoPrint], {type:'text/html'});
       iframe.src = URL.createObjectURL(ib);
-      iframe.onload = doPrint;
     }
+
+    // احتياط: نظّف بعد 20 ثانية حتى لو ما وصل حدث onafterprint (سلوك بعض هواتف أندرويد)
+    setTimeout(cleanup, 20000);
     return;
   }
 
-  // — سطح المكتب: أبقِ السلوك القديم (نافذة جديدة). وإن فشل، نرجع لـ iframe.
+  // سطح المكتب: السلوك القديم (نافذة جديدة)، مع fallback للـiframe إن مُنِعت النوافذ
   let preWin = null;
   try{ preWin = window.open('', '_blank'); }catch(_){}
   if (preWin && !preWin.closed) {
     preWin.document.open();
-    preWin.document.write(html);
+    preWin.document.write(baseHTML);
     preWin.document.close();
     setTimeout(()=>{ try{ preWin.focus(); preWin.print(); }catch(_){ } }, 120);
   } else {
-    // فallback لسطح المكتب إن مُنعت pop-up
+    // منع popup → fallback iframe (لكن بدون سكربت postMessage)
     const iframe = document.createElement('iframe');
     iframe.style.position='fixed';
     iframe.style.right='0';
     iframe.style.bottom='0';
-    iframe.style.width='0';
-    iframe.style.height='0';
+    iframe.style.width='1px';
+    iframe.style.height='1px';
+    iframe.style.opacity='0';
+    iframe.style.pointerEvents='none';
     iframe.style.border='0';
     document.body.appendChild(iframe);
 
@@ -2365,7 +2379,6 @@ async function exportEarningsToPrint(){
         const w = iframe.contentWindow;
         const finish = () => setTimeout(()=>{ try{ document.body.removeChild(iframe); }catch(_){ } }, 600);
         const tryPrint = () => { try{ w.focus(); w.print(); } finally { finish(); } };
-
         if (w?.document?.fonts?.ready) {
           w.document.fonts.ready.then(()=> setTimeout(tryPrint, 120));
         } else {
@@ -2377,15 +2390,17 @@ async function exportEarningsToPrint(){
     };
 
     if ('srcdoc' in iframe) {
-      iframe.srcdoc = html;
+      iframe.srcdoc = baseHTML;
       iframe.onload = doPrint;
     } else {
-      const ib = new Blob([html], {type:'text/html'});
+      const ib = new Blob([baseHTML], {type:'text/html'});
       iframe.src = URL.createObjectURL(ib);
       iframe.onload = doPrint;
     }
   }
 }
+// @earnings.print:end
+
 // @earnings.print:end
 
 
