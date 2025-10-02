@@ -1517,24 +1517,19 @@ function setOnline(flag){
   localStorage.setItem(ONLINE_PREF_KEY, online ? '1' : '0');
 
   if (online){
-  startPresence();          // RTDB presence + watchPosition (foreground)
-  attachOrders();
-  attachInbox();
-
-  driverLiveStart();        // NEW: تأكد تشغيل تتبّع المتصفح + نبض HB
-  ensureBGLoop();           // NEW: حلقة “self-heal” تعيد تشغيل Median إذا تعطل
-
-  startMedianBG(uid);       // Median (native bridge) لتتبّع الخلفية الحقيقي
-} else {
-  stopPresence();
-  detachOrders();
-  detachInbox();
-  stopIncomingAlert();
-
-  stopMedianBG();           // أوقف Median فورًا
-  stopBGLoop();             // NEW: أوقف حلقة self-heal
-}
-
+    startPresence();
+    attachOrders();
+    attachInbox();
+    startMedianBG(uid);
+	 driverLiveStart();
+  } else {
+    stopPresence();
+    detachOrders();
+    detachInbox();
+    stopIncomingAlert();
+    stopMedianBG();
+	driverLiveStop();
+  }
 }
 
 // اجعل الدالة متاحة للسكربت غير الموديول
@@ -2878,15 +2873,13 @@ document.addEventListener("click", async function onSingleDeliverClick(e) {
 /* ===== Auth gate ===== */
 onAuthStateChanged(auth, async (user)=>{
   // امنع الدخول التلقائي إلا أثناء التسجيل (regInFlight)
-  if (user && sessionStorage.getItem(SESSION_OK) !== '1' && !regInFlight) {
-    await signOut(auth).catch(()=>{});
-    authModal.style.display='flex'; appRoot.style.display='none';
-	/* [EARNINGS-RESET-ON-LOGOUT] */
-try{ earningsUnsub?.(); }catch(_){}
-setEarningsVisibility(false);
+// امنع الخروج القسري عند فقدان SESSION_OK بعد الرجوع من الخلفية
+if (user && sessionStorage.getItem(SESSION_OK) !== '1' && !regInFlight) {
+  // الجلسة صالحة من Firebase لكن sessionStorage فُرّغ — علّم العلم وأكمل
+  sessionStorage.setItem(SESSION_OK, '1');
+  // لا signOut ولا return هنا
+}
 
-    return;
-  }
   if(!user){
     // نوقف الحضور باستخدام uid القديم
     stopPresence();
