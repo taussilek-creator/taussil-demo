@@ -1517,19 +1517,24 @@ function setOnline(flag){
   localStorage.setItem(ONLINE_PREF_KEY, online ? '1' : '0');
 
   if (online){
-    startPresence();
-    attachOrders();
-    attachInbox();
-    startMedianBG(uid);
-	 driverLiveStart();
-  } else {
-    stopPresence();
-    detachOrders();
-    detachInbox();
-    stopIncomingAlert();
-    stopMedianBG();
-	driverLiveStop();
-  }
+  startPresence();          // RTDB presence + watchPosition (foreground)
+  attachOrders();
+  attachInbox();
+
+  driverLiveStart();        // NEW: تأكد تشغيل تتبّع المتصفح + نبض HB
+  ensureBGLoop();           // NEW: حلقة “self-heal” تعيد تشغيل Median إذا تعطل
+
+  startMedianBG(uid);       // Median (native bridge) لتتبّع الخلفية الحقيقي
+} else {
+  stopPresence();
+  detachOrders();
+  detachInbox();
+  stopIncomingAlert();
+
+  stopMedianBG();           // أوقف Median فورًا
+  stopBGLoop();             // NEW: أوقف حلقة self-heal
+}
+
 }
 
 // اجعل الدالة متاحة للسكربت غير الموديول
