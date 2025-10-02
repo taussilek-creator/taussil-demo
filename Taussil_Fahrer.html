@@ -1254,6 +1254,8 @@ const SESSION_OK='driver_session_ok';
 let lastAuthTab = localStorage.getItem('driver_auth_tab') || 'login';
 
 let uid=null, approved=false, online=false, watchId=null, lastLL=null, lastSentAt=0;
+let lastSpeedMS = null; // سرعة آخر قراءة (m/s) لاستخدامها في ضبط الـETA
+
 /* [EARNINGS-STATE] */
 let earningsOn = false;
 function setEarningsVisibility(on){
@@ -1522,6 +1524,8 @@ function setOnline(flag){
     attachInbox();
     startMedianBG(uid);
 	 driverLiveStart();
+	 scheduleEtaUpdate(400, /*force=*/true);
+
   } else {
     stopPresence();
     detachOrders();
@@ -1529,6 +1533,8 @@ function setOnline(flag){
     stopIncomingAlert();
     stopMedianBG();
 	driverLiveStop();
+	if(etaEl()) etaEl().textContent = 'Abholung —';
+
   }
 }
 
@@ -1547,9 +1553,11 @@ function startPresence(){
   try{ onDisconnect(pRef).update({ lastDisconnectAt: rServerTs() }); }catch(_){}
   if (hbTimer) clearInterval(hbTimer);
   hbTimer = setInterval(()=> {
-    rUpdate(pRef, { online:true, ts: Date.now(), ver:'driver-web-v7' }).catch(()=>{});
-  }, 15000);
-  startWatch();
+  rUpdate(pRef, { online:true, ts: Date.now(), ver:'driver-web-v7' }).catch(()=>{});
+  // نبضة ETA خفيفة — سيقرر tryEtaUpdateThrottled إن كانت مطلوبة
+  scheduleEtaUpdate(1200);
+}, 15000);
+
 }
 
 function stopPresence(){
@@ -1566,6 +1574,8 @@ function startWatch(){
     pos=>{
       const { latitude:lat, longitude:lng, accuracy, speed } = pos.coords;
       lastLL={lat,lng};
+	  lastSpeedMS = Number.isFinite(speed) ? speed : lastSpeedMS;
+
       const now=Date.now();
       if(now-lastSentAt>=4000){
         rUpdate(ref(rtdb,`drivers_locations/${uid}`), { lat,lng, accuracy: Number.isFinite(accuracy)?accuracy:null, updatedAt: now }).catch(()=>{});
@@ -1608,6 +1618,8 @@ function driverLiveStart(){
         const lat = +Number(c.latitude).toFixed(6);
         const lng = +Number(c.longitude).toFixed(6);
         LIVE_LAST_LL = { lat, lng };
+		lastSpeedMS = Number.isFinite(c.speed) ? c.speed : lastSpeedMS;
+
         if (now - LIVE_LAST_SENT < 4000) return;   // حد أقصى كل ≥4 ثوانٍ
         LIVE_LAST_SENT = now;
         rUpdate(locRef, {
@@ -1623,9 +1635,13 @@ function driverLiveStart(){
     // نبض كل 15s يدفع آخر نقطة حتى لو التبويب بالخلفية
     if (!LIVE_HB){
       LIVE_HB = setInterval(()=>{
-        if(!LIVE_LAST_LL) return;
-        rUpdate(locRef, { ...LIVE_LAST_LL, ts: Date.now(), ver:'hb' }).catch(()=>{});
-      }, 15000);
+  if(!LIVE_LAST_LL) return;
+  rUpdate(locRef, { ...LIVE_LAST_LL, ts: Date.now(), ver:'hb' }).catch(()=>{});
+
+  // نبضة ETA خفيفة — الـthrottle الداخلي يمنع الإسراف
+  scheduleEtaUpdate(1000);
+}, 15000);
+
     }
   }catch(e){ console.error('driverLiveStart error', e); }
 }
@@ -1930,9 +1946,108 @@ function attachOrders(){
     });
   }, ()=>{ ordersInfo.textContent="Wird geprüft…"; });
 }
+// === ETA throttling (foreground/background smart) ===
 const etaEl = () => document.getElementById('etaLine');
 let etaTimer = null;
-function scheduleEtaUpdate(ms=800){ clearTimeout(etaTimer); etaTimer=setTimeout(updatePickupETA, ms); }
+
+// آخر حساب + آخر موضع اعتمدناه + حارس سباقات
+let etaLastCalcAt = 0;
+let etaLastBaseLL = null;
+let etaReqSeq = 0;
+
+// إعدادات مرنة
+const ETA_CONF = {
+  FG_MIN_MS: 30_000,       // أدنى فاصل حساب بالواجهة الأمامية
+  BG_MIN_MS: 90_000,       // أدنى فاصل حساب بالخلفية
+  FG_MOVE_M: 120,          // تحرّك أدنى لإعادة الحساب (أمامي)
+  BG_MOVE_M: 300,          // تحرّك أدنى (خلفية)
+  STOP_SPEED_MS: 1.0,      // دون 1 م/ث نعتبره شبه ثابت
+  MAX_STALE_MS: 5 * 60_000 // مهما كان، لا نسمح بقدم أكثر من 5 دقائق
+};
+
+function ctxParams(){
+  const bg = document.hidden === true;
+  return {
+    minMs: bg ? ETA_CONF.BG_MIN_MS : ETA_CONF.FG_MIN_MS,
+    moveM: bg ? ETA_CONF.BG_MOVE_M : ETA_CONF.FG_MOVE_M
+  };
+}
+
+function movedEnough(a,b,needM){
+  if(!a || !b) return true;
+  try{ return (haversineKm(a,b) * 1000) >= (needM||0); }catch{ return true; }
+}
+
+async function tryEtaUpdateThrottled(force=false){
+  if(!online) return;
+
+  const now = Date.now();
+  const { minMs, moveM } = ctxParams();
+
+  // حد أدنى زمني
+  if(!force && (now - etaLastCalcAt < minMs)) return;
+
+  // نقطة السائق الحالية
+  const here = lastLL || await getCurrentLLOnce();
+  if(!here) return;
+
+  // حد الحركة (ومراعاة “التوقف” بسُرعة منخفضة)
+  const stationary = (lastSpeedMS != null && lastSpeedMS < ETA_CONF.STOP_SPEED_MS);
+  if(!force && etaLastBaseLL && !movedEnough(etaLastBaseLL, here, moveM)){
+    // لو شبه ثابت، اسمح بالتحديث فقط لو النتائج قديمة جدًا
+    if(stationary && (now - etaLastCalcAt) < ETA_CONF.MAX_STALE_MS) return;
+    if(!stationary) return;
+  }
+
+  // لا ETA دون طلب Pick-up صالح
+  const pick = choosePickupOrder();
+  if(!pick){ if(etaEl()) etaEl().textContent = 'Abholung —'; return; }
+  const restAddr = getRestaurantAddr(pick.o);
+  if(!restAddr){ if(etaEl()) etaEl().textContent = 'Abholung —'; return; }
+
+  // احسب مع حارس سباقات لتجاهل النتائج المتأخرة
+  const mySeq = ++etaReqSeq;
+  try{
+    const { km, sec } = await routeInfo(here, restAddr);
+    if(mySeq !== etaReqSeq) return; // نتيجة قديمة
+
+    let mins = sec/60;
+    if(!Number.isFinite(mins) || mins <= 0){
+      // تقدير احتياطي (28 كم/س داخل المدينة)
+      mins = (km / 28) * 60;
+    }
+    if(etaEl()) etaEl().textContent = formatETA(mins);
+  }catch(_){
+    if(mySeq !== etaReqSeq) return;
+    if(etaEl()) etaEl().textContent = 'Abholung —';
+  }
+
+  etaLastCalcAt = Date.now();
+  etaLastBaseLL = { lat: here.lat, lng: here.lng };
+}
+
+// جدولة آمنة
+function scheduleEtaUpdate(ms=800, force=false){
+  clearTimeout(etaTimer);
+  etaTimer = setTimeout(()=> tryEtaUpdateThrottled(force), ms);
+}
+
+// عند العودة للمقدمة: نبضة فورية (محكومة داخليًا)
+document.addEventListener('visibilitychange', ()=>{
+  if(!window.online){
+    driverLiveStop();
+    return;
+  }
+  if(!document.hidden){
+    driverLiveStart();
+    scheduleEtaUpdate(150, /*force=*/true);
+  }
+});
+
+
+// عند استعادة الشبكة
+window.addEventListener('online', ()=> scheduleEtaUpdate(500, /*force=*/true));
+
 
 // اختَر طلب الالتقاط (قبل التسليم)
 function choosePickupOrder(){
