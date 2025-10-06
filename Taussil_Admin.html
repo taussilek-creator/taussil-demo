@@ -649,6 +649,64 @@ body { min-height: 100dvh; }                   /* dvh يعالج شريط الم
   #tab-fleetx #fleetx-grid{ grid-template-columns: 1fr; }
   #tab-fleetx .fleetx-sash{ display:none; }
 }
+/* === Admin Desktop Fit Patch (append at end) === */
+:root{
+  --admin-maxw: 1280px;    /* عدّلها 1200–1440 حسب رغبتك */
+  --admin-padx: 16px;
+}
+
+/* 1) لا تمرير أفقي + حصر العرض داخل الشاشة */
+html{ overflow-x: hidden; }
+.app{
+  max-width: none;  /* يلغي 1400px القديمة */
+  width: min(var(--admin-maxw), 100vw - (var(--admin-padx)*2));
+  margin-inline: auto;
+}
+
+/* 2) أي صف/جريد ما يدفّش الصفحة */
+.row, .flex, .grid, .bar, .controls, .nav, .ph, .pb{ min-width: 0; }
+.row, .flex, .controls, .nav{ flex-wrap: wrap; }
+
+/* 3) جداول وبطاقات: أعمدة قابلة للانكماش (بدون تمدد أفقي) */
+.table .tr{
+  grid-template-columns:
+    auto
+    minmax(0,1fr)
+    minmax(0,1fr)
+    auto auto auto;
+}
+#incoming-list .tr{
+  grid-template-columns:
+    minmax(0,1.6fr)
+    auto auto auto
+    minmax(0,1fr)
+    auto;
+}
+#active-list .tr{
+  grid-template-columns:
+    minmax(0,1.4fr)
+    auto
+    minmax(0,1fr);
+}
+
+/* 4) قصّ النصوص الطويلة بأناقة */
+.app :where(.ellipsis, .force-fit, .trip-value, .right){
+  min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+/* 5) الكروت تحتفظ بارتفاع الشاشة والسكرول داخلي */
+.card{ display:flex; flex-direction:column; min-height:0; }
+.card > .pb{
+  flex:1; min-height:0; overflow:auto;
+  scrollbar-width:none; -ms-overflow-style:none;
+}
+.card > .pb::-webkit-scrollbar{ width:0; height:0 }
+
+/* 6) تهيئة لطيف 1366×768 */
+@media (max-width: 1366px){
+  :root{ --admin-maxw: 1400px; }
+  .controls .small{ display:none; }  /* لإفساح المجال عند الضيق */
+}
 
 </style>
 </head>
