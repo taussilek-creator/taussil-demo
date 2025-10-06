@@ -182,6 +182,7 @@ input[type="number"]{-moz-appearance:textfield;text-align:center;font-variant-nu
 .map-ui{position:absolute;right:10px;top:10px;display:flex;gap:6px;background:rgba(255,255,255,.95);border:1px solid rgba(0,0,0,.08);border-radius:10px;padding:6px 8px;font-size:12px;z-index:2}
 .map-ui select{border:1px solid rgba(0,0,0,.2);border-radius:6px;padding:2px 6px;background:#fff}
 
+
 /* right */
 .stats{display:grid;grid-template-columns:1fr;gap:8px;margin-bottom:10px}
 .stat{background:#fff;border:var(--border);border-radius:12px;padding:10px;display:flex;align-items:center;justify-content:space-between}
@@ -291,9 +292,14 @@ input[type="number"]{-moz-appearance:textfield;text-align:center;font-variant-nu
 }
 .field-grid label{ display:flex; align-items:center; gap:8px; font-size:13px; }
 .field-actions{ display:flex; gap:8px; justify-content:flex-end; }
+.tabs-inline{display:flex;gap:6px;background:#fff;border:1px solid rgba(0,0,0,.08);border-radius:10px;padding:4px;margin-bottom:8px}
+.tab-btn{flex:1;height:36px;border-radius:8px;background:#fff;border:1px solid rgba(0,0,0,.12);cursor:pointer;font-weight:800}
+.tab-btn.active{background:linear-gradient(180deg,#33BBDF,#1da9cf);color:#fff;border:none;box-shadow:0 6px 18px rgba(29,169,207,.32)}
 
 </style>
 </head>
+<section class="panel left">
+  <div class="pb">
 <!-- Drawer (right) -->
 <div id="drawerBackdrop" class="backdrop"></div>
 <div id="sideMenu" class="drawer">
@@ -402,6 +408,12 @@ input[type="number"]{-moz-appearance:textfield;text-align:center;font-variant-nu
     <section class="panel left">
       <div class="ph"><div class="t">Neue Bestellung</div><div class="s">Nr: <span id="nrBox">—</span> <button id="sndBtn" class="btn-mini" title="Audio wählen (Alt = Dateien)">🔊</button></div></div>
       <div class="pb">
+	  <!-- === MV FULL SWITCH TAB === -->
+<div class="tabs-inline" id="sendTabsNav" role="tablist" aria-label="Bestell-Tabs">
+  <button id="tabSend" class="tab-btn active" type="button" role="tab" aria-selected="true">Auftrag Senden</button>
+  <button id="tabMV"   class="tab-btn"        type="button" role="tab" aria-selected="false">Shop Verwaltung</button>
+</div>
+
         <div class="providers" id="providers">
           <div class="provider" data-src="Lieferando"><img src="Lieferando.png" alt="Lieferando"><div class="p-qty"><button class="p-dec">−</button><span class="n">1</span><button class="p-inc">+</button></div></div>
           <div class="provider" data-src="Uber Eats"><img src="Uber.png" alt="Uber Eats"><div class="p-qty"><button class="p-dec">−</button><span class="n">1</span><button class="p-inc">+</button></div></div>
@@ -446,6 +458,11 @@ input[type="number"]{-moz-appearance:textfield;text-align:center;font-variant-nu
       <div class="pb" style="padding:12px">
         <div class="map-wrap">
           <div class="map-ui">
+		  <label style="display:flex;align-items:center;gap:6px">
+  <input id="mapLiveToggle" type="checkbox" />
+  <span>Live-ETA</span>
+</label>
+
             <span>Style:</span>
             <select id="mapStyle">
               <option value="classic">Klassisch</option>
@@ -518,6 +535,18 @@ setPersistence(auth, browserLocalPersistence).catch(()=>{});
 const $ = (s)=>document.querySelector(s);
 const money = n=> (Number(n||0)).toLocaleString("de-DE",{minimumFractionDigits:2,maximumFractionDigits:2})+"€";
 const parsePrice = s => { if(s==null) return 0; const n = parseFloat(String(s).replace(/[^\d.,-]/g,"").replace(",",".")); return Number.isFinite(n)?n:0; };
+/* === TAUSSIL-COST: إعدادات توفير التكلفة === */
+const COST_SAVE = {
+  GEOFENCE_M: 280,          // 200–300m لإيقاف التتبّع والـDirections
+  ROUTE_MIN_MS: 60000,      // أقل فترة بين مكالمات Directions (60s)
+  ROUTE_MIN_MOVE_M: 700,    // أو عند تحرّك السائق ≥ 700م
+  LIVE_DEFAULT: false       // افتراضيًا *بدون* Live-ETA (توفير)
+};
+
+// حالة داخلية للتثبيت/الثروتل
+let __lastRouteAt   = 0;              // آخر وقت طلب Directions
+let __lastRouteFrom = null;           // آخر موضع استُخدم للـDirections
+let __geofenceHit   = false;          // قُفل بعد الاقتراب من المطعم
 
 /* === Persist keys (localStorage) === */
 const LS_TRIP_OID   = 'trip:selectedOrderId';
@@ -1349,76 +1378,79 @@ function haversine(a,b){
   return 2*R*Math.asin(Math.sqrt(s));
 }
 let restGeocoded=false;
-function updateMapAndDistance(dLat,dLng){
-  const distEl = document.getElementById('tripDistance');
-  const map = window.__map; if(!map) return;
-  if(window.__restPos){
-    window.__restMarker = window.__restMarker || new google.maps.Marker({map, label:'R'});
-    window.__restMarker.setPosition(window.__restPos);
-  }
-  if(!restGeocoded && hiddenDefaults.Restaurant_Adresse){
-    const geocoder = new google.maps.Geocoder();
-    geocoder.geocode({address:hiddenDefaults.Restaurant_Adresse}, (res,status)=>{
-      if(status==='OK' && res[0]){
-        const p=res[0].geometry.location;
-        window.__restPos={lat:p.lat(), lng:p.lng()};
-        restGeocoded=true;
-        ls.set(LS_REST_POS, window.__restPos);
-        map.setCenter(window.__restPos);
-        computeRouteAndETA({lat:dLat, lng:dLng});
-        window.__restMarker = window.__restMarker || new google.maps.Marker({map, label:'R'});
-        window.__restMarker.setPosition(window.__restPos);
-      }
+/* === TAUSSIL-COST: تحديث الخريطة + جيوفِنس + تقنين === */
+function updateMapAndDistance(dLat, dLng){
+  const map = window.__map;
+  if(!map || !window.google?.maps) return;
+
+  // 1) رسم السائق بسهم أخضر مع اتجاه الحركة
+  const nextLL = new google.maps.LatLng(Number(dLat), Number(dLng));
+  const prevLL = (lastDriverPos && Number.isFinite(lastDriverPos.lat) && Number.isFinite(lastDriverPos.lng))
+    ? new google.maps.LatLng(lastDriverPos.lat, lastDriverPos.lng)
+    : nextLL;
+
+  const rot = headingDeg(prevLL, nextLL);
+  if(!window.__driverMarker){
+    window.__driverMarker = new google.maps.Marker({
+      map,
+      position: nextLL,
+      icon: driverArrowIcon(rot),
+      title: 'Driver'
     });
+  } else {
+    window.__driverMarker.setIcon(driverArrowIcon(rot));
+    window.__driverMarker.setPosition(nextLL);
   }
-  // --- Driver arrow marker (rotates toward movement) ---
-const nextLL = new google.maps.LatLng(Number(dLat), Number(dLng));
-const prevLL = (lastDriverPos && Number.isFinite(lastDriverPos.lat) && Number.isFinite(lastDriverPos.lng))
-  ? new google.maps.LatLng(lastDriverPos.lat, lastDriverPos.lng)
-  : nextLL;
 
-const rot = headingDeg(prevLL, nextLL);
+  lastDriverPos = { lat: nextLL.lat(), lng: nextLL.lng() };
 
-if(!window.__driverMarker){
-  window.__driverMarker = new google.maps.Marker({
-    map,
-    position: nextLL,
-    icon: driverArrowIcon(rot),
-    title: 'Driver'
-  });
-}else{
-  window.__driverMarker.setIcon(driverArrowIcon(rot));
-  window.__driverMarker.setPosition(nextLL);
-}
-
-lastDriverPos = { lat: nextLL.lat(), lng: nextLL.lng() };
-
-  function updateMapAndDistance(lat, lng){
-  if(!window.__map || !window.google?.maps) return;
-
-  lat = Number(lat); lng = Number(lng);
-  if(!Number.isFinite(lat) || !Number.isFinite(lng)) return;
-
-  if(!DRIVER_MARKER){
-    DRIVER_MARKER = new google.maps.Marker({ map: window.__map, label:'D' });
+  // 2) تأكيد وضْع المطعم على الخريطة (مرة واحدة مع Cache)
+  if(window.__restPos){
+    window.__restMarker = window.__restMarker || new google.maps.Marker({ map, label:'R' });
+    window.__restMarker.setPosition(window.__restPos);
+  } else {
+    ensureRestaurantGeocoded(); // لديها Cache بالـlocalStorage بالفعل
   }
-  DRIVER_MARKER.setPosition({ lat, lng });
 
-  if(!DID_FIT){
-    DID_FIT = true;
-    if(window.__restPos){
-      const b = new google.maps.LatLngBounds();
-      b.extend(window.__restPos); b.extend({lat, lng});
-      window.__map.fitBounds(b);
-    }else{
-      window.__map.setCenter({lat, lng});
-      if(!window.__map.getZoom() || window.__map.getZoom()<14) window.__map.setZoom(14);
+  // 3) مسافة هافرسين (مجانية) + جيوفِنس لإيقاف البث Direction/RTDB
+  if(window.__restPos){
+    const distKm = haversine({lat:dLat,lng:dLng}, window.__restPos);
+    const distM  = distKm * 1000;
+
+    // جيوفِنس 280م: أوقف تتبّع RTDB + لا Directions + نظّف الخريطة
+    if(!__geofenceHit && distM <= COST_SAVE.GEOFENCE_M){
+      __geofenceHit = true;
+      renderMapInfo(distKm, null);   // نعرض مسافة تقريبية فقط
+      stopDriverTracking();          // ⛔ يوقف الـRTDB listener (توفير قراءات)
+      clearMapArtifacts();
+      resetTripTimesUI();
+      return;
+    }
+
+    // 4) وضع التوفير: إن لم يكن Live-ETA مفعّلاً، لا نطلب Directions أبداً
+    const liveOn = document.getElementById('mapLiveToggle')?.checked === true;
+    if(!liveOn){
+      renderMapInfo(distKm, null);   // مسافة فقط (ETA غير حيّ)
+      return;
+    }
+
+    // 5) Directions بثروتل قوي: كل 60s أو بعد تحرك ≥ 700m
+    const now = Date.now();
+    const movedM = __lastRouteFrom ? (haversine(__lastRouteFrom, {lat:dLat,lng:dLng}) * 1000) : Infinity;
+    const timeOk = (now - __lastRouteAt) >= COST_SAVE.ROUTE_MIN_MS;
+    const moveOk = movedM >= COST_SAVE.ROUTE_MIN_MOVE_M;
+
+    if(timeOk || moveOk || !TRIP_TARGET_MS){
+      __lastRouteAt   = now;
+      __lastRouteFrom = { lat:dLat, lng:dLng };
+      computeRouteAndETA({ lat:dLat, lng:dLng });   // ← طلبيّة واحدة فقط حسب الثروتل
+    } else {
+      // عرض المسافة التقريبية فقط بانتظار الثروتل
+      renderMapInfo(distKm, null);
     }
   }
 }
 
-  computeRouteAndETA({lat:dLat, lng:dLng});
-}
 /* === Realtime tracking + Directions/ETA === */
 let lastRouteTs = 0;
 let lastETARoundedSec = null;
@@ -1453,10 +1485,19 @@ function ensureDirections(){
 let DRIVER_MARKER = null;
   let DID_FIT = false;
 function computeRouteAndETA(driverPos){
+  const liveOn = document.getElementById('mapLiveToggle')?.checked === true;
+  if(!liveOn) return; // توفير: لا Directions مع Live-ETA مطفأ
+  // ... تابع الدالة كما هي ...
+
   if(!window.__restPos || !ensureDirections()) return;
   const now = Date.now();
-  if(now - lastRouteTs < 2000) return;
-  lastRouteTs = now;
+  const movedM = __lastRouteFrom ? (haversine(__lastRouteFrom, driverPos) * 1000) : Infinity;
+const timeOk = (now - __lastRouteAt) >= COST_SAVE.ROUTE_MIN_MS;
+const moveOk = movedM >= COST_SAVE.ROUTE_MIN_MOVE_M;
+if(!(timeOk || moveOk)) return;
+__lastRouteAt   = now;
+__lastRouteFrom = { ...driverPos };
+
   window.__dirService.route({
     origin: driverPos,
     destination: window.__restPos,
@@ -1574,7 +1615,30 @@ async function initMap(){
   window.__map = map;
   const styleSel=document.getElementById('mapStyle');
   styleSel?.addEventListener('change', e=>applyMapStyle(map, e.target.value));
+  // داخل initMap() بعد styleSel
+const liveChk = document.getElementById('mapLiveToggle');
+if (liveChk) {
+  liveChk.checked = COST_SAVE.LIVE_DEFAULT; // افتراضيًا Off
+  liveChk.addEventListener('change', () => {
+    if (liveChk.checked) {
+      // تفعيل: نفكّ الثروتل لأول طلب ونحاول توجيه فوري إن كانت البيانات متاحة
+      __lastRouteAt = 0;
+      __lastRouteFrom = null;
+      // لو نحن داخل الجيوفِنس، لن نرسم مسارًا (تصميمًا للتوفير)
+      if (!__geofenceHit && window.__restPos && lastDriverPos) {
+        ensureDirections();
+        computeRouteAndETA({ lat: lastDriverPos.lat, lng: lastDriverPos.lng });
+      }
+    } else {
+      // إيقاف: نمسح خط المسار الأزرق ونكتفي بالمعلومات التقريبية
+      try { window.__dirRenderer?.setDirections({ routes: [] }); } catch {}
+      renderMapInfo(null, null);
+    }
+  });
+}
+
   ensureRestaurantGeocoded();
+  
   // Bootstrap العدّاد من التخزين قبل وصول Snapshot
   (function restoreCountdownEarly(){
     const savedMs = ls.get(LS_TRIP_TARGET, null);
@@ -2171,6 +2235,62 @@ const fee     = money(feeNum);
   });
 })();
 
+/* === Full-page switch to Multi-Vendor Admin (robust) === */
+(() => {
+  // غيّر الاسم هنا إذا كان ملف واجهة الملتي-فيندور باسم/مسار مختلف
+  const MV_LOCAL_KEY = 'mv:path';              // يمكن تخزين مسار مخصص
+  const DEFAULT_ENTRY = localStorage.getItem(MV_LOCAL_KEY) || 'mv-admin.html';
+
+  const bSend = document.getElementById('tabSend');
+  const bMV   = document.getElementById('tabMV');
+
+  async function gotoMV(){
+    // مسارات افتراضية نحاولها بالتتالي
+    const base = new URL('.', location.href);
+    const candidates = [
+      DEFAULT_ENTRY,
+      './' + DEFAULT_ENTRY,
+      'admin/' + DEFAULT_ENTRY,
+      'pages/' + DEFAULT_ENTRY,
+      '../' + DEFAULT_ENTRY
+    ];
+
+    // على بيئة file:// (فتح ملفات محليًا) لا نقدر نعمل fetch HEAD؛ ننتقل مباشرة
+    if (location.protocol === 'file:') {
+      const url = new URL(candidates[0], location.href);
+      location.href = url.toString();
+      return;
+    }
+
+    // نحاول HEAD على نفس الأصل للعثور على الملف قبل الانتقال
+    for (const p of candidates){
+      const url = new URL(p, base);
+      try{
+        const res = await fetch(url, { method:'HEAD', cache:'no-store' });
+        if (res.ok) { window.location.assign(url.toString()); return; }
+      }catch(_){ /* تجاهل ونجرّب التالي */ }
+    }
+
+    // لو لم نجد الملف، اسمح بإدخال مسار مخصص مرة واحدة
+    const custom = prompt('Datei nicht gefunden. Pfad zur MV-Seite eingeben (z. B. /admin/mv-admin.html):');
+    if (custom) {
+      localStorage.setItem(MV_LOCAL_KEY, custom.trim());
+      const url = new URL(custom.trim(), base);
+      window.location.assign(url.toString());
+    } else {
+      alert('mv-admin.html nicht gefunden. Bitte legen Sie die Datei im selben Ordner ab oder passen Sie den Pfad an.');
+    }
+  }
+
+  bSend?.addEventListener('click', () => {
+    bSend.classList.add('active');
+    bMV?.classList.remove('active');
+  });
+  bMV?.addEventListener('click', (e) => {
+    e.preventDefault();
+    gotoMV();
+  });
+})();
 
 
 </script>
