@@ -1073,8 +1073,122 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 import {
-  getDatabase, ref as rRef, onValue, update as rUpdate
+  getDatabase, ref as rRef, onValue, update as rUpdate, set as rSet
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+
+// ===== Inline MapsCostGuard (no external import) =====
+class MapsCostGuard{
+  constructor(opts={}){
+    this.map = opts.map || null;
+    this.restPos = opts.restPos || null;
+    this.geofenceMeters = Number(opts.geofenceMeters ?? 300);
+    this.moveMinMeters  = Number(opts.moveMinMeters  ?? 500);
+    this.throttleMs     = Number(opts.throttleMs     ?? 60000);
+    this.bufferSec      = Number(opts.bufferSec      ?? 120);
+    this.maxCalls       = Number(opts.maxCalls       ?? 30);
+
+    this.onRoute     = opts.onRoute     || (()=>{});
+    this.onCountdown = opts.onCountdown || (()=>{});
+    this.onStop      = opts.onStop      || (()=>{});
+
+    this._live = false;
+    this._lastPos = null;
+    this._lastCallAt = 0;
+    this._callCount = 0;
+    this._countdown = null;
+    this._etaSec = 0;
+
+    this._dirSvc = null;
+    if(window.google?.maps) this._dirSvc = new google.maps.DirectionsService();
+  }
+
+  setLiveETA(flag){
+    this._live = !!flag;
+    if(!this._live){
+      this._stopCountdown();
+      this.onCountdown(null);
+    }
+  }
+
+  set restPos(p){ this._restPos = p; }
+  get restPos(){ return this._restPos; }
+
+  onDriverPosition(pos){
+    if(!this._live) return;
+    if(!window.google?.maps) return;
+    if(!this._dirSvc) this._dirSvc = new google.maps.DirectionsService();
+    if(!this.restPos) return;
+
+    // 1) geofence قرب المطعم
+    if(this._distance(pos, this.restPos) <= this.geofenceMeters){
+      this._stopCountdown();
+      this.onStop({ reason:'geofenced' });
+      return;
+    }
+
+    // 2) تحرّك كفاية عن آخر نقطة؟
+    if(this._lastPos && this._distance(pos, this._lastPos) < this.moveMinMeters){
+      // لا نعيد الطلب بلا داعٍ
+      return;
+    }
+
+    // 3) ثروتل + سقف مكالمات
+    const now = Date.now();
+    if(now - this._lastCallAt < this.throttleMs) return;
+    if(this._callCount >= this.maxCalls){
+      this._stopCountdown();
+      this.onStop({ reason:'maxcalls' });
+      return;
+    }
+
+    // 4) اطلب Directions (السائق → المطعم)
+    this._lastPos = pos;
+    this._lastCallAt = now;
+    this._callCount++;
+
+    this._dirSvc.route({
+      origin: pos,
+      destination: this.restPos,
+      travelMode: google.maps.TravelMode.DRIVING
+    }, (res, status)=>{
+      if(status!=='OK') return;
+      const leg = res?.routes?.[0]?.legs?.[0];
+      const distM = leg?.distance?.value ?? 0;
+      const durS  = leg?.duration?.value ?? 0;
+
+      // أبلغ الواجهة
+      this.onRoute({ distanceMeters: distM, durationSec: durS, calls: this._callCount });
+
+      // ابدأ عدّ تنازلي محلّي + بافر
+      this._etaSec = Math.max(0, Number(durS) + this.bufferSec);
+      this._startCountdown();
+    });
+  }
+
+  // ===== helpers =====
+  _distance(a,b){
+    if(!window.google?.maps?.geometry?.spherical) return Infinity;
+    const A = new google.maps.LatLng(a.lat, a.lng);
+    const B = new google.maps.LatLng(b.lat, b.lng);
+    return google.maps.geometry.spherical.computeDistanceBetween(A, B);
+  }
+
+  _startCountdown(){
+    this._stopCountdown();
+    this.onCountdown(this._etaSec);
+    this._countdown = setInterval(()=>{
+      this._etaSec = Math.max(0, this._etaSec - 1);
+      this.onCountdown(this._etaSec);
+      if(this._etaSec <= 0) this._stopCountdown();
+    }, 1000);
+  }
+
+  _stopCountdown(){
+    if(this._countdown){ clearInterval(this._countdown); this._countdown=null; }
+  }
+}
+// ===== End Inline MapsCostGuard =====
+
 
 const firebaseConfig = {
   apiKey: "AIzaSyD0g9T3amjuPodsLS6ZQkHYWrzV1UrX_QI",
@@ -1303,7 +1417,8 @@ function loadGmaps(){
     const cb='gm_cb_'+Math.random().toString(36).slice(2);
     window[cb]=()=>{ delete window[cb]; resolve(); };
     const s=document.createElement('script');
-    s.src=`https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(GMAPS_API_KEY)}&v=weekly&callback=${cb}`;
+    s.src=`https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(GMAPS_API_KEY)}&v=weekly&libraries=geometry&callback=${cb}`;
+
     s.async=true; s.defer=true; s.onerror=()=>{ delete window[cb]; reject(); };
     document.head.appendChild(s);
   });
@@ -1474,6 +1589,10 @@ async function initMap(){
 
 /* ===== Mini Map (Dashboard) + Trip Card ===== */
 let miniMap=null, miniDirService=null, miniDirRenderer=null;
+let miniGuard = null;
+let miniLastDriverPos = null;
+let miniLastDrawnEtaSec = 0;
+
 let miniDriverMarker=null, miniRestMarker=null, miniCustMarker=null;
 let miniDrvUnsub=null, miniOrderUnsub=null;
 let miniTrackedOrderId=null, miniTrackedDriverId=null;
@@ -1489,6 +1608,12 @@ const elTripStatus = document.getElementById('miniTripStatus');
 const elTripFee    = document.getElementById('miniTripFee');
 
 let miniOrder=null;
+// === Cost guard binding for Mini Map ===
+
+
+
+
+
 
 async function initMiniMap(){
   await loadGmaps().catch(()=>{});
@@ -1499,6 +1624,8 @@ async function initMiniMap(){
     miniDirService  = new google.maps.DirectionsService();
     miniDirRenderer = new google.maps.DirectionsRenderer({ map: miniMap, suppressMarkers:true, polylineOptions:{ strokeOpacity:.95, strokeWeight:5 } });
   }
+ 
+
 }
 function setMiniInfo(txt){ if(miniInfo) miniInfo.textContent = txt || '—'; }
 function euro(v){ const n=Number(v); return Number.isFinite(n)? n.toFixed(2)+' €' : '—'; }
@@ -1513,6 +1640,41 @@ function startMiniCountdown(){
     if(remain<=0) stopMiniCountdown();
   },1000);
 }
+function clearMiniMap(){
+  try{ miniDrvUnsub?.(); }catch(_){}
+  try{ miniOrderUnsub?.(); }catch(_){}
+  miniDrvUnsub = miniOrderUnsub = null;
+
+  // أوقف ETA المحلي + الحارس
+  stopMiniCountdown();
+  try{ miniGuard?.setLiveETA(false); }catch(_){}
+
+  // امسح الـ Directions
+  try{ miniDirRenderer?.setDirections({routes:[]}); }catch(_){}
+
+  // فكّ كل الماركرز
+  try{ miniDriverMarker?.setMap(null); }catch(_){}
+  try{ miniRestMarker?.setMap(null); }catch(_){}
+  try{ miniCustMarker?.setMap(null); }catch(_){}
+  miniDriverMarker = miniRestMarker = miniCustMarker = null;
+
+  // صفّر الحالة الظاهرة
+  setMiniInfo('—');
+  if(elTripEta)    elTripEta.textContent = 'ETA —:—';
+  if(elTripDriver) elTripDriver.textContent = '—';
+  if(elTripRest)   elTripRest.textContent = '—';
+  if(elTripOrder)  elTripOrder.textContent = '—';
+  if(elTripStatus){ elTripStatus.className='badge gray'; elTripStatus.textContent='—'; }
+  if(elTripFee)    elTripFee.textContent = 'Liefergebühr: —';
+
+  miniOrder = null;
+  miniTrackedOrderId = miniTrackedDriverId = null;
+  miniLastDriverPos = null;
+  miniLastDrawnEtaSec = 0;
+  miniEtaSec = 0;
+  miniEtaUpdatedAt = 0;
+}
+
 function readFee(o){
   return o?.serviceFee
       ?? o?.deliveryFee
@@ -1617,9 +1779,7 @@ async function geocodeAddress(addr){
 async function openMiniMapForOrder(o){
   await initMiniMap(); if(!miniMap) return;
 
-  try{ miniDrvUnsub?.(); }catch(_){}
-  try{ miniOrderUnsub?.(); }catch(_){}
-  stopMiniCountdown();
+clearMiniMap();
 
   miniOrder = o||null;
   miniTrackedOrderId  = o?.id || null;
@@ -1628,8 +1788,41 @@ async function openMiniMapForOrder(o){
 
   const restAddr = o?.restaurant?.address_text || o?.restaurant?.addressText || '';
   const restPos  = await geocodeAddress(restAddr);
-  const dropPos  = o?.dropoffPos || o?.to || o?.customer?.pos || null;
 
+  // فعّل/حدّث الحارس
+  if (!miniGuard) {
+    miniGuard = new MapsCostGuard({
+      geofenceMeters: 300,
+      moveMinMeters: 400,
+      throttleMs: 60_000,      // مرّة/دقيقة
+      bufferSec: 120,          // دقيقتان بافر
+      maxCalls: 40,            // سقف آمن
+      onRoute: ({ distanceMeters, durationSec }) => {
+        // حدّث ETA المحلي
+        miniEtaSec = Math.max(0, Number(durationSec) + 120);
+        miniEtaUpdatedAt = Date.now();
+        startMiniCountdown();
+        setMiniInfo(`${(distanceMeters/1000).toFixed(2)} km • ETA ${(durationSec/60|0)} min`);
+
+        // ارسم المسار فقط إذا تغيّر الـ ETA بشكل ملحوظ
+        if (Math.abs(durationSec - miniLastDrawnEtaSec) >= 60 && miniLastDriverPos && restPos) {
+          miniLastDrawnEtaSec = durationSec;
+          drawMiniRoute(miniLastDriverPos, restPos);
+        }
+      },
+      onCountdown: (sec) => { if (elTripEta) elTripEta.textContent = 'ETA ' + fmtMMSS(sec ?? 0); },
+      onStop: ({ reason }) => {
+        setMiniInfo(reason === 'geofenced' ? 'Driver at restaurant' : 'ETA paused');
+        stopMiniCountdown();
+      }
+    });
+  }
+  miniGuard.restPos = restPos;
+  miniGuard.setLiveETA(true);
+
+  const dropPos = o?.dropoffPos || o?.to || o?.customer?.pos || null;
+
+  // markers
   if(restPos){
     miniRestMarker = ensureMarker(miniMap, miniRestMarker, 'R');
     miniRestMarker.setPosition(restPos);
@@ -1640,6 +1833,7 @@ async function openMiniMapForOrder(o){
     miniCustMarker.setPosition(dropPos);
   }else if(miniCustMarker){ miniCustMarker.setMap(null); }
 
+  // تتبّع موقع السائق
   if(miniTrackedDriverId){
     const ref = rRef(rtdb, `drivers_locations/${miniTrackedDriverId}`);
     miniDrvUnsub = onValue(ref, (snap)=>{
@@ -1648,7 +1842,10 @@ async function openMiniMapForOrder(o){
         const dPos={lat,lng};
         miniDriverMarker = ensureMarker(miniMap, miniDriverMarker, 'D');
         miniDriverMarker.setPosition(dPos);
-        if(restPos) drawMiniRoute(dPos, restPos);
+
+        // مرّر الموقع للحارس (هو يتكفّل بطلب Directions بثروتل)
+        miniLastDriverPos = dPos;
+        miniGuard?.onDriverPosition(dPos);
 
         const bounds = new google.maps.LatLngBounds();
         bounds.extend(new google.maps.LatLng(dPos.lat, dPos.lng));
@@ -1660,17 +1857,20 @@ async function openMiniMapForOrder(o){
         if(!bounds.isEmpty()) miniMap.fitBounds(bounds, {top:40,bottom:40,left:40,right:40});
       }
     });
+
   }else{
     setMiniInfo('—');
     if(restPos) fitBoundsTo(restPos, miniCustMarker? miniCustMarker.getPosition().toJSON(): null);
   }
 
+  // راقب تغيّر وثيقة الطلب
   if(miniTrackedOrderId){
     miniOrderUnsub = onSnapshot(doc(db,'orders', miniTrackedOrderId), (ds)=>{
       if(!ds.exists()) return;
       miniOrder = { id: ds.id, ...ds.data() };
       renderMiniTrip(miniOrder);
 
+      // إذا تغيّر السائق، أعد توصيل مستمع الموقع
       const newDid = miniOrder?.driver?.id || null;
       if(newDid && newDid !== miniTrackedDriverId){
         miniTrackedDriverId = newDid;
@@ -1682,16 +1882,21 @@ async function openMiniMapForOrder(o){
             const dPos={lat,lng};
             miniDriverMarker = ensureMarker(miniMap, miniDriverMarker, 'D');
             miniDriverMarker.setPosition(dPos);
-            if(restPos) drawMiniRoute(dPos, restPos);
+            miniLastDriverPos = dPos;
+            miniGuard?.onDriverPosition(dPos);
           }
         });
       }
 
+      // أوقف الحارس عند انتهاء/إلغاء الرحلة
       const st = String(miniOrder?.status||'').toLowerCase();
-      if(st==='geliefert' || st==='abgebrochen') stopMiniCountdown();
+     if(st==='geliefert' || st==='abgebrochen'){
+   clearMiniMap();
+ }
     });
   }
 }
+
 function bindMiniMapRowClicks(){
   const wrap = document.getElementById('active-list');
   if(!wrap) return;
@@ -1892,10 +2097,11 @@ function renderDrivers(){
         <span class="right"></span>
         <button class="btn secondary"
         data-user-details
-        data-kind="restaurant"
-        data-id="${r.id}">
-  ${t('details')}
+        data-kind="driver"
+        data-id="${d.id}">
+  ${t('details')||'Details'}
 </button>
+
 
       </div>
     </div>`;
@@ -2550,15 +2756,49 @@ async function changeStatus(orderId, next){
   if(next==='Geliefert') playSound('geliefert');
   renderAll();
 }
+// Force driver desired online/offline from admin
+// Force driver desired online/offline from admin (نكتب presence + control)
+async function setDriverDesired(uid, desired){
+  const ts = Date.now();
+  try{
+    if(desired === false){
+      // إطفاء ناعم + إشارة واضحة لتطبيق السائق
+      await rSet( rRef(rtdb, `drivers_control/${uid}/forceOfflineUntil`), ts );
+    }else{
+      // تشغيل: رغبة = true + تنظيف أي أعلام سابقة
+      await rSet( rRef(rtdb, `drivers_control/${uid}/clear`), true );
+    }
+
+    await rUpdate( rRef(rtdb, `drivers_presence/${uid}`), {
+      desired: !!desired,
+      adminTs: ts
+    });
+  }catch(e){
+    console.warn('setDriverDesired failed:', e?.code||e);
+    alert('فشل الأمر ('+(e?.code||e?.message||'')+'). تأكد أن حساب الأدمن مسموح له بالكتابة.');
+    throw e;
+  }
+}
+
+
 function drvRowHtml(d){
-  const phone = d.phone || '';
+  const phone  = d.phone || '';
   const avatar = d.avatarUrl ? `<img class="avatar" src="${d.avatarUrl}">` : `<div class="avatar" style="background:#f3f4f6"></div>`;
+  const isOnline = !!presenceMap[d.id]; // يحسب من RTDB كما هو عندك
+  const toggleBtn = `
+    <button class="btn ${isOnline ? '' : 'secondary'}"
+            data-driver-offline="${d.id}"
+            data-state="${isOnline ? 'online' : 'offline'}">
+      ${isOnline ? t('Off') : t('On')}
+    </button>`;
+
   const earningsToggle = `
     <label class="small" style="display:flex;align-items:center;gap:6px">
       <input type="checkbox" class="drv-earnings-toggle" data-id="${d.id}" ${d.showEarnings ? 'checked':''}>
       <span data-i18n="drivers.earningsToggle">${t('drivers.earningsToggle')}</span>
     </label>
   `;
+
   return `
     <div class="drv-row">
       <div class="who" style="display:flex;gap:10px;align-items:center;min-width:0">
@@ -2569,6 +2809,7 @@ function drvRowHtml(d){
         </div>
       </div>
       <div class="actions">
+        ${toggleBtn}
         ${earningsToggle}
         <button class="btn secondary"
                 data-user-details
@@ -2664,6 +2905,27 @@ document.addEventListener('click', (e)=>{
     }
   }
 });
+// Toggle desired (admin) for a driver (Go offline / Allow online)
+document.addEventListener('click', async (e)=>{
+  const btn = e.target.closest('[data-driver-offline]');
+  if(!btn) return;
+
+  const uid   = btn.getAttribute('data-driver-offline');
+  const state = btn.getAttribute('data-state'); // 'online' أو 'offline'
+  const nextDesired = (state === 'online') ? false : true; // online→أوفلاين, offline→سماح بالأونلاين
+
+  btn.disabled = true;
+  const oldText = btn.textContent;
+  try{
+    btn.textContent = '…';
+    await setDriverDesired(uid, nextDesired);
+  }finally{
+    btn.disabled = false;
+    btn.textContent = oldText;
+    // سيُعاد الرسم تلقائيًا من مستمع drivers_presence في RTDB
+  }
+});
+
 // حفظ إظهار/إخفاء الأرباح لكل سائق
 document.addEventListener('change', async (e)=>{
   const ch = e.target.closest('.drv-earnings-toggle');
@@ -2781,9 +3043,7 @@ __fleets_from_docs = [];
 __fleets_from_users = [];
 fleetsApproved = [];
 
-try{ unsubFleetsApproved?.(); }catch(_){}
-unsubFleetsApproved = null;
-fleetsApproved = [];
+
 
 
   /* [TAUSSIL-REST-APPROVED-DETACH] */
@@ -3086,6 +3346,38 @@ function fmtKm(n){
   const x = Number(n);
   return Number.isFinite(x) ? x.toFixed(2) + ' km' : '—';
 }
+async function calcRouteDistanceKm(o){
+  try{
+    // 1) لو موجودة مسافة في الداتا بأي شكل، استخدمها
+    const kmInline = readDistanceKm(o);
+    if (kmInline && Number.isFinite(kmInline)) return kmInline;
+
+    // 2) إن ما في Google أو ما في عناوين، ارجع null
+    if (!window.google?.maps) return null;
+    const restAddr = o?.restaurant?.address_text || o?.restaurant?.addressText || '';
+    const dropAddr = o?.customer?.address_text   || o?.toAddress || '';
+    if(!restAddr || !dropAddr) return null;
+
+    // 3) Geocode بسيط ثم Directions
+    const g = new google.maps.Geocoder();
+    const geocode = (address)=> new Promise(res=>{
+      g.geocode({address}, (r, s)=> res(s==='OK' && r[0] ? r[0].geometry.location : null));
+    });
+    const A = await geocode(restAddr);
+    const B = await geocode(dropAddr);
+    if(!A || !B) return null;
+
+    const svc = new google.maps.DirectionsService();
+    const route = await new Promise(res=>{
+      svc.route({origin:A, destination:B, travelMode:google.maps.TravelMode.DRIVING},
+        (r, s)=> res(s==='OK' ? r : null));
+    });
+    const leg = route?.routes?.[0]?.legs?.[0] || null;
+    const meters = leg?.distance?.value;
+    return Number.isFinite(meters) ? meters/1000 : null;
+  }catch(_){ return null; }
+}
+
 // [DISTANCE-HELPERS-END]
 
 function getAllOrdersLoaded(){ return Array.isArray(orders)? orders : []; }
@@ -3118,7 +3410,7 @@ function exportCsv(rows, filenameTag){
       nrOr, o.id||'', o.restaurant?.name||'', o.restaurant?.phone||'',
       o.driver?.fullName||'', o.driver?.phone||'',
       plat, Number(o.qty||0), price, fee, o.status||'',
-      o.pickupTime||'', fmtTs(o.createdAt), fmtTs(o.updatedAt)
+      o.pickupTime||'', fmtTsLatn(o.createdAt), fmtTsLatn(o.updatedAt)
     ].map(esc).join(',');
   };
   const csv = [headers.join(','), ...rows.map(rec)].join('\n');
