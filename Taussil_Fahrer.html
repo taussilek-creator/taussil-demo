@@ -675,6 +675,48 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
 /* [EARNINGS-CSS] */
 #menuEarningsLink{ display:none; }              /* مخفي افتراضيًا */
 html.show-earnings #menuEarningsLink{ display:block; }  /* يظهر عند السماح */
+/* === MOBILE CONTAINMENT ONLY — حصر الواجهة داخل شاشة الجوال بدون تغيير مقاسات البطاقات === */
+
+/* 1) امنع أي تمرير أفقي على مستوى الصفحة */
+html, body { width:100%; max-width:100%; overflow-x:hidden; }
+
+/* 2) حصر عرض الحاوية بالكامل داخل عرض الشاشة مع مراعاة حواف الأجهزة (notch) */
+:root{
+  --safe-l: env(safe-area-inset-left, 0px);
+  --safe-r: env(safe-area-inset-right, 0px);
+}
+#appRoot, .app{
+  width:100%;
+  max-width:100vw;          /* لا تتجاوز عرض الشاشة */
+  padding-left:  max(14px, var(--safe-l));
+  padding-right: max(14px, var(--safe-r));
+  overflow-x:clip;          /* قص أي بروز عرضي من العناصر الداخلية */
+}
+
+/* 3) عناصر الرأس/التبويب تبقى محصورة داخل الشاشة */
+.neo-toolbar, .header, #tabsRow, .card, .list{ max-width:100%; }
+
+/* 4) السماح لعمود المعلومات في Grid أن ينكمش داخل البطاقة (لا يغيّر مقاس البطاقة) */
+.neo-driver .card-order .info,
+.neo-driver .card-order .info .line,
+.neo-driver .card-order .info .small{ min-width:0; }
+
+/* 5) لو في نص طويل بدون مسافات، يكسره بدل ما يوسّع العرض */
+.neo-driver .card-order .info,
+.neo-driver .card-order .info *{
+  overflow-wrap:anywhere;
+  word-break:break-word;
+}
+
+/* 6) (استثناء صغير للحصر فقط) أسطر الـ multi-stops كانت تزحلق خارج الحافة بسبب margin سالب.
+      على الشاشات الصغيرة نلغي الإزاحة السالبة ونبقيها داخل عرض البطاقة/الشاشة.
+      هذا لا يغيّر حجم البطاقة، فقط يمنع البروز خارج الإطار. */
+@media (max-width: 480px){
+  .neo-driver .card-order .info .multi-stops{
+    margin-left:0;
+    width:100%;
+  }
+}
 
 </style>
 </head>
@@ -942,34 +984,60 @@ async function loadInviteIfAny(){
 /* ===== Address + Distance + Pricing Helpers ===== */
 /* مفتاح خرائط جوجل (استخدمت نفس المفتاح الموجود بواجهة المطعم) */
 const GMAPS_API_KEY = 'AIzaSyDipzUmxEQmAjaDkn6xQ91ZhqnkPmgl-2o';
+let __gmapsLoading = false, __gmapsWaiters = [];
 async function ensureGmaps(){
   if (window.google?.maps) return true;
+  if (__gmapsLoading) return new Promise(res => __gmapsWaiters.push(res));
+  __gmapsLoading = true;
   await new Promise((resolve, reject)=>{
     const cb='gm_cb_'+Math.random().toString(36).slice(2);
     window[cb]=()=>{ delete window[cb]; resolve(true); };
     const s=document.createElement('script');
     s.src=`https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(GMAPS_API_KEY)}&v=weekly&loading=async&callback=${cb}`;
-    s.async=true; s.defer=true; s.onerror=()=>{ delete window[cb]; reject(new Error('gmaps-load-failed')); };
+    s.async=true; s.defer=true;
+    s.onerror=()=>{ delete window[cb]; reject(new Error('gmaps-load-failed')); };
     document.head.appendChild(s);
   });
+  __gmapsLoading = false; __gmapsWaiters.splice(0).forEach(fn=>fn(true));
   return true;
 }
+
+// === ROUTE CACHE (3m TTL) ===
+const __routeCache = new Map();
+const __asKey = (p)=> typeof p==='string' ? p.trim().toLowerCase()
+  : (p && isFinite(p.lat) && isFinite(p.lng)) ? `${(+p.lat).toFixed(4)},${(+p.lng).toFixed(4)}` : String(p||'');
+function __getC(kind, a, b){
+  const k = `${kind}|${__asKey(a)}|${__asKey(b)}`;
+  const v = __routeCache.get(k);
+  if(!v) return null;
+  if(Date.now() > v.exp){ __routeCache.delete(k); return null; }
+  return v.val;
+}
+function __setC(kind, a, b, val, ttl=180000){
+  const k = `${kind}|${__asKey(a)}|${__asKey(b)}`;
+  __routeCache.set(k, { val, exp: Date.now()+ttl });
+}
+
 async function routeKm(origin, destination){
+  const hit = __getC('km', origin, destination);
+  if(hit!=null) return hit;
   await ensureGmaps();
   return new Promise((resolve, reject)=>{
     const ds = new google.maps.DirectionsService();
     ds.route({ origin, destination, travelMode: google.maps.TravelMode.DRIVING }, (res, status)=>{
       const leg = res?.routes?.[0]?.legs?.[0];
       if (status==='OK' && leg?.distance?.value!=null) {
-        resolve(leg.distance.value / 1000);
-      } else {
-        reject(new Error(status || 'no-route'));
-      }
+        const km = leg.distance.value / 1000;
+        __setC('km', origin, destination, km);
+        resolve(km);
+      } else { reject(new Error(status || 'no-route')); }
     });
   });
 }
-// معلومات مسار كاملة: كم + زمن (ثوانٍ) مع حركة المرور لو متاحة
+
 async function routeInfo(origin, destination){
+  const hit = __getC('info', origin, destination);
+  if(hit){ return hit; }
   await ensureGmaps();
   return new Promise((resolve, reject)=>{
     const ds = new google.maps.DirectionsService();
@@ -980,15 +1048,16 @@ async function routeInfo(origin, destination){
     }, (res, status)=>{
       const leg = res?.routes?.[0]?.legs?.[0];
       if(status==='OK' && leg?.distance?.value!=null){
-        const km  = leg.distance.value / 1000;
-        const sec = (leg.duration_in_traffic?.value ?? leg.duration?.value ?? 0);
-        resolve({ km, sec });
+        const out = { km: leg.distance.value/1000, sec: (leg.duration_in_traffic?.value ?? leg.duration?.value ?? 0) };
+        __setC('info', origin, destination, out);
+        resolve(out);
       }else{
         reject(new Error(status||'no-route'));
       }
     });
   });
 }
+
 
 function formatETA(mins){
   const m = Math.max(0, Math.round(mins));
@@ -1004,6 +1073,57 @@ function haversineKm(a,b){
   const s=Math.sin(dLat/2)**2 + Math.cos(toRad(a.lat))*Math.cos(toRad(b.lat))*Math.sin(dLng/2)**2;
   return 2*R*Math.asin(Math.sqrt(s));
 }
+
+// === Geofence @ Restaurant (enter=250m, exit=320m) ===
+const GEOFENCE = { ENTER_M: 250, EXIT_M: 320 };
+let geof = { inside:false, suspended:false };
+
+function getRestaurantLL(o){
+  const lat = Number(o?.restaurant?.lat), lng = Number(o?.restaurant?.lng);
+  return (Number.isFinite(lat) && Number.isFinite(lng)) ? { lat:+lat, lng:+lng } : null;
+}
+const distMeters = (a,b)=> haversineKm(a,b) * 1000;
+function geofenceBlocks(){ return geof.suspended === true; }
+
+function pauseBroadcast(){
+  if (geof.suspended) return;
+  geof.suspended = true;
+  stopMedianBG();                 // لا RTDB/ETA داخل النطاق
+}
+
+function resumeBroadcast(){
+  if (!geof.suspended) return;
+  geof.suspended = false;
+  if (window.online) startMedianBG(uid);
+  scheduleEtaUpdate(300, /*force=*/true);
+}
+
+async function geofenceStep(here){
+  try{
+    const pick = choosePickupOrder();      // طلب الالتقاط الحالي فقط
+    if (!pick){ if (geof.suspended){ geof.inside=false; resumeBroadcast(); } return; }
+    const rll = getRestaurantLL(pick.o);
+    if (!rll){ if (geof.suspended){ geof.inside=false; resumeBroadcast(); } return; }
+
+    const d = distMeters(here, rll);
+    if (!Number.isFinite(d)) return;
+
+    // دخول
+    if (!geof.inside && d <= GEOFENCE.ENTER_M){
+      geof.inside = true;
+      pauseBroadcast();
+      try{ toast('Am Restaurant (Geofence)'); }catch(_){}
+      return;
+    }
+    // خروج
+    if (geof.inside && d >= GEOFENCE.EXIT_M){
+      geof.inside = false;
+      resumeBroadcast();
+      try{ toast('Geofence verlassen'); }catch(_){}
+    }
+  }catch(_){}
+}
+
 function getRestaurantAddr(o){
   return (o?.restaurant?.addressText || o?.restaurant?.address_text || '').trim() || null;
 }
@@ -1018,16 +1138,36 @@ function getDropAddr(o){
   for (const v of cand){ if (v && String(v).trim()) return String(v).trim(); }
   return null;
 }
-async function getCurrentLLOnce(){
+async function getCurrentLLOnce(opts={}){
+  const cfg = Object.assign({ enableHighAccuracy:true, maximumAge:5000, timeout:12000 }, opts);
   return new Promise(res=>{
-    if(navigator.geolocation){
-      navigator.geolocation.getCurrentPosition(
-        p=>res({lat:p.coords.latitude, lng:p.coords.longitude}),
-        _=>res(null), {enableHighAccuracy:true, maximumAge:1000, timeout:7000}
-      );
-    } else { res(null); }
+    if(!navigator.geolocation) return res(null);
+    navigator.geolocation.getCurrentPosition(
+      p=>res({ lat:+p.coords.latitude, lng:+p.coords.longitude }),
+      _=>res(null),
+      cfg
+    );
   });
 }
+
+// قراءة آخر موقع معروف من RTDB عند الطوارئ
+async function getLastKnownFromRTDB(){
+  try{
+    const u = auth?.currentUser?.uid || uid;
+    if(!u) return null;
+    const locRef = ref(rtdb, `drivers_locations/${u}`);
+    return await new Promise(resolve=>{
+      const off = onValue(locRef, (snap)=>{
+        try{ off(); }catch(_){}
+        const v = snap.val() || {};
+        const lat = Number(v.lat), lng = Number(v.lng);
+        if (Number.isFinite(lat) && Number.isFinite(lng)) resolve({ lat:+lat, lng:+lng });
+        else resolve(null);
+      });
+    });
+  }catch(_){ return null; }
+}
+
 /* سلسلة التسليمات (multi-drop): نخزن آخر نقطة تسليم */
 const LS_CHAIN_LAST_DEST = 'driver:chain:lastDest';
 function getLastDest(){
@@ -1197,8 +1337,10 @@ function calcFeeSingleOrMulti(orderObj, betrag, legKm){
 }
 /* ===== Helpers/UI ===== */
 const $=s=>document.querySelector(s);
-const toast=t=>{ const el=$("#toast"); el.textContent=t; el.classList.add("show"); setTimeout(()=>el.classList.remove("show"),1600); if(navigator.vibrate) navigator.vibrate(20); };
+const toast=t=>{ const el=$("#toast"); el.textContent=t; el.classList.add("show"); setTimeout(()=>el.classList.remove("show"),1600); if (window.__gestureUnlocked === true && 'vibrate' in navigator) { try{ navigator.vibrate(20); }catch(_){} } };
+
 const nowStr=()=>new Date().toLocaleTimeString();
+
 /* ===== Navigation Preference & URL ===== */
 const NAV_PREF_KEY='taussil_nav_pref';
 function detectDefaultNav(){
@@ -1328,7 +1470,8 @@ function openNavPref(){
   navModal.classList.add('show');
   document.querySelectorAll('input[name="navpref"]').forEach(r=>{ r.checked = (r.value===pref); });
 }
-mNav.addEventListener('click', (e)=>{ e.preventDefault(); openNavPref(); });
+if (mNav) mNav.addEventListener('click', (e)=>{ e.preventDefault(); openNavPref(); });
+
 navClose.addEventListener('click', ()=> navModal.classList.remove('show'));
 navModal.addEventListener('click',(e)=>{ if(e.target===navModal) navModal.classList.remove('show'); });
 navSave.addEventListener('click', (e)=>{
@@ -1339,6 +1482,54 @@ navSave.addEventListener('click', (e)=>{
   navModal.classList.remove('show');
   toast('Navigation gespeichert');
 });
+/* === Admin Soft Switch (one-shot OFF + "desired") === */
+const LS_LAST_KICK = 'driver:lastKick';
+let lastForceOfflineSeen = Number(localStorage.getItem(LS_LAST_KICK) || 0);
+let unsubAdminCtrl = null, unsubDesired = null;
+
+function hasActiveOrders(){
+  const all = Array.isArray(lastOrders) ? lastOrders : [];
+  return all.some(({o})=>{
+    const s = String(o?.status||'').toLowerCase();
+    return s !== 'geliefert' && s !== 'abgebrochen';
+  });
+}
+
+function startAdminSoftSwitch(){
+  stopAdminSoftSwitch();
+  if(!uid) return;
+
+  // 1) رغبة الأدمن (desired): نطبقها فورًا لكن السائق يقدر يغيّر بعدها
+  unsubDesired = onValue(ref(rtdb, `drivers_presence/${uid}/desired`), snap=>{
+    const want = snap.val();
+    if (want === true && !online) {
+      toast('Admin → Online');
+      setOnline(true);             // سويتش تلقائي إلى Online (السائق يقدر يطفي بعدها)
+    } else if (want === false && online && !hasActiveOrders()) {
+      toast('Admin → Offline');
+      setOnline(false);            // سويتش تلقائي إلى Offline (يتجاهل لو فيه طلبات نشطة)
+    }
+  });
+
+  // 2) “ركلة” إيقاف لمرة واحدة: إذا تغيّر الرقم → أطفي مرّة واحدة فقط
+  unsubAdminCtrl = onValue(ref(rtdb, `drivers_control/${uid}/forceOfflineUntil`), snap=>{
+    const t = Number(snap.val() || 0);
+    if (!Number.isFinite(t) || t <= 0) return;
+    if (t <= lastForceOfflineSeen) return;  // تم استهلاكها سابقًا
+    lastForceOfflineSeen = t;
+    try{ localStorage.setItem(LS_LAST_KICK, String(t)); }catch(_){}
+    if (online && !hasActiveOrders()){
+      toast('Admin → Offline (once)');
+      setOnline(false);
+    }
+  });
+}
+
+function stopAdminSoftSwitch(){
+  try{ unsubDesired?.(); }catch(_){}
+  try{ unsubAdminCtrl?.(); }catch(_){}
+  unsubDesired = unsubAdminCtrl = null;
+}
 
 /* ===== Tabs ===== */
 function switchPane(which){
@@ -1548,15 +1739,18 @@ let hbTimer = null;
 
 function startPresence(){
   if (!uid) { console.warn('startPresence: no uid'); return; }
+  const cu = auth?.currentUser?.uid;
+if (!cu || cu !== uid) { console.warn('presence: auth mismatch'); return; }
+
   const pRef = ref(rtdb, `drivers_presence/${uid}`);
   rUpdate(pRef, { online:true, desired:true, ts: Date.now(), ver:'driver-web-v7' }).catch(()=>{});
   try{ onDisconnect(pRef).update({ lastDisconnectAt: rServerTs() }); }catch(_){}
   if (hbTimer) clearInterval(hbTimer);
-  hbTimer = setInterval(()=> {
+hbTimer = setInterval(()=> {
   rUpdate(pRef, { online:true, ts: Date.now(), ver:'driver-web-v7' }).catch(()=>{});
-  // نبضة ETA خفيفة — سيقرر tryEtaUpdateThrottled إن كانت مطلوبة
-  scheduleEtaUpdate(1200);
+  // لا نحفّز ETA في وضع Idle — الحارس في tryEtaUpdateThrottled سيعمل عند الحاجة
 }, 15000);
+
 
 }
 
@@ -1574,16 +1768,24 @@ function startWatch(){
     pos=>{
       const { latitude:lat, longitude:lng, accuracy, speed } = pos.coords;
       lastLL={lat,lng};
+	  geofenceStep({ lat: +lat, lng: +lng });
+
 	  lastSpeedMS = Number.isFinite(speed) ? speed : lastSpeedMS;
 
       const now=Date.now();
-      if(now-lastSentAt>=4000){
-        rUpdate(ref(rtdb,`drivers_locations/${uid}`), { lat,lng, accuracy: Number.isFinite(accuracy)?accuracy:null, updatedAt: now }).catch(()=>{});
-        lastSentAt=now;
-		scheduleEtaUpdate(300);
-      }
+      if (now - lastSentAt >= 4000){
+  if (!geofenceBlocks()){
+    rUpdate(ref(rtdb,`drivers_locations/${uid}`), {
+      lat, lng, accuracy: Number.isFinite(accuracy)?accuracy:null, updatedAt: now
+    }).catch(()=>{});
+    scheduleEtaUpdate(300);
+  }
+  lastSentAt = now;
+}
+
     },
-    _=>{},
+    err=>{ /* صامت: لا يؤثر على التسليم، لدينا Fallback */ },
+
     { enableHighAccuracy:true, maximumAge:1000, timeout:10000 }
   );
 }
@@ -1617,30 +1819,32 @@ function driverLiveStart(){
         if (c.accuracy && c.accuracy > 80) return; // تجاهل قراءات غير دقيقة (>80m)
         const lat = +Number(c.latitude).toFixed(6);
         const lng = +Number(c.longitude).toFixed(6);
+		geofenceStep({ lat, lng });
+
         LIVE_LAST_LL = { lat, lng };
 		lastSpeedMS = Number.isFinite(c.speed) ? c.speed : lastSpeedMS;
 
-        if (now - LIVE_LAST_SENT < 4000) return;   // حد أقصى كل ≥4 ثوانٍ
-        LIVE_LAST_SENT = now;
-        rUpdate(locRef, {
-          lat, lng,
-          accuracy: Number.isFinite(c.accuracy)? c.accuracy : null,
-          speed:    Number.isFinite(c.speed)?    c.speed    : null,
-          heading:  Number.isFinite(c.heading)?  c.heading  : null,
-          ts: now, ver:'watch'
-        }).catch(()=>{});
+        if (!geofenceBlocks()){
+  rUpdate(locRef, {
+    lat, lng,
+    accuracy: Number.isFinite(c.accuracy)? c.accuracy : null,
+    speed:    Number.isFinite(c.speed)?    c.speed    : null,
+    heading:  Number.isFinite(c.heading)?  c.heading  : null,
+    ts: now, ver:'watch'
+  }).catch(()=>{});
+}
+
       }, err=>console.warn('GPS', err), { enableHighAccuracy:true, maximumAge:0, timeout:10000 });
     }
 
     // نبض كل 15s يدفع آخر نقطة حتى لو التبويب بالخلفية
     if (!LIVE_HB){
-      LIVE_HB = setInterval(()=>{
+     LIVE_HB = setInterval(()=>{
   if(!LIVE_LAST_LL) return;
+  if(geofenceBlocks()) return; // لا إرسال داخل الـGeofence
   rUpdate(locRef, { ...LIVE_LAST_LL, ts: Date.now(), ver:'hb' }).catch(()=>{});
-
-  // نبضة ETA خفيفة — الـthrottle الداخلي يمنع الإسراف
-  scheduleEtaUpdate(1000);
 }, 15000);
+
 
     }
   }catch(e){ console.error('driverLiveStart error', e); }
@@ -1766,7 +1970,7 @@ async function finalizeStop(orderId, stopId, stopData, orderData) {
     const origin = await getSequentialOriginForStop(orderId, stopData, orderData);
 
     // 2) موقع السائق الحالي ← نقطة التسليم الفعلية
-    const ll = lastLL || await getCurrentLLOnce();
+    const ll = lastLL || await getCurrentLLOnce() || await getLastKnownFromRTDB();
     if (!origin || !ll) {
       toast('Standort fehlt');
       return;
@@ -1810,12 +2014,25 @@ async function finalizeStop(orderId, stopId, stopData, orderData) {
     });
 
     const justDelivered = prevDel + 1;
-    if (qty > 0 && justDelivered >= qty) {
-      await recalcOrderFees(orderId);
-      await patchOrder(orderId, { status: "Geliefert" });
-    }
+if (qty > 0 && justDelivered >= qty) {
+  // علِّم الطلب Geliefert فورًا (UX سريع)
+  await patchOrder(orderId, { status: "Geliefert" });
 
-    toast(`Stop geliefert · ${km.toFixed(2)} km · 14% = ${fee14.toFixed(2)}€`);
+  // شغّل الحساب لاحقًا بدون حظر الواجهة + حارس تكرار
+  if (!window.__feesBusy) window.__feesBusy = new Set();
+  if (!window.__feesBusy.has(orderId)) {
+    window.__feesBusy.add(orderId);
+    setTimeout(async ()=>{
+      try{ await recalcOrderFees(orderId); }
+      catch(e){ console.error('recalc later', e); }
+      finally{ window.__feesBusy.delete(orderId); }
+    }, 0);
+  }
+}
+
+// Toast مبكر وواضح
+toast(`Stop geliefert · ${km.toFixed(2)} km · 14% = ${fee14.toFixed(2)}€`);
+
   } catch (e) {
     console.error('finalizeStop error', e);
     toast("Fehler beim Stop");
@@ -1903,13 +2120,21 @@ return `
 
     // ربط زر التسليم لكل stop
     cont.querySelectorAll('button[data-stop]').forEach(btn=>{
-      btn.onclick = async (e)=>{
-        e.stopPropagation();
-        const sid = btn.getAttribute('data-stop');
-        const sd  = docs.find(d=>d.id===sid)?.s || {};
-        await finalizeStop(orderId, sid, sd, orderData);
-      };
-    });
+  btn.onclick = async (e)=>{
+    e.stopPropagation();
+    // تحفيز إذن الموقع (نقطة لمرة واحدة) قبل الحساب
+    try{
+      await new Promise(res=>{
+        if(!navigator.geolocation) return res();
+        navigator.geolocation.getCurrentPosition(()=>res(), ()=>res(), { enableHighAccuracy:true, timeout:10000, maximumAge:5000 });
+      });
+    }catch(_){}
+    const sid = btn.getAttribute('data-stop');
+    const sd  = docs.find(d=>d.id===sid)?.s || {};
+    await finalizeStop(orderId, sid, sd, orderData);
+  };
+});
+
   }, ()=>{ cont.style.display='none'; if(doneGeneral) doneGeneral.style.display='inline-flex'; });
 
   stopsUnsubs.set(orderId, unsub);
@@ -1957,13 +2182,15 @@ let etaReqSeq = 0;
 
 // إعدادات مرنة
 const ETA_CONF = {
-  FG_MIN_MS: 30_000,       // أدنى فاصل حساب بالواجهة الأمامية
-  BG_MIN_MS: 90_000,       // أدنى فاصل حساب بالخلفية
-  FG_MOVE_M: 120,          // تحرّك أدنى لإعادة الحساب (أمامي)
-  BG_MOVE_M: 300,          // تحرّك أدنى (خلفية)
-  STOP_SPEED_MS: 1.0,      // دون 1 م/ث نعتبره شبه ثابت
-  MAX_STALE_MS: 5 * 60_000 // مهما كان، لا نسمح بقدم أكثر من 5 دقائق
+  FG_MIN_MS: 60_000,
+  BG_MIN_MS: 180_000,
+  FG_MOVE_M: 200,
+  BG_MOVE_M: 400,
+  STOP_SPEED_MS: 1.0,
+  MAX_STALE_MS: 5 * 60_000
 };
+
+
 
 function ctxParams(){
   const bg = document.hidden === true;
@@ -1979,6 +2206,11 @@ function movedEnough(a,b,needM){
 }
 
 async function tryEtaUpdateThrottled(force=false){
+if (geofenceBlocks()){
+  if (etaEl()) etaEl().textContent = 'Abholung —';
+  return;
+}
+
   if(!online) return;
 
   const now = Date.now();
@@ -1987,36 +2219,50 @@ async function tryEtaUpdateThrottled(force=false){
   // حد أدنى زمني
   if(!force && (now - etaLastCalcAt < minMs)) return;
 
-  // نقطة السائق الحالية
-  const here = lastLL || await getCurrentLLOnce();
-  if(!here) return;
+  // لا ETA إن لم يوجد طلب Pick-up مناسب (يحفظ البطارية ويمنع geolocation)
+  const pick = choosePickupOrder();
+  if(!pick){
+    if(etaEl()) etaEl().textContent = 'Abholung —';
+    return;
+  }
+  const restAddr = getRestaurantAddr(pick.o);
+  if(!restAddr){
+    if(etaEl()) etaEl().textContent = 'Abholung —';
+    return;
+  }
 
-  // حد الحركة (ومراعاة “التوقف” بسُرعة منخفضة)
+  // نقطة السائق الحالية (نُفضّل آخر نقطة معروفة؛ وإلا قراءة لمرة واحدة فقط)
+  const here = lastLL || await getCurrentLLOnce();
+  if(!here){
+    if(etaEl()) etaEl().textContent = 'Abholung —';
+    return;
+  }
+
+  // حد الحركة / التوقف
   const stationary = (lastSpeedMS != null && lastSpeedMS < ETA_CONF.STOP_SPEED_MS);
   if(!force && etaLastBaseLL && !movedEnough(etaLastBaseLL, here, moveM)){
-    // لو شبه ثابت، اسمح بالتحديث فقط لو النتائج قديمة جدًا
     if(stationary && (now - etaLastCalcAt) < ETA_CONF.MAX_STALE_MS) return;
     if(!stationary) return;
   }
 
-  // لا ETA دون طلب Pick-up صالح
-  const pick = choosePickupOrder();
-  if(!pick){ if(etaEl()) etaEl().textContent = 'Abholung —'; return; }
-  const restAddr = getRestaurantAddr(pick.o);
-  if(!restAddr){ if(etaEl()) etaEl().textContent = 'Abholung —'; return; }
-
-  // احسب مع حارس سباقات لتجاهل النتائج المتأخرة
+  // حارس سباقات
   const mySeq = ++etaReqSeq;
   try{
     const { km, sec } = await routeInfo(here, restAddr);
-    if(mySeq !== etaReqSeq) return; // نتيجة قديمة
+    if(mySeq !== etaReqSeq) return;
 
     let mins = sec/60;
-    if(!Number.isFinite(mins) || mins <= 0){
-      // تقدير احتياطي (28 كم/س داخل المدينة)
-      mins = (km / 28) * 60;
+    if(!Number.isFinite(mins) || mins <= 0){ mins = (km / 28) * 60; } // fallback سرعة مدينة
+
+    // Delta-ETA Gate (لا نحدّث لو التغير < دقيقة)
+    const prevText = etaEl()?.textContent || '';
+    const prevNum  = /(\d+)\s*min/.test(prevText) ? +RegExp.$1 : null;
+    const curNum   = Math.round(mins);
+    if(prevNum!=null && Math.abs(curNum - prevNum) < 1){
+      // لا تحديث مرئي لتقليل الضوضاء
+    }else{
+      if(etaEl()) etaEl().textContent = formatETA(mins);
     }
-    if(etaEl()) etaEl().textContent = formatETA(mins);
   }catch(_){
     if(mySeq !== etaReqSeq) return;
     if(etaEl()) etaEl().textContent = 'Abholung —';
@@ -2025,6 +2271,7 @@ async function tryEtaUpdateThrottled(force=false){
   etaLastCalcAt = Date.now();
   etaLastBaseLL = { lat: here.lat, lng: here.lng };
 }
+
 
 // جدولة آمنة
 function scheduleEtaUpdate(ms=800, force=false){
@@ -2065,6 +2312,8 @@ function choosePickupOrder(){
 }
 
 async function updatePickupETA(){
+if (geofenceBlocks()){ if(etaEl()) etaEl().textContent='Abholung —'; return; }
+
   try{
     // إذا أوفلاين أو ما في طلب مناسب → فرّغ النص
     if(!online){
@@ -2170,31 +2419,6 @@ listEl.querySelectorAll(".card-order").forEach(el=>{
   attachStopsForOrder(id, o, el);
 });
 
-
-  // ربط الأحداث
-  listEl.querySelectorAll(".card-order").forEach(el=>{
-    el.addEventListener("click",(e)=>{
-      if(e.target.closest(".btn-icon")) return;
-      const id = el.getAttribute("data-id"); openDetail(id);
-    });
-    const startA = el.querySelector('a[data-act="start"]');
-    if(startA){
-      startA.addEventListener("click", async (e)=>{
-        const id = el.getAttribute("data-id");
-        const addr = decodeURIComponent(el.getAttribute("data-addr")||"").trim();
-        if(!addr){ e.preventDefault(); toast('Restaurant-Adresse fehlt'); return; }
-        await safeSetStatusToUnterwegs(id);
-      });
-    }
-    const doneBtn = el.querySelector('button[data-act="delivered"]');
-    if(doneBtn){
-      doneBtn.addEventListener("click", async (e)=>{
-        e.stopPropagation();
-        const id = el.getAttribute("data-id");
-        await finalizeOrderWithFee(id);
-      });
-    }
-  });
 }
 // @earnings.logic:start
 function pickServiceFee(o){
@@ -2561,6 +2785,11 @@ function unlockAudioOnce(){
 ['pointerdown','touchstart','keydown','focus'].forEach(evt=>{
   window.addEventListener(evt, unlockAudioOnce, { once:true, capture:true });
 });
+// Flag لتفعيل الاهتزاز فقط بعد أول تفاعل مستخدم (منع التحذير)
+window.__gestureUnlocked = false;
+['pointerdown','touchstart','keydown','focus'].forEach(evt=>{
+  window.addEventListener(evt, ()=>{ window.__gestureUnlocked = true; }, { once:true, capture:true });
+});
 
 function startIncomingSound(scope=''){
   if(!newOrderSound) return;
@@ -2734,11 +2963,22 @@ md_price_edit.onclick = (e)=>{
 
   md.classList.add("show");
   md_start.onclick=async (e)=>{
-    e.preventDefault();
-    if(!addr){ toast('Restaurant-Adresse fehlt'); return; }
-    window.open(makeNavUrl(addr), '_blank', 'noopener,noreferrer');
-    await safeSetStatusToUnterwegs(id);
-  };
+  e.preventDefault();
+  if(!addr){ toast('Restaurant-Adresse fehlt'); return; }
+
+  // تحفيز إذن الموقع بنقطة لمرة واحدة قبل الانطلاق
+  try{
+    await new Promise(res=>{
+      if(!navigator.geolocation) return res();
+      navigator.geolocation.getCurrentPosition(()=>res(), ()=>res(), { enableHighAccuracy:true, timeout:10000, maximumAge:5000 });
+    });
+  }catch(_){}
+
+  window.open(makeNavUrl(addr), '_blank', 'noopener,noreferrer');
+  await safeSetStatusToUnterwegs(id);
+};
+
+
   md_done.onclick = async (e)=>{
     e.preventDefault();
     await finalizeOrderWithFee(id);
@@ -2795,91 +3035,46 @@ async function writeFeeOnly(id, fee){
 
 
 /* === Recalculate order fees (Multi-Orders: 14% + distance from stops) === */
-async function recalcOrderFees(orderId) {
-  try {
+// === FAST FEES (sum of stops) ===
+// === FAST FEES (sum of delivered stops; no Directions) ===
+async function recalcOrderFees(orderId){
+  try{
     const oref = doc(db, "orders", orderId);
-    const osnap = await getDoc(oref);
-    if (!osnap.exists()) return;
-    const odata = osnap.data() || {};
+    const osnap = await getDoc(oref); if(!osnap.exists()) return;
 
     const sref = collection(db, "orders", orderId, "stops");
-    const snap = await getDocs(sref);
-    if (snap.empty) return;
+    const snap = await getDocs(sref); if(snap.empty) return;
 
-    const toMillis = t => (t?.toMillis?.() ?? (typeof t?._seconds === "number" ? t._seconds * 1000 : 0));
-    const delivered = snap.docs
-      .map(d => ({ id: d.id, s: d.data() || {} }))
-      .filter(x => String(x.s.status || '').trim().toLowerCase() === 'geliefert')
-      .sort((a, b) => toMillis(a.s.deliveredAt) - toMillis(b.s.deliveredAt));
-
-    const n = delivered.length;
-    if (n === 0) return;
-
-    const asLL = x => (x && Number.isFinite(+x.lat) && Number.isFinite(+x.lng))
-      ? { lat:+Number(x.lat).toFixed(6), lng:+Number(x.lng).toFixed(6) } : null;
-
-    async function segmentKm(origin, destLL) {
-      if (!destLL) return 0;
-      if (typeof origin === 'object' && origin.lat !== undefined && origin.lng !== undefined) {
-        const approx = haversineKm(origin, destLL);
-        if (approx <= 0.05) return 0;
-        try { return await routeKm(origin, destLL); } catch { return approx; }
-      } else {
-        try { return await routeKm(origin, destLL); } catch { return 0; }
+    let totalKm = 0, sum14 = 0, itemsTotal = 0, deliveredCount = 0;
+    snap.docs.forEach(d=>{
+      const s = d.data() || {};
+      if (String(s.status||'').toLowerCase() === 'geliefert'){
+        deliveredCount++;
+        totalKm   += Number(s.distance_km||0) || 0;
+        sum14     += Number(s.deliveryFee||0) || 0; // 14% للستوب محفوظة
+        itemsTotal+= Number(s.price||0) || 0;
       }
-    }
-
-    const firstLL = asLL(delivered[0].s.delivered_ll);
-    const restaurantAddr = getRestaurantAddr(odata);
-    let totalKm = 0;
-    if (restaurantAddr && firstLL) {
-      totalKm += await segmentKm(restaurantAddr, firstLL);
-    }
-
-    for (let i = 1; i < n; i++) {
-      const prevLL = asLL(delivered[i - 1].s.delivered_ll);
-      const currLL = asLL(delivered[i].s.delivered_ll);
-      if (prevLL && currLL) {
-        totalKm += await segmentKm(prevLL, currLL);
-      }
-    }
-
-    totalKm = Math.max(0, Number(totalKm || 0));
-    const totalKmRounded = Math.round(totalKm * 100) / 100;
-
-    let sum14 = 0;
-    let itemsTotal = 0;
-    delivered.forEach(({ s }) => {
-      const s14 = Number.isFinite(+s.deliveryFee) ? +s.deliveryFee
-                  : Math.round((Number(s.price || 0) * 0.14) * 100) / 100;
-      sum14 += s14;
-      itemsTotal += Number(s.price || 0);
     });
-    sum14 = Math.round(sum14 * 100) / 100;
 
-    const billableKm = Math.max(0, totalKmRounded - 2);
-    const billableKmRounded = Math.round(billableKm * 100) / 100;
+    totalKm = Math.max(0, Math.round(totalKm*100)/100);
+    const distanceFee = distanceCostFromTotalKm(totalKm);
+    const deliveryFee = Math.round(sum14*100)/100;
+    const serviceFee  = Math.round((distanceFee + deliveryFee)*100)/100;
 
-    const distanceFee = distanceCostFromTotalKm(totalKmRounded);
-    const deliveryFee = sum14;
-    const serviceFee = Math.round((distanceFee + deliveryFee) * 100) / 100;
-
-    await updateDoc(oref, {
-      distance_km_total:    totalKmRounded,
-      distance_km_billable: billableKmRounded,
-      distanceFee:          distanceFee,
-      deliveryFee:          deliveryFee,
-      serviceFee:           serviceFee,
-      items_total_eur:      Math.round(itemsTotal * 100) / 100,
-      stops_delivered:      n,
-      stops_total:          snap.size,
-      updatedAt:            serverTimestamp()
+    await updateDoc(oref,{
+      distance_km_total: totalKm,
+      distance_km_billable: Math.max(0, Math.round((totalKm-2)*100)/100),
+      distanceFee, deliveryFee, serviceFee,
+      items_total_eur: Math.round(itemsTotal*100)/100,
+      stops_delivered: deliveredCount,
+      updatedAt: serverTimestamp()
     });
-  } catch (e) {
-    console.error('recalcOrderFees error', e);
-    toast('Fehler beim Neuberechnen der Gebühren');
+  }catch(e){
+    console.error('recalcOrderFees fast error', e);
+    toast('Gebühren-Berechnung fehlgeschlagen');
   }
 }
+
 
 
 
@@ -2900,8 +3095,9 @@ async function finalizeSingleDelivery(orderId) {
       return;
     }
 
-    const gps = lastLL || await getCurrentLLOnce();
-    if (!gps || !Number.isFinite(gps.lat) || !Number.isFinite(gps.lng)) {
+    const gps = lastLL || await getCurrentLLOnce() || await getLastKnownFromRTDB();
+if (!gps || !Number.isFinite(gps.lat) || !Number.isFinite(gps.lng)) {
+
       toast("Standort fehlt");
       return;
     }
@@ -2949,6 +3145,10 @@ const deliveryFee = amountEUR < 25 ? 3.5 : Math.round(amountEUR * 0.14 * 100) / 
     console.error("finalizeSingleDelivery error", e);
     toast("Fehler bei der Einzellieferung");
   }
+}
+// Alias لتوحيد النداء من الشاشات المختلفة
+async function finalizeOrderWithFee(id){
+  return finalizeSingleDelivery(id);
 }
 
 // تفعيل زر "Geliefert" للطلب المنفرد فقط، مع إيقاف أي مستمعات قديمة
@@ -3002,9 +3202,13 @@ if (user && sessionStorage.getItem(SESSION_OK) !== '1' && !regInFlight) {
     appRoot.style.display='none'; authModal.style.display='flex';
     detachOrders(); stopIncomingAlert(); stopMedianBG();
     switchPane(lastAuthTab==='register' ? 'register' : 'login');
+	stopAdminSoftSwitch();
+try{ localStorage.removeItem(LS_LAST_KICK); }catch(_){}
+
     return;
   }
   uid = user.uid;
+startAdminSoftSwitch();
 
   // تحقق الموافقة
   approved=false;
@@ -3215,10 +3419,7 @@ $("#neoMoney")?.addEventListener("click", (e)=>{ e.preventDefault(); window.__dr
   });
 })();
 
+
 </script>
-</body>
-</html>
-
-
 </body>
 </html>
