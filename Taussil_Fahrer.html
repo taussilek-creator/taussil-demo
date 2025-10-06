@@ -717,6 +717,25 @@ html, body { width:100%; max-width:100%; overflow-x:hidden; }
     width:100%;
   }
 }
+/* Restore multi-stops look safely */
+@media (max-width: 400px){
+  .neo-driver .card-order .info .multi-stops{
+    margin-left: 0 !important;
+    width: 100% !important;
+    padding-left: 0 !important;
+  }
+}
+@media (min-width: 401px){
+  /* فقط للأجهزة الأوسع نحافظ على السحب لليسار كما كان */
+  .neo-driver .card-order .info .multi-stops{
+    margin-left: calc(-1 * (var(--logo-col) + var(--col-gap))) !important;
+    width: calc(100% + var(--logo-col) + var(--col-gap)) !important;
+  }
+}
+
+/* تأكد إن العناصر ما توسّع البطاقة */
+.neo-driver .card-order .info,
+.neo-driver .card-order .info *{ min-width:0; overflow-wrap:anywhere; }
 
 </style>
 </head>
