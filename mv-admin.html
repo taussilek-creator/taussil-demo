@@ -1,0 +1,1642 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+<title>Taussil – Restaurant Admin</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+<style>
+/* ========= PALETTE (Neo Driver – no navy) ========= */
+:root{
+  --bg:#5a5a5a;           /* Hintergrund grau (wie Neo-Driver) */
+  --card:#f1f1f1;         /* Karten hell */
+  --ink:#111;             /* Text dunkel */
+  --muted:#555;           /* Sekundärtext */
+  --cta:#33BBDF;          /* Akzent/CTA */
+  --bar:#1d2021;          /* dunkler Balken (Toolbar/Tabs) */
+  --ok:#22c55e; --warn:#f59e0b; --err:#ef4444;
+  --border:1px solid rgba(0,0,0,.12);
+  --radius:16px;
+  --shadow:0 12px 28px rgba(0,0,0,.18), 0 2px 8px rgba(0,0,0,.08);
+  --hit:48px;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif}
+
+/* App layout */
+.app{max-width:1100px;margin:0 auto;padding:16px 14px 28px;display:flex;flex-direction:column;gap:12px}
+
+/* Top toolbar */
+.toolbar{
+  position:sticky; top:8px; z-index:10;
+  display:flex; align-items:center; justify-content:space-between; gap:12px;
+  background:var(--bar); color:#fff; border-radius:24px; padding:10px 14px; border:1px solid rgba(255,255,255,.12);
+  box-shadow:0 8px 24px rgba(0,0,0,.35);
+}
+.brand{display:flex;align-items:center;gap:10px;font-weight:800}
+.toolbar .actions{display:flex;gap:8px}
+.btn, a.btn{
+  height:var(--hit); padding:0 14px; border-radius:14px; border:1px solid rgba(0,0,0,.15);
+  display:inline-flex; align-items:center; justify-content:center; gap:8px; cursor:pointer; text-decoration:none; user-select:none;
+  background:#fff; color:#111; font-weight:800;
+}
+.btn-ghost{ background:#e9eef3; color:#111; }
+.btn-cta{ background:linear-gradient(180deg,#33BBDF,#1da9cf); color:#fff; border:none; box-shadow:0 6px 18px rgba(29,169,207,.32); }
+.btn:disabled{opacity:.6;cursor:not-allowed}
+.btn-icon{ width:44px; min-width:44px; height:44px; padding:0; border-radius:12px }
+
+/* Tabs */
+.tabs{
+  background:var(--bar); border:1px solid rgba(255,255,255,.12); border-radius:12px; padding:6px; display:flex; gap:6px;
+}
+.tab-btn{
+  flex:1; height:44px; border-radius:12px; border:1px solid rgba(255,255,255,.14); background:transparent; color:#fff; cursor:pointer; font-weight:800;
+}
+.tab-btn:hover{ background:rgba(255,255,255,.06); }
+.tab-btn.active{ background:linear-gradient(180deg,#33BBDF,#1da9cf); border:none; color:#fff; box-shadow:0 6px 18px rgba(29,169,207,.32); }
+
+/* Cards / blocks */
+.card{
+  background:var(--card); border:var(--border); border-radius:var(--radius); box-shadow:var(--shadow); padding:12px;
+}
+.section-head{display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:8px}
+.section-head .title{font-weight:800; font-size:18px}
+.small{font-size:12px; color:var(--muted)}
+
+/* Grid rows */
+.row{display:grid; grid-template-columns:1fr 1fr; gap:8px}
+@media (max-width:860px){ .row{ grid-template-columns:1fr } }
+
+/* Inputs */
+.input, select, textarea{
+  height:var(--hit); background:#fff; color:#111; border:1px solid rgba(0,0,0,.14); border-radius:12px; padding:0 12px; font-size:15px; width:100%;
+  box-shadow:0 2px 8px rgba(0,0,0,.08);
+}
+textarea{ min-height:120px; padding:10px 12px; height:auto; }
+.input:focus, select:focus, textarea:focus{ outline:none; box-shadow:0 2px 8px rgba(0,0,0,.08), 0 0 0 2px #aee7f5 }
+.switch{ display:inline-flex; align-items:center; gap:8px; user-select:none }
+.switch input{ appearance:none; width:44px; height:26px; border-radius:999px; border:1px solid rgba(0,0,0,.2); background:#ddd; position:relative; cursor:pointer }
+.switch input:after{ content:""; position:absolute; top:3px; left:3px; width:20px; height:20px; border-radius:50%; background:#fff; transition:.18s }
+.switch input:checked{ background:#c7f9ff; border-color:#9be5f1 }
+.switch input:checked:after{ left:21px }
+
+/* Table */
+.table-wrap{overflow:auto}
+table{ width:100%; border-collapse:collapse; background:#fff; border-radius:14px; overflow:hidden }
+th,td{ padding:10px 12px; border-bottom:1px solid rgba(0,0,0,.08); color:#111; font-size:14px; vertical-align:middle }
+th{ text-align:left; font-weight:800; background:#f6f8fc }
+tr:hover td{ background:#f9fbff }
+td .actions{ display:flex; gap:6px; }
+
+/* Image thumb */
+/* Image thumb */
+.thumb{
+  width:56px; height:56px;
+  border-radius:12px;
+  border:1px solid rgba(0,0,0,.1);
+  object-fit:contain;           /* <- كانت cover */
+  object-position:center;       /* لضمان توسيط الصورة */
+  background:#fff;
+}
+
+
+/* Upload */
+.upload{
+  display:flex; align-items:center; justify-content:center; gap:10px; padding:16px; border-radius:14px;
+  background:#fff; border:1px dashed rgba(0,0,0,.18); color:var(--muted); text-align:center;
+}
+.upload.drag{ background:#eef8ff; border-color:#33BBDF }
+
+/* Modal */
+.modal{ position:fixed; inset:0; display:none; align-items:center; justify-content:center; background:rgba(0,0,0,.45); z-index:1000; }
+.modal.show{ display:flex }
+.sheet{
+  background:var(--card); color:#111; border:var(--border); border-radius:16px; box-shadow:var(--shadow);
+  width:min(720px,94%); max-height:86vh; overflow:auto; padding:12px;
+}
+.sheet .hdr{ display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:8px }
+.sheet .title{ font-weight:800 }
+.sheet .close{ width:36px; height:36px; border-radius:10px; border:1px solid rgba(0,0,0,.12); background:#fff; color:#111; cursor:pointer }
+
+/* Pills / tags */
+/* Market tags (admin) */
+.tags-wrap{display:flex;flex-wrap:wrap;gap:8px}
+.tag-badge{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border-radius:999px;background:#fff;border:1px solid rgba(0,0,0,.12);box-shadow:0 2px 8px rgba(0,0,0,.06);font-weight:700}
+.tag-badge .ico{font-size:16px;line-height:1}
+.tags-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+@media (max-width:860px){.tags-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.tag-chip{display:flex;align-items:center;gap:8px;padding:10px 12px;border-radius:12px;background:#fff;border:1px solid rgba(0,0,0,.12);cursor:pointer;user-select:none;box-shadow:0 2px 8px rgba(0,0,0,.06);font-weight:800}
+.tag-chip .ico{font-size:18px}
+.tag-chip.active{background:#e6f7fb;border-color:#aee7f5}
+
+.pill{ font-size:12px; padding:4px 8px; border-radius:999px; background:#e9eef3; border:1px solid #0001; color:#111; font-weight:800 }
+
+/* Toast */
+.toast{ position:fixed; left:50%; transform:translateX(-50%); bottom:18px; background:#1d2021; color:#fff; border-radius:12px; padding:10px 14px; opacity:0; transition:opacity .18s; z-index:2000 }
+.toast.show{ opacity:1 }
+
+/* Helpers */
+.hidden{ display:none !important }
+hr.sep{ border:0; border-top:1px solid rgba(0,0,0,.12); margin:8px 0 }
+.kv{ display:flex; justify-content:space-between; gap:8px; padding:6px 0; border-top:1px solid rgba(0,0,0,.08) }
+.kv:first-child{ border-top:0 }
+/* سويتشات التولبار */
+.toolbar .actions{ flex-wrap:wrap; gap:10px }
+.toolbar .switch span{ color:#fff; font-weight:800 }
+/* === Buttons — unified sizing & radius (OVERRIDE) === */
+/* مقاسات مرنة عبر clamp لتناسب سطح المكتب والجوال */
+:root{
+  --btn-h:     clamp(36px, 5.2vw, 48px);
+  --btn-h-sm:  clamp(30px, 4.4vw, 40px);
+  --btn-h-lg:  clamp(44px, 6.0vw, 56px);
+
+  --btn-pad-x:    14px;
+  --btn-pad-x-sm: 10px;
+  --btn-pad-x-lg: 18px;
+
+  --btn-radius: 14px;   /* زوايا منحنية موحّدة */
+  --btn-gap:    8px;
+}
+
+/* القاعدة الموحدة لكل الأزرار */
+.btn, a.btn, .btn-ghost, .btn-cta{
+  height: var(--btn-h);
+  padding: 0 var(--btn-pad-x);
+  border-radius: var(--btn-radius);
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--btn-gap);
+  font-weight: 800;
+  /* لا نغير الخلفيات/الألوان القائمة لديك (btn vs btn-cta) */
+}
+
+/* أحجام إضافية اختيارية (موجود لديك .btn-sm – نعيد ضبطها) */
+.btn-sm{
+  height: var(--btn-h-sm);
+  padding: 0 var(--btn-pad-x-sm);
+  border-radius: calc(var(--btn-radius) - 2px);
+  font-weight: 700;
+}
+.btn-lg{
+  height: var(--btn-h-lg);
+  padding: 0 var(--btn-pad-x-lg);
+  border-radius: calc(var(--btn-radius) + 2px);
+}
+
+/* أيقونة مربعة متناسقة */
+.btn-icon{
+  width: var(--btn-h);
+  height: var(--btn-h);
+  min-width: var(--btn-h);
+  padding: 0;
+  border-radius: 12px;
+}
+
+/* عرض موحّد لأزرار الحفظ الشائعة بدون الحاجة لتعديل HTML */
+#pmSave, #cmSave, #gmSave, #saveSettings, #liveSave, #rCoverSave, #rLogoSave{
+  min-width: 160px;          /* مظهر ثابت ومتماسك */
+}
+
+/* زر إضافة المنتج وغيره يبقى Primary لكن بنفس المقاس */
+#addProduct{ min-width: 160px; }
+
+/* أزرار التولبار أصغر قليلًا لتناسب الشريط */
+.toolbar .actions .btn,
+.toolbar .actions .btn-cta{
+  height: var(--btn-h-sm);
+}
+
+/* تحسين طفيف للجوال */
+@media (max-width: 720px){
+  .btn, a.btn, .btn-ghost, .btn-cta{ font-weight: 700; }
+}
+
+</style>
+<!-- Firebase (Compat CDN – يعمل بدون type="module" ويحترم سكربتك الحالي) -->
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-storage-compat.js"></script>
+<script>
+  // ضع إعداداتك هنا
+  const firebaseConfig = {
+    apiKey: "AIzaSyD0g9T3amjuPodsLS6ZQkHYWrzV1UrX_QI",
+    authDomain: "taussil-lieferservice-8bbe9.firebaseapp.com",
+    projectId: "taussil-lieferservice-8bbe9",
+    storageBucket: "taussil-lieferservice-8bbe9.firebasestorage.app",
+    messagingSenderId: "583536892937",
+    appId: "1:583536892937:web:5d5ff133de4d8b3b28ecd8",
+    databaseURL: "https://taussil-lieferservice-8bbe9-default-rtdb.europe-west1.firebasedatabase.app"
+  };
+  try{ firebase.initializeApp(firebaseConfig); }catch(e){}
+</script>
+
+
+
+</head>
+<body>
+<div class="app">
+  <!-- Toolbar -->
+  <div class="toolbar" role="navigation" aria-label="Top Bar"> <!-- داخل الهيدر في mv-admin.html -->
+<a id="mvBack" class="btn" href="Taussil_Restaurant.html">Auftrag Senden</a>
+
+
+    <div class="brand">Restaurant Verwalten</div>
+    <div class="actions">
+	<label class="switch" style="color:#fff"><input id="openNow" type="checkbox"><span>Geöffnet</span></label>
+<label class="switch" style="color:#fff"><input id="acceptOrders" type="checkbox"><span>Bestellungen</span></label>
+
+      <button id="btnExport" class="btn">Export&nbsp;JSON</button>
+      <label for="imp" class="btn btn-ghost" style="cursor:pointer">Import&nbsp;JSON<input id="imp" type="file" accept="application/json" style="display:none"></label>
+      <button id="btnSettings" class="btn btn-icon" title="Einstellungen">⚙️</button>
+    </div>
+  </div>
+
+  <!-- Tabs -->
+  <div class="tabs" role="tablist">
+    <button class="tab-btn active" data-tab="produkte" role="tab" aria-selected="true">Produkte</button>
+    <button class="tab-btn" data-tab="kategorien" role="tab">Kategorien</button>
+    <button class="tab-btn" data-tab="optionen" role="tab">Optionen/Extras</button>
+    <button class="tab-btn" data-tab="einstellungen" role="tab">Einstellungen</button>
+  </div>
+
+  <!-- Produkte -->
+  <section id="tab-produkte" class="card" role="tabpanel">
+    <div class="section-head">
+      <div>
+        <div class="title">Produkte</div>
+        <div class="small">Verwalten Sie Speisen & Getränke, Preise, Bilder und Verfügbarkeit.</div>
+      </div>
+      <div style="display:flex; gap:8px">
+        <input id="search" class="input" placeholder="Suche nach Name/Kategorie …" style="width:260px">
+        <button id="addProduct" class="btn-cta">+ Neues Produkt</button>
+      </div>
+    </div>
+    <div class="table-wrap">
+      <table id="productsTable" aria-label="Produktliste">
+        <thead>
+          <tr>
+            <th>Bild</th>
+            <th>Name</th>
+            <th>Kategorie</th>
+            <th>Preis</th>
+            <th>Status</th>
+            <th style="width:220px">Aktionen</th>
+          </tr>
+        </thead>
+        <tbody><!-- rows via JS --></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- Kategorien -->
+  <section id="tab-kategorien" class="card hidden" role="tabpanel" aria-hidden="true">
+    <div class="section-head">
+      <div>
+        <div class="title">Kategorien</div>
+        <div class="small">Ordnen Sie Produkte Kategorien zu (z. B. Pizza, Getränke, Desserts).</div>
+      </div>
+      <div>
+        <button id="addCategory" class="btn-cta">+ Neue Kategorie</button>
+      </div>
+    </div>
+    <div class="table-wrap">
+      <table id="catsTable">
+        <thead><tr><th>Name</th><th>Sortierung</th><th style="width:200px">Aktionen</th></tr></thead>
+        <tbody><!-- rows via JS --></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- Optionen/Extras -->
+  <section id="tab-optionen" class="card hidden" role="tabpanel" aria-hidden="true">
+    <div class="section-head">
+      <div>
+        <div class="title">Optionen/Extras</div>
+        <div class="small">Definieren Sie wählbare Gruppen (z. B. „Größe“, „Extras Käse“).</div>
+      </div>
+      <div><button id="addGroup" class="btn-cta">+ Neue Gruppe</button></div>
+    </div>
+    <div class="table-wrap">
+      <table id="groupsTable">
+        <thead>
+          <tr>
+            <th>Gruppenname</th>
+            <th>Typ</th>
+            <th>Min/Max</th>
+            <th>Optionen</th>
+            <th style="width:220px">Aktionen</th>
+          </tr>
+        </thead>
+        <tbody><!-- rows via JS --></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- Einstellungen -->
+<section id="tab-einstellungen" class="card hidden" role="tabpanel" aria-hidden="true">
+  <div class="section-head">
+    <div>
+      <div class="title">Einstellungen</div>
+      <div class="small">Allgemeine Restaurant-Parameter.</div>
+    </div>
+    <div></div>
+  </div>
+
+  <!-- صف 1: Live-Promo + Bestellregeln -->
+  <div class="row">
+    <!-- Live-Promo (Rabatt & Lieferzeit) -->
+    <div class="card">
+      <div class="title" style="margin-bottom:8px">Live-Promo</div>
+      <div class="row" style="grid-template-columns:1fr 1fr">
+        <div>
+          <label class="small">Rabatt (%)</label>
+          <div style="display:flex;gap:6px;align-items:center">
+            <button id="discMinus" class="btn">−</button>
+            <input id="discValue" class="input" inputmode="numeric" style="width:96px;text-align:center" value="0">
+            <button id="discPlus" class="btn">+</button>
+          </div>
+          <div class="small">0–50%</div>
+        </div>
+
+        <div>
+          <label class="small">Lieferzeit (allgemein) +Minuten</label>
+          <div style="display:flex;gap:6px;align-items:center">
+            <button id="etaMinus" class="btn">−</button>
+            <input id="etaValue" class="input" inputmode="numeric" style="width:96px;text-align:center" value="0">
+            <button id="etaPlus" class="btn">+</button>
+          </div>
+          <div class="small">0–60 Min · Schritt 5</div>
+        </div>
+      </div>
+      <div style="margin-top:8px; display:flex; gap:8px; justify-content:flex-end">
+        <button id="liveSave" class="btn-cta">Speichern</button>
+      </div>
+    </div>
+
+    <!-- Bestellregeln -->
+    <div class="card">
+      <div class="title" style="margin-bottom:8px">Bestellregeln</div>
+      <div class="row">
+        <div>
+          <label class="small">Mindestbestellwert (€)</label>
+          <input id="minOrder" class="input" inputmode="decimal" placeholder="z. B. 20,00">
+        </div>
+        <div>
+          <label class="small">Optionale Lieferpauschale (max. 5 €)</label>
+          <input id="flatDelivery" class="input" inputmode="decimal" placeholder="0–5,00">
+        </div>
+      </div>
+      <div class="kv">
+        <div class="small">Hinweis</div>
+        <div class="small">Die operative Zustellung über unseren Fuhrpark folgt den bestehenden Lieferpreisregeln.</div>
+      </div>
+      <div style="margin-top:8px; display:flex; gap:8px; justify-content:flex-end">
+        <button id="saveSettings" class="btn-cta">Speichern</button>
+        <span id="settingsMsg" class="small"></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- صف 2: Cover / Promo-Bild + Logo -->
+<div class="row" style="grid-template-columns:1fr 1fr">
+  <!-- COVER -->
+  <div class="card">
+    <div class="title" style="margin-bottom:8px">Cover / Promo-Bild</div>
+    <div class="row" style="grid-template-columns:1fr 160px">
+      <div>
+        <div id="rCoverDrop" class="upload">Bild hier ablegen oder klicken</div>
+        <input id="rCoverFile" type="file" accept="image/*" class="hidden">
+        <div style="margin-top:8px">
+          <img id="rCoverPreview" class="thumb" style="width:100%;height:auto;max-height:180px;object-fit:contain;background:#fff" alt="Cover">
+        </div>
+        <div class="small" style="margin-top:6px">
+          Empfohlen: 1600×900 (16:9). URL wird als <code>coverUrl</code> gespeichert.
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:8px;align-items:stretch">
+        <button id="rCoverSave" class="btn-cta">Cover speichern</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- LOGO -->
+  <div class="card">
+    <div class="title" style="margin-bottom:8px">Logo</div>
+    <div class="row" style="grid-template-columns:1fr 160px">
+      <div>
+        <div id="rLogoDrop" class="upload">Logo hier ablegen oder klicken</div>
+        <input id="rLogoFile" type="file" accept="image/*" class="hidden">
+        <div style="margin-top:8px;display:flex;align-items:center;gap:12px">
+          <img id="rLogoPreview" class="thumb" style="width:140px;height:140px;object-fit:contain;background:#fff" alt="Logo">
+          <div class="small">Quadratisch empfohlen (z. B. 512×512). Wird als <code>logoUrl</code> gespeichert.</div>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:8px;align-items:stretch">
+        <button id="rLogoSave" class="btn-cta">Logo speichern</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+    <!-- صف 3: Marktplatz-Kategorien (multi-select) -->
+  <div class="row" style="grid-template-columns:1fr">
+    <div class="card">
+      <div class="section-head">
+        <div class="title">Marktplatz-Kategorien</div>
+        <div class="small">Wählen Sie passende Kategorien für Ihr Restaurant (mehrere möglich).</div>
+      </div>
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+        <div id="tagsBadges" class="tags-wrap"><span class="small">Noch keine Auswahl</span></div>
+        <button id="btnTags" class="btn-cta">Kategorien auswählen</button>
+      </div>
+    </div>
+  </div>
+
+</section>
+
+
+<!-- Produkt-Modal -->
+<div id="productModal" class="modal" aria-hidden="true">
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="pmTitle">
+    <div class="hdr">
+      <div class="title" id="pmTitle">Produkt</div>
+      <button class="close" id="pmClose">✕</button>
+    </div>
+    <div class="row">
+      <div>
+        <label class="small">Name*</label>
+        <input id="pName" class="input" placeholder="z. B. Margherita" required>
+      </div>
+      <div>
+        <label class="small">Preis (€)*</label>
+        <input id="pPrice" class="input" inputmode="decimal" placeholder="z. B. 8,90" required>
+      </div>
+      <div>
+        <label class="small">Kategorie*</label>
+        <select id="pCat"></select>
+      </div>
+      <div>
+        <label class="small">Verfügbar</label>
+        <label class="switch"><input id="pActive" type="checkbox" checked><span>Aktiv</span></label>
+      </div>
+      <div class="row" style="grid-template-columns:1fr">
+        <div>
+          <label class="small">Beschreibung</label>
+          <textarea id="pDesc" placeholder="Kurzbeschreibung …"></textarea>
+        </div>
+      </div>
+	  <!-- Größen (optional) -->
+<div class="row" style="grid-template-columns:1fr">
+  <div class="card">
+    <label class="small" style="display:flex;gap:8px;align-items:center">
+      <input id="pHasSizes" type="checkbox"> Größen / Size / الحجم / Boyut
+    </label>
+    <div id="sizeRows" class="card" style="margin-top:8px; display:flex; flex-direction:column; gap:6px"></div>
+    <button id="addSize" class="btn" type="button">+ Größe</button>
+    <div class="small">Geben Sie Endpreise pro Größe ein. Wir berechnen die Differenzen automatisch.</div>
+  </div>
+</div>
+
+      <div class="row" style="grid-template-columns:1fr 1fr">
+        <div>
+          <label class="small">Bild</label>
+          <div id="pUpload" class="upload">Bild hier ablegen oder klicken</div>
+          <input id="pImg" type="file" accept="image/*" class="hidden">
+          <div style="margin-top:8px"><img id="pPreview" class="thumb hidden" alt="Vorschau"></div>
+        </div>
+        <div>
+          <label class="small">Optionengruppen (Anhaken)</label>
+          <div id="pGroups" class="card" style="max-height:210px; overflow:auto"></div>
+        </div>
+      </div>
+    </div>
+    <hr class="sep">
+    <div style="display:flex; gap:8px; justify-content:flex-end">
+      <button id="pmCancel" class="btn">Abbrechen</button>
+      <button id="pmSave" class="btn-cta">Speichern</button>
+    </div>
+  </div>
+</div>
+
+<!-- Kategorie-Modal -->
+<div id="catModal" class="modal" aria-hidden="true">
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="cmTitle">
+    <div class="hdr">
+      <div class="title" id="cmTitle">Kategorie</div>
+      <button class="close" id="cmClose">✕</button>
+    </div>
+    <div class="row">
+      <div>
+        <label class="small">Name*</label>
+        <input id="cName" class="input" placeholder="z. B. Pizza">
+      </div>
+      <div>
+        <label class="small">Sortierung</label>
+        <input id="cSort" class="input" inputmode="numeric" placeholder="z. B. 10">
+      </div>
+    </div>
+    <hr class="sep">
+    <div style="display:flex; gap:8px; justify-content:flex-end">
+      <button id="cmCancel" class="btn">Abbrechen</button>
+      <button id="cmSave" class="btn-cta">Speichern</button>
+    </div>
+  </div>
+</div>
+
+<!-- Gruppe-Modal -->
+<div id="groupModal" class="modal" aria-hidden="true">
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="gmTitle">
+    <div class="hdr">
+      <div class="title" id="gmTitle">Optionengruppe</div>
+      <button class="close" id="gmClose">✕</button>
+    </div>
+    <div class="row">
+      <div>
+        <label class="small">Gruppenname*</label>
+        <input id="gName" class="input" placeholder="z. B. Größe">
+      </div>
+      <div>
+        <label class="small">Typ*</label>
+        <select id="gType">
+          <option value="single">Einfachauswahl (1 wählen)</option>
+          <option value="multi">Mehrfachauswahl (0–n)</option>
+        </select>
+      </div>
+      <div>
+        <label class="small">Min</label>
+        <input id="gMin" class="input" inputmode="numeric" placeholder="0">
+      </div>
+      <div>
+        <label class="small">Max</label>
+        <input id="gMax" class="input" inputmode="numeric" placeholder="1">
+      </div>
+    </div>
+    <div class="card" style="margin-top:8px">
+  <div class="section-head">
+    <div class="title">Optionen</div>
+    <button id="addOption" class="btn">+ Option</button>
+  </div>
+
+  <div id="optsList"><!-- rows --></div>
+
+  <!-- تلميح: هذه القيم هي فروقات سعر وليست أسعار نهائية -->
+  <div id="optHint" class="small" style="margin-top:6px;color:#6b7280">
+    Hinweis: Dieses Feld ist eine <strong>Preis-Differenz (Δ)</strong>, nicht der Endpreis.
+    Beispiel (Größe): Klein <strong>0,00 €</strong>, Groß <strong>+2,00 €</strong>.
+  </div>
+</div>
+
+    <hr class="sep">
+    <div style="display:flex; gap:8px; justify-content:flex-end">
+      <button id="gmCancel" class="btn">Abbrechen</button>
+      <button id="gmSave" class="btn-cta">Speichern</button>
+    </div>
+  </div>
+</div>
+<!-- Tags Modal -->
+<div id="tagsModal" class="modal" aria-hidden="true">
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="tgTitle">
+    <div class="hdr">
+      <div class="title" id="tgTitle">Kategorien auswählen</div>
+      <button class="close" id="tagsClose">✕</button>
+    </div>
+    <div class="tags-grid" id="tagsList"><!-- chips via JS --></div>
+    <hr class="sep">
+    <div style="display:flex; gap:8px; justify-content:flex-end">
+      <button id="tagsCancel" class="btn">Abbrechen</button>
+      <button id="tagsSave" class="btn-cta">Speichern</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div id="toast" class="toast">OK</div>
+
+<script>
+/* ============ State & Storage ============ */
+const LS = {
+  products: 'mv:products',
+  categories: 'mv:categories',
+  groups: 'mv:groups',
+  settings: 'mv:settings'
+};
+const $ = s => document.querySelector(s);
+const $$ = s => Array.from(document.querySelectorAll(s));
+const toast = (t)=>{ const el=$("#toast"); el.textContent=t; el.classList.add("show"); setTimeout(()=>el.classList.remove("show"),1600); };
+
+let products = [];
+let categories = [];
+let groups = [];
+let settings = { minOrder:null, flatDelivery:null, openNow:false, acceptOrders:true };
+
+function loadAll(){
+  try{ products = JSON.parse(localStorage.getItem(LS.products)||'[]'); }catch{ products=[]; }
+  try{ categories = JSON.parse(localStorage.getItem(LS.categories)||'[]'); }catch{ categories=[]; }
+  try{ groups = JSON.parse(localStorage.getItem(LS.groups)||'[]'); }catch{ groups=[]; }
+  try{ settings = Object.assign(settings, JSON.parse(localStorage.getItem(LS.settings)||'{}')); }catch{}
+  // Seed minimal if empty
+  if(categories.length===0){ categories = [{id:uid(), name:"Pizza", sort:10}, {id:uid(), name:"Getränke", sort:20}]; save('categories'); }
+}
+function save(key){
+  if(key==='products') localStorage.setItem(LS.products, JSON.stringify(products));
+  if(key==='categories') localStorage.setItem(LS.categories, JSON.stringify(categories));
+  if(key==='groups') localStorage.setItem(LS.groups, JSON.stringify(groups));
+  if(key==='settings') localStorage.setItem(LS.settings, JSON.stringify(settings));
+}
+/* ===== MV SYNC (Firestore + Storage) — place RIGHT AFTER save() ===== */
+const MV = {
+  auth: firebase.auth(),
+  fs: firebase.firestore(),
+  st: firebase.storage(),
+  uid: null,
+  timers: {}
+};
+
+// استخدم جلسة المطعم الموجودة (لا نسجل مجهول)
+function mvOnAuthReady(cb){
+  const u = MV.auth.currentUser;
+  if (u) { MV.uid = u.uid; cb(u); return; }
+  MV.auth.onAuthStateChanged(user => { if (user){ MV.uid=user.uid; cb(user); } });
+}
+
+// تجميع عمليات الحفظ (debounce)
+function mvQueueSync(key){
+  clearTimeout(MV.timers[key]);
+  MV.timers[key] = setTimeout(()=> mvPush(key).catch(console.warn), 400);
+}
+
+// رفع الصورة لو كانت dataURL
+async function mvUploadDataUrlIfNeeded(uid, p){
+  let url = p.img || null;
+  if(url && url.startsWith('data:')){
+    const [hdr,b64] = url.split(',');
+    const mime = /data:(.*?);base64/.exec(hdr)?.[1] || 'image/jpeg';
+    const bin = atob(b64); const u8 = new Uint8Array(bin.length);
+    for(let i=0;i<bin.length;i++) u8[i]=bin.charCodeAt(i);
+    const blob = new Blob([u8], {type:mime});
+    const path = `restaurants/${uid}/products/${p.id}/main.jpg`;
+    const snap = await MV.st.ref(path).put(blob);
+    url = await snap.ref.getDownloadURL();
+    p.img = url; // عدّل المحلي
+    try{ save('products'); }catch(_){}
+  }
+  return url;
+}
+
+// دفع البيانات إلى Firestore تحت restaurants/{uid}/...
+async function mvPush(key){
+  if(!MV.uid) return;
+
+  const base = MV.fs.collection('restaurants').doc(MV.uid);
+  const ts = firebase.firestore.FieldValue.serverTimestamp();
+
+  if(key==='categories'){
+    const batch = MV.fs.batch();
+    categories.forEach(c=>{
+      const ref = base.collection('categories').doc(c.id);
+      batch.set(ref, { name:c.name, sort:+(c.sort||0), updatedAt: ts }, { merge:true });
+    });
+    await batch.commit();
+    return;
+  }
+
+  if(key==='groups'){
+    const batch = MV.fs.batch();
+    groups.forEach(g=>{
+      const ref = base.collection('option_groups').doc(g.id);
+      batch.set(ref, {
+        name:g.name, type:(g.type==='multi'?'multi':'single'),
+        min:+(g.min||0), max:(g.max==null? null : +g.max),
+        items:(g.options||[]).map(o=>({ name:o.name, priceDelta:+(o.price||0) })),
+        updatedAt: ts
+      }, { merge:true });
+    });
+    await batch.commit();
+    return;
+  }
+
+  if(key==='products'){
+  // 1) ارفع/حدّث كل المنتجات الحالية
+  for(const p of products){
+    const imgUrl = await mvUploadDataUrlIfNeeded(MV.uid, p);
+    await base.collection('products').doc(p.id).set({
+      name: p.name,
+      desc: p.desc || '',
+      price: +(p.price||0),
+      isAvailable: !!p.active,
+      categoryId: p.cat || null,
+      optionGroupIds: p.groups || [],
+	  sizes: Array.isArray(p.sizes)
+  ? p.sizes.map(s => ({
+      name: s.name || '',
+      priceDelta: Number(s.priceDelta||0)
+    }))
+  : [],
+
+      images: imgUrl ? [imgUrl] : [],
+      createdAt: p.createdAt ? new Date(p.createdAt) : ts,
+      updatedAt: ts
+    }, { merge:true });
+  }
+
+  // 2) نظّف أي وثائق موجودة على السحابة ليست ضمن القائمة المحلية
+  try{
+    const localIds = new Set(products.map(x=> x.id));
+    const snap = await base.collection('products').get();
+    const toDelete = [];
+    snap.forEach(d=> { if(!localIds.has(d.id)) toDelete.push(d.id); });
+
+    await Promise.all(toDelete.map(async pid=>{
+      try{ await base.collection('products').doc(pid).delete(); }catch(_){}
+      try{ await MV.st.ref(`restaurants/${MV.uid}/products/${pid}/main.jpg`).delete(); }catch(_){}
+    }));
+  }catch(e){ console.warn('prune skipped:', e); }
+
+  return;
+}
+
+}
+// حذف نهائي: وثيقة المنتج + صورة main.jpg من الستوريج
+async function mvDeleteProduct(pid){
+  if(!MV?.uid) return;
+  const base = MV.fs.collection('restaurants').doc(MV.uid);
+
+  // 1) Firestore
+  try { await base.collection('products').doc(pid).delete(); } catch(e){ console.warn(e); }
+
+  // 2) Storage (نفس المسار الذي نرفعه فيه في mvUploadDataUrlIfNeeded)
+  try {
+    const ref = MV.st.ref(`restaurants/${MV.uid}/products/${pid}/main.jpg`);
+    await ref.delete();
+  } catch(e){ /* تجاهل إن لم توجد */ }
+}
+
+// لفّ save() بأمان (بعد تعريفها)
+(function attachSaveWrapper(){
+  let tries = 0;
+  (function loop(){
+    if (window.__mvWrapped) return;
+    if (typeof window.save !== 'function'){
+      if (tries++ < 80) return setTimeout(loop,50);
+      return;
+    }
+    const _orig = window.save;
+    window.save = function(key){ _orig(key); mvQueueSync(key); };
+    window.__mvWrapped = true;
+  })();
+})();
+
+// دفع أولي بعد توفر الجلسة (مطعم مسجّل ومعتمد)
+mvOnAuthReady(()=> ['categories','groups','products'].forEach(mvQueueSync));
+
+const uid = ()=> 'id_'+Math.random().toString(36).slice(2,9);
+
+/* ============ Tabs ============ */
+const tabs = $$('.tab-btn');
+tabs.forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    tabs.forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    const tab = btn.dataset.tab;
+    $$('#tab-produkte, #tab-kategorien, #tab-optionen, #tab-einstellungen')
+      .forEach(s=>s.classList.add('hidden'));
+    $('#tab-'+tab).classList.remove('hidden');
+  });
+});
+
+
+/* ============ Renderers ============ */
+function eur(n){
+  const x = Number(n||0);
+  try{ return new Intl.NumberFormat('de-DE',{style:'currency',currency:'EUR'}).format(x); }catch{ return x.toFixed(2)+' €'; }
+}
+function catName(id){ return categories.find(c=>c.id===id)?.name || '—'; }
+
+function renderProducts(){
+  const tb = $("#productsTable tbody");
+  const q = ($("#search").value||'').trim().toLowerCase();
+  const rows = products
+    .filter(p=>{
+      if(!q) return true;
+      return (p.name||'').toLowerCase().includes(q) || (catName(p.cat)||'').toLowerCase().includes(q);
+    })
+    .map(p=>{
+      return `<tr data-id="${p.id}">
+        <td>${p.img ? `<img class="thumb" src="${p.img}" alt="">` : `<span class="pill">Kein Bild</span>`}</td>
+        <td><strong>${escapeHtml(p.name||'')}</strong><div class="small">${escapeHtml(p.desc||'')}</div></td>
+        <td>${escapeHtml(catName(p.cat))}</td>
+        <td>${eur(p.price)}</td>
+        <td>${p.active?'<span class="pill">Aktiv</span>':'<span class="pill" style="background:#ffecec;border-color:#ffcdcd">Inaktiv</span>'}</td>
+        <td>
+          <div class="actions">
+            <button class="btn" data-act="edit">Bearbeiten</button>
+            <button class="btn" data-act="toggle">${p.active?'Deaktivieren':'Aktivieren'}</button>
+            <button class="btn" data-act="del">Löschen</button>
+          </div>
+        </td>
+      </tr>`;
+    }).join('');
+  tb.innerHTML = rows || `<tr><td colspan="6" class="small">Keine Produkte</td></tr>`;
+  // bind
+  tb.querySelectorAll('button[data-act]').forEach(b=>{
+    b.addEventListener('click', (e)=>{
+      const id = b.closest('tr')?.dataset?.id;
+      const act = b.dataset.act;
+      if(!id) return;
+      if(act==='edit') openProductModal(products.find(x=>x.id===id));
+      if(act==='toggle'){ const p = products.find(x=>x.id===id); p.active=!p.active; save('products'); renderProducts(); }
+      if(act==='del'){
+  if(!confirm('Produkt endgültig löschen?')) return;
+
+  // احذف محلياً أولاً
+  products = products.filter(x=>x.id!==id);
+  save('products'); renderProducts();
+
+  // ثم احذف عن بُعد (Firestore + Storage)
+  mvOnAuthReady(()=> mvDeleteProduct(id)
+    .then(()=> toast('Gelöscht'))
+    .catch(e=> { console.warn(e); toast('Server-Löschung fehlgeschlagen'); })
+  );
+}
+
+    });
+  });
+}
+function renderCats(){
+  const tb = $("#catsTable tbody");
+  const rows = categories
+    .slice().sort((a,b)=>(+a.sort||0)-(+b.sort||0))
+    .map(c=>`
+      <tr data-id="${c.id}">
+        <td><strong>${escapeHtml(c.name||'')}</strong></td>
+        <td>${Number(c.sort||0)}</td>
+        <td>
+          <div class="actions">
+            <button class="btn" data-act="edit">Bearbeiten</button>
+            <button class="btn" data-act="del">Löschen</button>
+          </div>
+        </td>
+      </tr>
+    `).join('');
+  tb.innerHTML = rows || `<tr><td colspan="3" class="small">Keine Kategorien</td></tr>`;
+  tb.querySelectorAll('button[data-act]').forEach(b=>{
+    b.addEventListener('click', ()=>{
+      const id = b.closest('tr')?.dataset?.id;
+      const act = b.dataset.act;
+      if(act==='edit') openCatModal(categories.find(x=>x.id===id));
+      if(act==='del'){
+        // prevent deleting in-use category
+        if(products.some(p=>p.cat===id)){ toast('Kategorie wird von Produkten verwendet'); return; }
+        categories = categories.filter(x=>x.id!==id); save('categories'); renderCats(); fillCatSelect();
+      }
+    });
+  });
+}
+function renderGroups(){
+  const tb = $("#groupsTable tbody");
+  const rows = groups.map(g=>{
+    const type = g.type==='multi' ? 'Mehrfach' : 'Einfach';
+    const minmax = `${Number(g.min||0)} / ${g.max?Number(g.max):'—'}`;
+    const opts = (g.options||[]).map(o=>`${escapeHtml(o.name)} (${eur(o.price||0)})`).join(', ') || '—';
+    return `<tr data-id="${g.id}">
+      <td><strong>${escapeHtml(g.name||'')}</strong></td>
+      <td>${type}</td>
+      <td>${minmax}</td>
+      <td>${opts}</td>
+      <td>
+        <div class="actions">
+          <button class="btn" data-act="edit">Bearbeiten</button>
+          <button class="btn" data-act="del">Löschen</button>
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
+  tb.innerHTML = rows || `<tr><td colspan="5" class="small">Keine Gruppen</td></tr>`;
+  tb.querySelectorAll('button[data-act]').forEach(b=>{
+    b.addEventListener('click', ()=>{
+      const id = b.closest('tr')?.dataset?.id;
+      const act = b.dataset.act;
+      if(act==='edit') openGroupModal(groups.find(x=>x.id===id));
+      if(act==='del'){
+        // prevent deleting if any product references it
+        if(products.some(p=> (p.groups||[]).includes(id))){ toast('Gruppe wird von Produkten verwendet'); return; }
+        groups = groups.filter(x=>x.id!==id); save('groups'); renderGroups(); }
+    });
+  });
+}
+function fillCatSelect(){
+  const sel = $("#pCat");
+  sel.innerHTML = categories
+    .slice().sort((a,b)=>(+a.sort||0)-(+b.sort||0))
+    .map(c=>`<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('');
+}
+
+/* ============ Produkt-Modal ============ */
+const pModal = $("#productModal");
+const pName=$("#pName"), pPrice=$("#pPrice"), pCat=$("#pCat"), pActive=$("#pActive"), pDesc=$("#pDesc");
+const pUpload=$("#pUpload"), pImg=$("#pImg"), pPreview=$("#pPreview"), pGroupsBox=$("#pGroups");
+// أسماء تُعرّف مجموعة الأحجام
+const SIZE_NAMES = ['Größe','Size','الحجم','Boyut'];
+
+function findSizeGroup(p){
+  const gid = (p?.groups||[]).find(id => {
+    const g = groups.find(x=>x.id===id);
+    return g && (g.kind==='size' || SIZE_NAMES.includes((g.name||'').trim()));
+  });
+  return gid ? groups.find(x=>x.id===gid) : null;
+}
+function readSizeRows(){
+  const box = document.getElementById('sizeRows');
+  const rows = Array.from(box?.querySelectorAll('.size-row')||[]);
+  return rows.map(r=>{
+    const name = r.querySelector('input[name="szName"]').value.trim();
+    const price = parseEUR(r.querySelector('input[name="szPrice"]').value);
+    return (name && price!=null) ? {name, price} : null;
+  }).filter(Boolean);
+}
+function mountSizeRow(name='', price=''){
+  const box = document.getElementById('sizeRows');
+  const row = document.createElement('div');
+  row.className='size-row';
+  row.innerHTML = `
+    <div class="row" style="grid-template-columns:minmax(150px,2fr) 110px 64px; align-items:center; column-gap:8px">
+      <input class="input" name="szName" placeholder="z. B. Klein / Small" value="${escapeHtml(name)}">
+      <input class="input" name="szPrice" inputmode="decimal" placeholder="Preis" value="${price!==''?String(price).replace('.',','):''}">
+      <button class="btn" type="button" data-del>✕</button>
+    </div>`;
+  row.querySelector('[data-del]').addEventListener('click', ()=> row.remove());
+  box.appendChild(row);
+}
+// تعبئة واجهة الأحجام من مجموعة موجودة (تحويل الدلتا إلى سعر نهائي عبر base pPrice)
+// تعبئة واجهة الأحجام من product.sizes إن وُجدت، وإلا من مجموعة الحجم (fallback)
+function prefillSizesUI(p){
+  const has = document.getElementById('pHasSizes');
+  const box = document.getElementById('sizeRows');
+  box.innerHTML = '';
+
+  // 1) الأولوية لـ product.sizes (الفورمات الجديد)
+  if (p && Array.isArray(p.sizes) && p.sizes.length){
+    has.checked = true;
+    const base = (typeof p.price==='number') ? p.price : Number(p.price||0);
+    p.sizes.forEach(s => {
+      const finalPrice = base + Number(s.priceDelta||0);
+      mountSizeRow(s.name || '', finalPrice);
+    });
+    return;
+  }
+
+  // 2) fallback: من مجموعة "Größe"/"Size" (القديمة) بتحويل الدلتا إلى أسعار نهائية
+  const g = findSizeGroup(p);
+  if(!g){ has.checked=false; return; }
+  has.checked = true;
+  const base = (typeof p.price==='number') ? p.price : Number(p.price||0);
+  (g.options||[]).forEach(o=> mountSizeRow(o.name, (base + Number(o.price||0))));
+}
+
+
+let editProductId = null;
+function openProductModal(p){
+  editProductId = p?.id || null;
+  $("#pmTitle").textContent = editProductId ? "Produkt bearbeiten" : "Neues Produkt";
+  pName.value = p?.name || '';
+  pPrice.value = p?.price!=null ? String(p.price).replace('.',',') : '';
+  pCat.value = p?.cat || (categories[0]?.id||'');
+  pActive.checked = p?.active!==false;
+  pDesc.value = p?.desc || '';
+  if(p?.img){ pPreview.src = p.img; pPreview.classList.remove('hidden'); } else { pPreview.src=''; pPreview.classList.add('hidden'); }
+  // groups checklist
+  pGroupsBox.innerHTML = groups.map(g=>{
+    const checked = (p?.groups||[]).includes(g.id) ? 'checked' : '';
+    return `<label class="small" style="display:flex;align-items:center;gap:8px;margin:4px 0">
+      <input type="checkbox" value="${g.id}" ${checked}> <span>${escapeHtml(g.name)}</span>
+    </label>`;
+  }).join('') || '<div class="small">Keine Gruppen – bitte unter „Optionen/Extras“ anlegen.</div>';
+  pModal.classList.add('show');
+  // Größen UI
+document.getElementById('addSize').onclick = ()=> mountSizeRow();
+const has = document.getElementById('pHasSizes');
+has.addEventListener('change', ()=>{
+  if(has.checked && !document.querySelector('#sizeRows .size-row')){
+    // أضف صفين افتراضيين
+    mountSizeRow('Small', pPrice.value?parseEUR(pPrice.value):0);
+    mountSizeRow('Large', '');
+  }
+});
+prefillSizesUI(p);
+
+}
+function closeProductModal(){ pModal.classList.remove('show'); }
+$("#pmClose").onclick = closeProductModal;
+$("#pmCancel").onclick = closeProductModal;
+
+function parseEUR(raw){
+  if(raw==null) return null;
+  const cleaned = String(raw).replace(/[^\d,.\-]/g,'').replace(',','.');
+  const n = Number(cleaned);
+  return isFinite(n) && n>=0 ? Math.round(n*100)/100 : null;
+}
+$("#pmSave").addEventListener('click', ()=>{
+  const name   = pName.value.trim();
+  const price0 = parseEUR(pPrice.value);
+  const cat    = pCat.value;
+  const active = !!pActive.checked;
+  const desc   = pDesc.value.trim();
+  const img    = (pPreview.src && !pPreview.classList.contains('hidden')) ? pPreview.src : null;
+
+  if(!name || price0==null || !cat){ toast('Bitte Name, Preis und Kategorie prüfen'); return; }
+
+  // المجموعات المختارة كما هي (بدون إضافة مجموعة حجم)
+  const selGroups = Array
+    .from(pGroupsBox.querySelectorAll('input[type="checkbox"]:checked'))
+    .map(x=>x.value);
+
+  // === أحجام (sizes): المستخدم أدخل "أسعار نهائية" لكل حجم
+  let sizesToSave = [];    // [{name, priceDelta}]
+  let basePrice   = price0;
+
+  const hasSizes = document.getElementById('pHasSizes')?.checked;
+  if(hasSizes){
+    const rows = readSizeRows(); // [{name, price}]
+    const valid = rows.filter(s => s && s.name && s.price!=null);
+    if(valid.length){
+      // اجعل base = أقل سعر، وخزّن الفروقات
+      basePrice = Math.min(...valid.map(s=> s.price));
+      pPrice.value = String(basePrice).replace('.',','); // انعكاس بصري في الـUI
+      sizesToSave = valid.map(s=> ({
+        name: s.name,
+        priceDelta: Math.max(0, Math.round((s.price - basePrice)*100)/100)
+      }));
+    }
+  }
+
+  if(editProductId){
+    const p = products.find(x=>x.id===editProductId);
+    Object.assign(p, {
+      name, price: basePrice, cat, active, desc, img,
+      groups: selGroups,
+      sizes: sizesToSave
+    });
+  }else{
+    products.unshift({
+      id: uid(),
+      name, price: basePrice, cat, active, desc, img,
+      groups: selGroups,
+      sizes: sizesToSave,
+      createdAt: Date.now()
+    });
+  }
+
+  save('products'); renderProducts(); closeProductModal(); toast('Gespeichert');
+});
+
+
+
+/* Image upload / drag */
+pUpload.addEventListener('click', ()=> pImg.click());
+pUpload.addEventListener('dragover', (e)=>{ e.preventDefault(); pUpload.classList.add('drag'); });
+pUpload.addEventListener('dragleave', ()=> pUpload.classList.remove('drag'));
+pUpload.addEventListener('drop', (e)=>{ e.preventDefault(); pUpload.classList.remove('drag'); handleImg(e.dataTransfer.files?.[0]); });
+pImg.addEventListener('change', ()=> handleImg(pImg.files?.[0]));
+function handleImg(file){
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = ()=>{ pPreview.src = reader.result; pPreview.classList.remove('hidden'); };
+  reader.readAsDataURL(file);
+}
+
+/* ============ Kategorien-Modal ============ */
+const cModal = $("#catModal");
+const cName = $("#cName"), cSort=$("#cSort");
+let editCatId = null;
+function openCatModal(c){
+  editCatId = c?.id || null;
+  $("#cmTitle").textContent = editCatId ? "Kategorie bearbeiten" : "Neue Kategorie";
+  cName.value = c?.name || '';
+  cSort.value = c?.sort!=null ? c.sort : '';
+  cModal.classList.add('show');
+}
+function closeCatModal(){ cModal.classList.remove('show'); }
+$("#cmClose").onclick = closeCatModal;
+$("#cmCancel").onclick = closeCatModal;
+$("#cmSave").addEventListener('click', ()=>{
+  const name = cName.value.trim();
+  const sort = Number(cSort.value||0);
+  if(!name){ toast('Name erforderlich'); return; }
+  if(editCatId){ const c = categories.find(x=>x.id===editCatId); Object.assign(c,{name, sort}); }
+  else { categories.push({ id:uid(), name, sort }); }
+  save('categories'); renderCats(); fillCatSelect(); closeCatModal(); toast('Gespeichert');
+});
+
+/* ============ Gruppen-Modal ============ */
+const gModal = $("#groupModal");
+const gName=$("#gName"), gType=$("#gType"), gMin=$("#gMin"), gMax=$("#gMax"), optsList=$("#optsList");
+let editGroupId = null;
+function openGroupModal(g){
+  editGroupId = g?.id || null;
+  $("#gmTitle").textContent = editGroupId ? "Gruppe bearbeiten" : "Neue Gruppe";
+  gName.value = g?.name || '';
+  gType.value = g?.type || 'single';
+  gMin.value = g?.min!=null ? g.min : '0';
+  gMax.value = g?.max!=null ? g.max : (g?.type==='single' ? '1' : '');
+  optsList.innerHTML = (g?.options||[]).map((o,i)=> optRow(i,o.name,o.price)).join('') || '';
+  gModal.classList.add('show');
+}
+function closeGroupModal(){ gModal.classList.remove('show'); }
+$("#gmClose").onclick = closeGroupModal;
+$("#gmCancel").onclick = closeGroupModal;
+$("#addOption").addEventListener('click', ()=>{
+  const i = optsList.querySelectorAll('.opt-row').length;
+  optsList.insertAdjacentHTML('beforeend', optRow(i,'',0));
+});
+optsList.addEventListener('click', (e)=>{
+  const r = e.target.closest('.opt-row'); if(!r) return;
+  if(e.target.matches('button[data-act="del"]')) r.remove();
+});
+function optRow(i,name,price){
+  return `<div class="opt-row row" style="grid-template-columns:1fr 160px 100px; align-items:center; margin:6px 0">
+    <input class="input" placeholder="Option" value="${escapeHtml(name||'')}">
+    <input class="input" inputmode="decimal" placeholder="Preis +" value="${price!=null?String(price).replace('.',','):''}">
+    <button class="btn" data-act="del">Entfernen</button>
+  </div>`;
+}
+$("#gmSave").addEventListener('click', ()=>{
+  const name = gName.value.trim();
+  const type = gType.value==='multi' ? 'multi' : 'single';
+  const min = Math.max(0, parseInt(gMin.value||'0',10));
+  const maxRaw = gMax.value.trim(); const max = maxRaw==='' ? null : Math.max(0, parseInt(maxRaw,10));
+  if(!name){ toast('Gruppenname erforderlich'); return; }
+
+  // اجمع القيم المدخلة (نعتبرها Δ فروقات كما هي)
+  const rows = Array.from(optsList.querySelectorAll('.opt-row'));
+  const rawOptions = rows.map(r=>{
+    const n = r.children[0].value.trim();
+    const p = parseEUR(r.children[1].value);
+    return n ? { name:n, price: (p||0) } : null;
+  }).filter(Boolean);
+
+  // اكتشاف سريع: إذا كان أصغر رقم > 0 فغالبًا المستخدم أدخل أسعارًا مطلقة بدل فروقات
+  if (rawOptions.length){
+    const minVal = Math.min(...rawOptions.map(o => +o.price || 0));
+    if (minVal > 0){
+      const ok = confirm(
+        'Hinweis: Diese Felder sind Preis-Differenzen (Δ), nicht Endpreise.\n' +
+        'Beispiel: Klein 0,00 €, Groß +2,00 €.\n\n' +
+        'Speichern trotzdem?'
+      );
+      if (!ok){ toast('Speichern abgebrochen'); return; }
+    }
+  }
+
+  // خزّن كما هي (Δ)، بدون أي تعديل آلي
+  if(editGroupId){
+    const g = groups.find(x=>x.id===editGroupId);
+    Object.assign(g, { name, type, min, max, options: rawOptions });
+  }else{
+    groups.push({ id:uid(), name, type, min, max, options: rawOptions });
+  }
+
+  save('groups'); renderGroups(); closeGroupModal(); toast('Gespeichert');
+});
+
+
+/* ============ Einstellungen ============ */
+function renderSettings(){
+  $("#minOrder").value = settings.minOrder!=null ? String(settings.minOrder).replace('.',',') : '';
+  $("#flatDelivery").value = settings.flatDelivery!=null ? String(settings.flatDelivery).replace('.',',') : '';
+  $("#openNow").checked = !!settings.openNow;
+  $("#acceptOrders").checked = settings.acceptOrders!==false;
+}
+// يكتب isOpen إلى restaurants/{uid}
+// حفظ إعدادات الحد الأدنى والباوشاله فقط (بدون isOpen/acceptOrders)
+// حفظ قيم الحد الأدنى والباوشاله فقط
+$("#saveSettings").addEventListener('click', ()=>{
+  const mo = parseEUR($("#minOrder").value);
+  const fd = parseEUR($("#flatDelivery").value);
+  if (fd!=null && fd>5){ toast('Lieferpauschale max. 5,00 €'); return; }
+  settings.minOrder = mo;
+  settings.flatDelivery = fd;
+  save('settings');
+  $("#settingsMsg").textContent = 'Gespeichert';
+  setTimeout(()=>$("#settingsMsg").textContent='', 1500);
+  toast('Einstellungen gespeichert');
+});
+
+/* ============ Market Tags (multi-select) ============ */
+const TAGS_DEF = [
+  {key:'bbq',     ico:'🍖', label:'Grill/BBQ'},
+  {key:'seafood', ico:'🐟', label:'Fisch & Meeresfrüchte'},
+  {key:'vegan',   ico:'🌿', label:'Vegan'},
+  {key:'asian',   ico:'🍜', label:'Asiatisch'},
+  {key:'pizza',   ico:'🍕', label:'Pizza'},
+  {key:'burger',  ico:'🍔', label:'Burger'},
+  {key:'dessert', ico:'🍰', label:'Desserts'},
+  {key:'coffee',  ico:'☕',  label:'Kaffee'}
+];
+
+let selectedTags = []; // الحالة الحالية (تُملأ من وثيقة المطعم)
+const tagsModal   = document.getElementById('tagsModal');
+const tagsList    = document.getElementById('tagsList');
+const tagsBadges  = document.getElementById('tagsBadges');
+
+function renderTagsBadges(){
+  if(!tagsBadges) return;
+  tagsBadges.innerHTML = '';
+  if(!selectedTags.length){
+    tagsBadges.innerHTML = '<span class="small">Noch keine Auswahl</span>';
+    return;
+  }
+  const frag = document.createDocumentFragment();
+  selectedTags.forEach(k=>{
+    const def = TAGS_DEF.find(x=>x.key===k);
+    const el = document.createElement('span');
+    el.className = 'tag-badge';
+    el.innerHTML = `<span class="ico">${def?.ico||'🏷️'}</span><span>${def?.label||k}</span>`;
+    frag.appendChild(el);
+  });
+  tagsBadges.appendChild(frag);
+}
+
+function openTagsModal(){
+  if(!tagsList) return;
+  // بناء الشبكة مع إبراز المحدد
+  tagsList.innerHTML = '';
+  TAGS_DEF.forEach(def=>{
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'tag-chip' + (selectedTags.includes(def.key) ? ' active' : '');
+    btn.dataset.key = def.key;
+    btn.innerHTML = `<span class="ico">${def.ico}</span><span>${def.label}</span>`;
+    btn.addEventListener('click', ()=>{
+      const k = def.key;
+      if(selectedTags.includes(k)){
+        selectedTags = selectedTags.filter(x=> x!==k);
+        btn.classList.remove('active');
+      }else{
+        selectedTags = [...selectedTags, k];
+        btn.classList.add('active');
+      }
+    });
+    tagsList.appendChild(btn);
+  });
+  tagsModal.classList.add('show');
+}
+function closeTagsModal(){ tagsModal.classList.remove('show'); }
+async function saveTagsModal(){
+  try{
+    if(!MV?.uid){ toast('Nicht angemeldet'); return; }
+    const ts = firebase.firestore.FieldValue.serverTimestamp();
+    await MV.fs.collection('restaurants').doc(MV.uid).set({
+      marketTags: selectedTags, updatedAt: ts
+    }, { merge:true });
+    renderTagsBadges();
+    closeTagsModal();
+    toast('Gespeichert');
+  }catch(e){
+    console.warn(e);
+    toast('Fehler beim Speichern');
+  }
+}
+
+
+/* ============ Cover Upload (restaurants/{uid}.coverUrl) ============ */
+const rCoverDrop    = document.getElementById('rCoverDrop');
+const rCoverFile    = document.getElementById('rCoverFile');
+const rCoverPreview = document.getElementById('rCoverPreview');
+const rCoverSaveBtn = document.getElementById('rCoverSave');
+/* ============ Logo Upload (restaurants/{uid}.logoUrl) ============ */
+const rLogoDrop    = document.getElementById('rLogoDrop');
+const rLogoFile    = document.getElementById('rLogoFile');
+const rLogoPreview = document.getElementById('rLogoPreview');
+const rLogoSaveBtn = document.getElementById('rLogoSave');
+
+// حمّل اللوغو الحالي (إن وُجد) عند توفر الجلسة
+mvOnAuthReady(async ()=>{
+  try{
+    const base = MV.fs.collection('restaurants').doc(MV.uid);
+    const snap = await base.get();
+    const url  = snap.exists ? (snap.data().logoUrl || '') : '';
+    if(url){ rLogoPreview.src = url; }
+  }catch(e){ console.warn(e); }
+});
+function readLocalLogo(file){
+  if(!file) return;
+  const rdr = new FileReader();
+  rdr.onload = ()=> { rLogoPreview.src = rdr.result; };
+  rdr.readAsDataURL(file);
+}
+
+rLogoDrop?.addEventListener('click', ()=> rLogoFile.click());
+rLogoDrop?.addEventListener('dragover', e=>{ e.preventDefault(); rLogoDrop.classList.add('drag'); });
+rLogoDrop?.addEventListener('dragleave', ()=> rLogoDrop.classList.remove('drag'));
+rLogoDrop?.addEventListener('drop', e=>{ e.preventDefault(); rLogoDrop.classList.remove('drag'); readLocalLogo(e.dataTransfer.files?.[0]); });
+rLogoFile?.addEventListener('change', ()=> readLocalLogo(rLogoFile.files?.[0]));
+rLogoSaveBtn?.addEventListener('click', async ()=>{
+  try{
+    if(!MV?.uid){ toast('Nicht angemeldet'); return; }
+    const file = rLogoFile.files?.[0];
+    if(!file && (!rLogoPreview.src || rLogoPreview.src.startsWith('http'))){
+      toast('Kein neues Logo ausgewählt'); return;
+    }
+
+    let downloadUrl = null;
+    const path = `restaurants/${MV.uid}/branding/logo.jpg`;
+    const ref  = MV.st.ref(path);
+
+    if(file){
+      await ref.put(file);
+      downloadUrl = await ref.getDownloadURL();
+    }else if(rLogoPreview.src.startsWith('data:')){
+      const [hdr,b64] = rLogoPreview.src.split(',');
+      const mime = /data:(.*?);base64/.exec(hdr)?.[1] || 'image/png';
+      const bin = atob(b64); const u8 = new Uint8Array(bin.length);
+      for(let i=0;i<bin.length;i++) u8[i]=bin.charCodeAt(i);
+      await ref.put(new Blob([u8], {type:mime}));
+      downloadUrl = await ref.getDownloadURL();
+    }
+
+    if(!downloadUrl){ toast('Kein Logo gefunden'); return; }
+
+    const ts = firebase.firestore.FieldValue.serverTimestamp();
+    await MV.fs.collection('restaurants').doc(MV.uid).set({
+      logoUrl: downloadUrl, updatedAt: ts
+    }, { merge:true });
+
+    toast('Logo gespeichert');
+  }catch(err){
+    console.error(err);
+    toast('Fehler beim Speichern');
+  }
+});
+
+// حمّل الغلاف الحالي (إن وجد) عند توفر الجلسة
+mvOnAuthReady(async ()=>{
+  try{
+    const base = MV.fs.collection('restaurants').doc(MV.uid);
+    const snap = await base.get();
+    const url = snap.exists ? (snap.data().coverUrl || '') : '';
+    if(url){ rCoverPreview.src = url; }
+  }catch(e){ console.warn(e); }
+});
+
+// معاينة الملف محليًا
+function readLocal(file){
+  if(!file) return;
+  const rdr = new FileReader();
+  rdr.onload = ()=> { rCoverPreview.src = rdr.result; };
+  rdr.readAsDataURL(file);
+}
+
+// سحب/إفلات + نقر
+rCoverDrop.addEventListener('click', ()=> rCoverFile.click());
+rCoverDrop.addEventListener('dragover', e=>{ e.preventDefault(); rCoverDrop.classList.add('drag'); });
+rCoverDrop.addEventListener('dragleave', ()=> rCoverDrop.classList.remove('drag'));
+rCoverDrop.addEventListener('drop', e=>{ e.preventDefault(); rCoverDrop.classList.remove('drag'); readLocal(e.dataTransfer.files?.[0]); });
+rCoverFile.addEventListener('change', ()=> readLocal(rCoverFile.files?.[0]));
+
+// رفع إلى Storage وتحديث coverUrl
+rCoverSaveBtn.addEventListener('click', async ()=>{
+  try{
+    if(!MV?.uid){ toast('Nicht angemeldet'); return; }
+    const file = rCoverFile.files?.[0];
+    if(!file && (!rCoverPreview.src || rCoverPreview.src.startsWith('http'))){
+      // لا ملف جديد (ربما صورة سابقة فقط)
+      toast('Kein neues Bild ausgewählt'); return;
+    }
+
+    // إذا كانت المعاينة DataURL → ارفعها؛ غير ذلك (ملف) ارفعه مباشرةً
+    let downloadUrl = null;
+    const path = `restaurants/${MV.uid}/branding/cover.jpg`;
+    const ref  = MV.st.ref(path);
+
+    if(file){
+      await ref.put(file);
+      downloadUrl = await ref.getDownloadURL();
+    }else if(rCoverPreview.src.startsWith('data:')){
+      // تحويل DataURL إلى Blob ورفعها
+      const [hdr,b64] = rCoverPreview.src.split(',');
+      const mime = /data:(.*?);base64/.exec(hdr)?.[1] || 'image/jpeg';
+      const bin = atob(b64); const u8 = new Uint8Array(bin.length);
+      for(let i=0;i<bin.length;i++) u8[i]=bin.charCodeAt(i);
+      await ref.put(new Blob([u8], {type:mime}));
+      downloadUrl = await ref.getDownloadURL();
+    }
+
+    if(!downloadUrl){ toast('Kein Bild gefunden'); return; }
+
+    // حفظ الرابط في وثيقة المطعم
+    const ts = firebase.firestore.FieldValue.serverTimestamp();
+    await MV.fs.collection('restaurants').doc(MV.uid).set({
+      coverUrl: downloadUrl, updatedAt: ts
+    }, { merge:true });
+
+    toast('Cover gespeichert');
+  }catch(err){
+    console.error(err);
+    toast('Fehler beim Speichern');
+  }
+});
+/* ============ Live-Promo (discount & ETA) ============ */
+const discMinus = document.getElementById('discMinus');
+const discPlus  = document.getElementById('discPlus');
+const discValue = document.getElementById('discValue');
+
+const etaMinus  = document.getElementById('etaMinus');
+const etaPlus   = document.getElementById('etaPlus');
+const etaValue  = document.getElementById('etaValue');
+
+const liveSave  = document.getElementById('liveSave');
+
+const clamp = (n,min,max)=> Math.max(min, Math.min(max, Number.isFinite(+n)? +n : 0));
+function setDisc(n){ discValue.value = clamp(n,0,50); }
+function setEta(n){  etaValue.value  = clamp(n,0,60); }
+
+// تحميل القيم الحالية من وثيقة المطعم
+mvOnAuthReady(async ()=>{
+  try{
+    const ref = MV.fs.collection('restaurants').doc(MV.uid);
+    const d   = await ref.get();
+    const x   = d.exists ? d.data() : {};
+    setDisc(x.discountPercent ?? 0);
+    setEta (x.etaExtraMinutes ?? 0);
+  }catch(e){ console.warn(e); }
+});
+
+// أزرار +/-
+discMinus?.addEventListener('click', ()=> setDisc(+discValue.value - 1));
+discPlus ?.addEventListener('click', ()=> setDisc(+discValue.value + 1));
+etaMinus ?.addEventListener('click', ()=> setEta(+etaValue.value - 5));
+etaPlus  ?.addEventListener('click', ()=> setEta(+etaValue.value + 5));
+
+// حفظ إلى وثيقة المطعم
+liveSave?.addEventListener('click', async ()=>{
+  try{
+    if(!MV?.uid){ toast('Nicht angemeldet'); return; }
+    const payload = {
+      discountPercent: clamp(discValue.value,0,50),
+      etaExtraMinutes: clamp(etaValue.value,0,60),
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    };
+    await MV.fs.collection('restaurants').doc(MV.uid).set(payload, { merge:true });
+    toast('Gespeichert');
+  }catch(e){
+    console.warn(e); toast('Fehler beim Speichern');
+  }
+});
+
+// === Topbar live toggles (safe, no null .checked) ===
+(function initLiveToggles(){
+  const ids = ['openNow','acceptOrders'];
+  ids.forEach(id=>{
+    const el = document.getElementById(id);
+    if(!el) return; // لو لم يوجد (صفحة قديمة) لا تفعل شيئًا
+
+    el.addEventListener('change', async (ev)=>{
+      try{
+        // لا تعتمد على عناصر أخرى؛ خذ القيمة من نفس الـinput أو الحدث
+        const isChecked = !!(ev?.target && 'checked' in ev.target ? ev.target.checked : el.checked);
+
+        // حدّث النسخة المحلية واحفظها
+        if(id === 'openNow')      { settings.openNow = isChecked; }
+        if(id === 'acceptOrders') { settings.acceptOrders = isChecked; }
+        save('settings');
+
+        // اكتب فورًا إلى وثيقة المطعم
+        if(!MV?.uid){ toast('Nicht angemeldet'); return; }
+        const ts = firebase.firestore.FieldValue.serverTimestamp();
+        const patch = (id === 'openNow')
+          ? { isOpen: isChecked, updatedAt: ts }
+          : { acceptOrders: isChecked, updatedAt: ts };
+
+        await MV.fs.collection('restaurants').doc(MV.uid).set(patch, { merge:true });
+
+        // Feedback صغير
+        if(id === 'openNow') toast(isChecked ? 'Status: Geöffnet' : 'Status: Geschlossen');
+        else                 toast(isChecked ? 'Bestellungen: AN' : 'Bestellungen: AUS');
+      }catch(err){
+        console.warn(err);
+        toast('Fehler beim Speichern');
+      }
+    }, { passive:true });
+  });
+})();
+
+
+
+
+
+/* ============ Export / Import ============ */
+$("#btnExport").addEventListener('click', ()=>{
+  const payload = { products, categories, groups, settings };
+  const blob = new Blob([JSON.stringify(payload,null,2)], {type:'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'restaurant-admin-export.json';
+  a.click();
+  URL.revokeObjectURL(a.href);
+});
+$("#imp").addEventListener('change', ()=>{
+  const f = $("#imp").files?.[0]; if(!f) return;
+  const rdr = new FileReader();
+  rdr.onload = ()=>{
+    try{
+      const obj = JSON.parse(rdr.result);
+      if(obj.products) products = obj.products;
+      if(obj.categories) categories = obj.categories;
+      if(obj.groups) groups = obj.groups;
+      if(obj.settings) settings = Object.assign(settings, obj.settings);
+      save('products'); save('categories'); save('groups'); save('settings');
+      fillCatSelect(); renderProducts(); renderCats(); renderGroups(); renderSettings();
+      toast('Import erfolgreich');
+    }catch{ toast('Import fehlgeschlagen'); }
+  };
+  rdr.readAsText(f);
+});
+
+/* ============ Helpers & Bindings ============ */
+function escapeHtml(s){ return String(s||'').replace(/[&<>"']/g, m=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[m])); }
+
+$("#addProduct").addEventListener('click', ()=> openProductModal(null));
+$("#addCategory").addEventListener('click', ()=> openCatModal(null));
+$("#addGroup").addEventListener('click', ()=> openGroupModal(null));
+
+$("#search").addEventListener('input', renderProducts);
+
+/* Settings icon focus scroll */
+$("#btnSettings").addEventListener('click', ()=>{
+  tabs.forEach(b=>b.classList.remove('active'));
+  document.querySelector('.tab-btn[data-tab="einstellungen"]').classList.add('active');
+  $$('#tab-produkte, #tab-kategorien, #tab-optionen, #tab-einstellungen').forEach(s=>s.classList.add('hidden'));
+  $('#tab-einstellungen').classList.remove('hidden');
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+});
+// Tags button + modal controls
+document.getElementById('btnTags')   ?.addEventListener('click', openTagsModal);
+document.getElementById('tagsClose') ?.addEventListener('click', closeTagsModal);
+document.getElementById('tagsCancel')?.addEventListener('click', closeTagsModal);
+document.getElementById('tagsSave')  ?.addEventListener('click', saveTagsModal);
+
+// حمّل الوسوم الحالية من وثيقة المطعم عند توفر الجلسة
+mvOnAuthReady(async ()=>{
+  try{
+    const snap = await MV.fs.collection('restaurants').doc(MV.uid).get();
+    const data = snap.exists ? snap.data() : {};
+    selectedTags = Array.isArray(data.marketTags) ? data.marketTags.slice(0, 24) : [];
+    renderTagsBadges();
+  }catch(e){ console.warn(e); }
+});
+
+/* Init */
+loadAll();
+fillCatSelect();
+renderProducts();
+renderCats();
+renderGroups();
+renderSettings();
+// Firebase: دخول مجهول + إنشاء وثيقة المطعم + دفع أولي للبيانات الموجودة
+// Cloud sync only if the user is signed-in as an approved restaurant
+
+
+/* === Robust Back Button === */
+(() => {
+  const el = document.getElementById('mvBack');
+  if (!el) return;
+
+  // 1) اقرأ ?back= من الـURL إن وُجد
+  const q = new URLSearchParams(location.search);
+  const backParam = q.get('back');
+
+  // 2) حدد مسار افتراضي في نفس المجلد الحالي
+  const basePath = location.pathname.replace(/[^/]+$/, '');
+  const defaultBack = backParam || (basePath + 'Taussil_Restaurant.html');
+
+  // عيّن href النهائي (حتى لو الجافاسكربت تعطّل يبقى شغّال)
+  el.setAttribute('href', defaultBack);
+
+  // 3) لو الصفحة فُتحت من نفس الـorigin والسجل يحتوي صفحة سابقة: ارجع تاريخيًا
+  el.addEventListener('click', (e) => {
+    try {
+      const hasRef = !!document.referrer;
+      const sameOriginRef = hasRef && new URL(document.referrer).origin === location.origin;
+
+      if (sameOriginRef) {
+        e.preventDefault();
+        history.back();           // رجوع حقيقي لنفس الصفحة التي فتحت الإدارة
+        return;
+      }
+
+      // لا referrer من نفس الأصل → اترك الرابط يعمل كما هو
+    } catch (_) {
+      // في حال أي خطأ، اترك المتصفح يتبع href كما هو
+    }
+  });
+})();
+
+
+</script>
+</body>
+</html>
