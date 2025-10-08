@@ -295,6 +295,77 @@ input[type="number"]{-moz-appearance:textfield;text-align:center;font-variant-nu
 .tabs-inline{display:flex;gap:6px;background:#fff;border:1px solid rgba(0,0,0,.08);border-radius:10px;padding:4px;margin-bottom:8px}
 .tab-btn{flex:1;height:36px;border-radius:8px;background:#fff;border:1px solid rgba(0,0,0,.12);cursor:pointer;font-weight:800}
 .tab-btn.active{background:linear-gradient(180deg,#33BBDF,#1da9cf);color:#fff;border:none;box-shadow:0 6px 18px rgba(29,169,207,.32)}
+/* ===== Underway pulse ===== */
+:root{
+  --pulse-color: #22c55e;   /* أخضر */
+  --pulse-radius: 12px;     /* نفس نصف قطر بطاقتك تقريبًا */
+}
+
+/* ===== Underway pulse (right list rows) ===== */
+:root{
+  --pulse-color: #22c55e;
+  --pulse-radius: 10px; /* يطابق border-radius ل .rowx */
+}
+
+/* بطاقات قائمة "Letzte Aufträge" */
+#lastList .rowx{ position: relative; }
+
+#lastList .rowx.is-underway::after{
+  content:"";
+  position:absolute;
+  inset:-2px;                 /* هالة خارجية رفيعة */
+  border-radius: var(--pulse-radius);
+  pointer-events:none;
+  box-shadow: 0 0 0 0 rgba(34,197,94,.45);
+  animation: taussil-pulse 1.6s ease-out infinite;
+  will-change: box-shadow, opacity;
+}
+
+@keyframes taussil-pulse{
+  0%   { box-shadow: 0 0 0 0   rgba(34,197,94,.45); opacity: 1; }
+  70%  { box-shadow: 0 0 0 14px rgba(34,197,94,0);  opacity: .9; }
+  100% { box-shadow: 0 0 0 0   rgba(34,197,94,0);   opacity: 1; }
+}
+
+/* تقليل الحركة */
+@media (prefers-reduced-motion: reduce){
+  #lastList .rowx.is-underway::after{
+    animation: none;
+    box-shadow: 0 0 0 3px rgba(34,197,94,.55);
+  }
+}
+/* ===== Driver pulsing marker (green dot + ring) ===== */
+.gm-driver{
+  position:absolute;
+  pointer-events:none;      /* لا يتعارض مع سحب/تكبير الخريطة */
+}
+.gm-driver .dot{
+  position:absolute; top:0; left:0;
+  width:15px; height:15px;              /* حجم النقطة */
+  background:#22c55e;                   /* أخضر */
+  border:2px solid #fff;                /* حافة بيضاء */
+  border-radius:50%;
+  box-shadow:0 1px 3px rgba(0,0,0,.25);
+  transform: translate(-50%,-50%);
+}
+.gm-driver .ring{
+  position:absolute; top:0; left:0;
+  width:20px; height:20px;
+  border-radius:50%;
+  background: rgba(34,197,94,.35);      /* أخضر شفّاف */
+  transform: translate(-50%,-50%);
+  animation: gmPulse 1.6s ease-out infinite;
+}
+@keyframes gmPulse{
+  0%   { opacity:.9; transform: translate(-50%,-50%) scale(1); }
+  70%  { opacity:0;  transform: translate(-50%,-50%) scale(2.6); }
+  100% { opacity:0;  transform: translate(-50%,-50%) scale(1); }
+}
+/* احترام تفضيل تقليل الحركة */
+@media (prefers-reduced-motion: reduce){
+  .gm-driver .ring{ animation: none; opacity:.5; }
+}
+
 
 </style>
 </head>
@@ -595,6 +666,15 @@ const rRegMsg      = $("#rRegMsg");
 
 /* Hidden defaults */
 const hiddenDefaults = { Restaurant_ID: null, Restaurant_Name: null, Restaurant_Adresse: null, Telefon: null };
+/* نبض للطلبات Unterwegs في قائمة اليمين */
+function markUnterwegsRows(){
+  if(!lastList) return;
+  lastList.querySelectorAll('.rowx').forEach(row=>{
+    const s = (row.dataset.status || '').trim();
+    const isDone = (s === 'Geliefert' || s === 'Abgebrochen');
+    row.classList.toggle('is-underway', s === 'Unterwegs' && !isDone);
+  });
+}
 
 /* ===== Tabs (login/register) ===== */
 function switchPane(which){
@@ -1150,21 +1230,25 @@ const l = Number(feeForView(o) || 0);
         return;
       }
       lastList.innerHTML = snap.docs.map(d=>{
-        const o=d.data()||{};
-        const plat = Array.isArray(o.platform)? o.platform.join(' / ') : (o.platform||'—');
-        const preis= money(Number(o.price||0));
-        const name = o.restaurant?.name || '—';
-        const qty  = Number(o.qty||0);
-        const nr   = (o.nr!=null ? `#${o.nr}` : '');
-        return `<div class="rowx" data-oid="${d.id}">
-          <div class="id">${d.id} ${nr}</div>
-          <div class="tag">${plat}</div>
-          <div style="flex:1"></div>
-          <div>${name}</div>
-          <div>${qty>0? qty : ''}</div>
-          <div>${preis}</div>
-        </div>`;
-      }).join('');
+  const o=d.data()||{};
+  const plat = Array.isArray(o.platform)? o.platform.join(' / ') : (o.platform||'—');
+  const preis= money(Number(o.price||0));
+  const name = o.restaurant?.name || '—';
+  const qty  = Number(o.qty||0);
+  const nr   = (o.nr!=null ? `#${o.nr}` : '');
+  /* ⬅️ أضفنا data-status */
+  return `<div class="rowx" data-oid="${d.id}" data-status="${o.status||''}">
+    <div class="id">${d.id} ${nr}</div>
+    <div class="tag">${plat}</div>
+    <div style="flex:1"></div>
+    <div>${name}</div>
+    <div>${qty>0? qty : ''}</div>
+    <div>${preis}</div>
+  </div>`;
+}).join('');
+/* ⬅️ بعد الرندر مباشرة */
+markUnterwegsRows();
+
       snap.docChanges().forEach(ch=>{
         const id = ch.doc.id; const o = ch.doc.data()||{};
         const prev = ORDER_CACHE.get(id)?.status;
@@ -1391,16 +1475,15 @@ function updateMapAndDistance(dLat, dLng){
 
   const rot = headingDeg(prevLL, nextLL);
   if(!window.__driverMarker){
-    window.__driverMarker = new google.maps.Marker({
-      map,
-      position: nextLL,
-      icon: driverArrowIcon(rot),
-      title: 'Driver'
-    });
-  } else {
-    window.__driverMarker.setIcon(driverArrowIcon(rot));
-    window.__driverMarker.setPosition(nextLL);
-  }
+  // دائرة خضراء مع نبض
+  window.__driverMarker = new (window.PulsingMarker)(
+    { lat: nextLL.lat(), lng: nextLL.lng() },
+    map
+  );
+} else if (window.__driverMarker.setPosition){
+  window.__driverMarker.setPosition({ lat: nextLL.lat(), lng: nextLL.lng() });
+}
+
 
   lastDriverPos = { lat: nextLL.lat(), lng: nextLL.lng() };
 
@@ -1635,6 +1718,42 @@ if (liveChk) {
       renderMapInfo(null, null);
     }
   });
+}
+// === TAUSSIL-PATCH: Pulsing driver marker (HTML Overlay) ===
+if(!window.PulsingMarker){
+  class PulsingMarker extends google.maps.OverlayView{
+    constructor(position, map){
+      super();
+      this.position = new google.maps.LatLng(position);
+      this.div = null;
+      this.setMap(map);
+    }
+    onAdd(){
+      const div = document.createElement('div');
+      div.className = 'gm-driver';
+      const ring = document.createElement('div'); ring.className='ring';
+      const dot  = document.createElement('div'); dot.className='dot';
+      div.appendChild(ring); div.appendChild(dot);
+      this.div = div;
+      // فوق الطبقات الأخرى، بدون اعتراض للأحداث
+      this.getPanes().overlayMouseTarget.appendChild(div);
+    }
+    draw(){
+      if(!this.div) return;
+      const proj = this.getProjection();
+      const pt = proj && proj.fromLatLngToDivPixel(this.position);
+      if(pt){
+        this.div.style.left = pt.x + 'px';
+        this.div.style.top  = pt.y + 'px';
+      }
+    }
+    onRemove(){ this.div?.remove(); this.div = null; }
+    setPosition(latlng){
+      this.position = new google.maps.LatLng(latlng);
+      this.draw();
+    }
+  }
+  window.PulsingMarker = PulsingMarker;
 }
 
   ensureRestaurantGeocoded();
