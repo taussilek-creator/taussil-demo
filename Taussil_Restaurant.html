@@ -113,6 +113,7 @@ html,body{margin:0;padding:0;height:100dvh;background:var(--bg);color:var(--ink)
   gap:var(--gap);
   height:100dvh;
   padding:var(--gap);
+  padding-bottom: calc(var(--gap) + 16px + env(safe-area-inset-bottom, 0px));
 }
 
 .panel{background:var(--card);border:var(--border);border-radius:var(--radius);box-shadow:var(--shadow);display:flex;flex-direction:column;min-height:0}
@@ -517,7 +518,6 @@ input[type="number"]{-moz-appearance:textfield;text-align:center;font-variant-nu
           <div class="trip-row"><div class="k">Status</div><div class="v" id="tripStatus">—</div></div>
           <div class="trip-row"><div class="k">Auftrag-ID</div><div class="v" id="tripOrderId">—</div></div>
           <div class="trip-row"><div class="k">ETM (zum Restaurant)</div><div class="v countdown" id="tripETM">--:--</div></div>
-          <div class="trip-row"><div class="k">Distanz</div><div class="v" id="tripDistance">— km</div></div>
           <div class="trip-row"><div class="k">Liefergebühr</div><div class="v" id="tripDeliveryFee">0,00€</div></div>
         </div>
       </div>
