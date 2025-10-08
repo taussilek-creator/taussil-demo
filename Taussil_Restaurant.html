@@ -366,7 +366,121 @@ input[type="number"]{-moz-appearance:textfield;text-align:center;font-variant-nu
 @media (prefers-reduced-motion: reduce){
   .gm-driver .ring{ animation: none; opacity:.5; }
 }
+/* ===== Order Details (DL layout • aligned labels with colon) ===== */
+.od-dl{
+  /* اضبط عرض عمود التسميات من هنا عند الحاجة */
+  --od-label-w: 180px;
 
+  display: grid;
+  grid-template-columns: var(--od-label-w) 1fr;
+  gap: 8px 16px;
+  align-items: start;
+}
+
+.od-dl dt{
+  justify-self: end;            /* محاذاة المسمّى لليمين */
+  font-weight: 700;
+  color: #374151;
+  position: relative;
+  white-space: nowrap;          /* المسمّى لا يلف */
+}
+
+/* نقطتان بعد المسمّى مع مسافة أنيقة */
+.od-dl dt::after{
+  content: " :";
+  color: #9ca3af;
+  margin-left: 8px;
+}
+
+.od-dl dd{
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+  /* عرض القيمة بشكل طبيعي (بدون قصّ) */
+  white-space: normal;
+  overflow-wrap: anywhere;      /* لو القيمة طويلة (IDs / عناوين) */
+}
+
+/* عنوان فرعي للقوائم (مثل Stops) */
+.od-subttl{
+  font-weight: 800;
+  margin: 12px 0 6px;
+}
+
+/* استجابة — على الشاشات الضيقة نجعلها سطرين: المسمّى فوق والقيمة تحت */
+@media (max-width: 560px){
+  .od-dl{
+    grid-template-columns: 1fr;
+    gap: 6px 0;
+  }
+  .od-dl dt{
+    justify-self: start;
+  }
+  .od-dl dt::after{
+    content: ":";               /* نقطتان مباشرة بلا مسافة كبيرة */
+    margin-left: 6px;
+  }
+}
+/* ===== PATCH: Order Details fixes (apply after your .od-dl block) ===== */
+
+/* 1) محاذاة العناوين من اليسار → اليمين + نقطتان ملاصقتان */
+.od-dl dt{
+  justify-self: start !important;
+  text-align: left !important;
+}
+.od-dl dt::after{
+  content: ":" !important;
+  margin-left: 6px !important;
+}
+
+/* 2) إخفاء زر X العلوي داخل منبثق التفاصيل فقط (نغطي عدة IDs محتملة) */
+#detailsModal .box > .row:first-child button,
+#orderDetailsModal .box > .row:first-child button,
+#odModal .box > .row:first-child button,
+#order-modal .box > .row:first-child button {   /* لو كان هذا هو الـID المستعمل */
+  display: none !important;
+}
+
+/* 3) إبقاء زر Schließen ظاهرًا دائمًا — تمرير داخلي بدون عمود سكرول ظاهر */
+#detailsModal .box,
+#orderDetailsModal .box,
+#odModal .box,
+#order-modal .box{
+  display: flex !important;
+  flex-direction: column !important;
+  max-height: 88vh !important;
+  overflow: hidden !important;     /* نخفي سكرول الصندوق */
+  padding-bottom: 10px !important; /* مساحة لزر الإغلاق */
+}
+
+/* اجعل قائمة التفاصيل نفسها هي منطقة التمرير الداخلية */
+#detailsModal .od-dl,
+#orderDetailsModal .od-dl,
+#odModal .od-dl,
+#order-modal .od-dl{
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  overflow: auto !important;
+  scrollbar-width: none;           /* Firefox */
+  -ms-overflow-style: none;        /* IE/Edge */
+}
+#detailsModal .od-dl::-webkit-scrollbar,
+#orderDetailsModal .od-dl::-webkit-scrollbar,
+#odModal .od-dl::-webkit-scrollbar,
+#order-modal .od-dl::-webkit-scrollbar{
+  width: 0; height: 0;             /* WebKit */
+}
+
+/* لو عندك شريط أزرار سفلي داخل المنبثق (od-actions)، ثبّته */
+#detailsModal .od-actions,
+#orderDetailsModal .od-actions,
+#odModal .od-actions,
+#order-modal .od-actions{
+  position: sticky;
+  bottom: 0;
+  background: #fff;
+  padding-top: 8px;
+  margin-top: 8px;
+}
 
 </style>
 </head>
@@ -436,6 +550,22 @@ input[type="number"]{-moz-appearance:textfield;text-align:center;font-variant-nu
     <div class="field-actions">
       <button id="expPrint" class="btn-mini" type="button">Drucken</button>
       <button id="expPDF"   class="btn-mini" type="button">PDF</button>
+    </div>
+  </div>
+</div>
+<!-- ===== Order Details Modal ===== -->
+<div id="orderDetailModal" class="modal white" style="display:none">
+  <div class="box" role="dialog" aria-modal="true" aria-labelledby="orderDetailTitle">
+    <div id="orderDetailHead" class="row" style="justify-content:space-between;align-items:center">
+      <strong id="orderDetailTitle">Auftragsdetails</strong>
+    
+    </div>
+    <div class="od-scroll">
+      <div id="orderDetailBody" class="od-grid"></div>
+      <div id="odStopsWrap" style="padding-top:8px"></div>
+    </div>
+    <div style="padding-top:8px; display:flex; justify-content:center">
+      <button id="orderDetailOk" class="btn btn-ghost" style="height:36px">Schließen</button>
     </div>
   </div>
 </div>
@@ -2000,6 +2130,175 @@ const l = Number(feeForView(o) || 0);
       return true;
     });
   }
+  // ===== Order Details: DL layout + draggable modal (robust) =====
+const orderDetailModal = document.getElementById('orderDetailModal');
+const orderDetailClose = document.getElementById('orderDetailClose');
+const orderDetailOk    = document.getElementById('orderDetailOk');
+const orderDetailBody  = document.getElementById('orderDetailBody');
+const odStopsWrap      = document.getElementById('odStopsWrap');
+const orderDetailHead  = document.getElementById('orderDetailHead');
+
+function showDetailModal(on=true){
+  if(!orderDetailModal) return;
+  orderDetailModal.style.display = on ? 'flex' : 'none';
+  if(on){
+    const box = orderDetailModal.querySelector('.box');
+    if(box){
+      box.style.position = 'fixed';
+      box.style.top  = '10vh';
+      box.style.left = '50%';
+      box.style.transform = 'translateX(-50%)';
+    }
+  }
+}
+
+const moneyDE = n => (Number(n||0)).toLocaleString('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2})+'€';
+const kmDE    = n => (typeof n==='number' && isFinite(n)) ? `${n.toFixed(2)} km` : '—';
+const arrJoin = v => Array.isArray(v) ? v.join(' / ') : (v ?? '—');
+const toDateMaybe = v => (v && typeof v.toDate==='function') ? v.toDate() : (v instanceof Date ? v : null);
+const deDate = d => { try{ return d ? d.toLocaleString('de-DE') : '—'; }catch{ return '—'; } };
+const num    = v => (Number.isFinite(Number(v)) ? Number(v) : 0);
+
+// HTML helper
+function dtdd(k, v){ return `<dt>${k}</dt><dd>${(v ?? '—')}</dd>`; }
+
+// يبني DL منظّم من الحقول (بدون driver.*)
+function buildOrderDL(oid, o){
+  const created = toDateMaybe(o?.createdAt);
+  const updated = toDateMaybe(o?.updatedAt);
+  // عرض الرسوم: serviceFee أولاً ثم deliveryFee ثم distanceFee
+  const feeService = num(o?.serviceFee);
+  const feeDeliv   = num(o?.deliveryFee);
+  const feeDist    = num(o?.distanceFee);
+
+  return `
+  <dl class="od-dl">
+    ${dtdd('Order ID', oid)}
+    ${dtdd('Nr', o?.nr ?? '—')}
+    ${dtdd('Status', o?.status ?? '—')}
+    ${dtdd('Plattform(en)', arrJoin(o?.platform))}
+    ${dtdd('Qty', num(o?.qty))}
+    ${dtdd('Preis', moneyDE(num(o?.price)))}
+
+    ${dtdd('Service Fee',   moneyDE(feeService))}
+    ${dtdd('Liefergebühr',  moneyDE(feeDeliv))}
+    ${dtdd('Distance Fee',  moneyDE(feeDist))}
+
+    ${dtdd('Distanz (gesamt)',    kmDE(o?.distance_km_total))}
+    ${dtdd('Distanz (berechnet)', kmDE(o?.distance_km_billable))}
+
+    ${dtdd('Stops gesamt',    num(o?.stops_total ?? o?.qty))}
+    ${dtdd('Stops geliefert', num(o?.stops_delivered))}
+
+    ${dtdd('Abholzeit', o?.pickupTime ?? '—')}
+    ${dtdd('ETM Target (ms)', (o?.etmTargetMs ?? o?.ETM_Target ?? '—'))}
+
+    ${dtdd('Erstellt',    deDate(created))}
+    ${dtdd('Aktualisiert',deDate(updated))}
+
+
+  </dl>`;
+}
+
+async function openOrderDetails(oid){
+  if(!oid || !orderDetailModal || !orderDetailBody) return;
+  orderDetailBody.innerHTML = `<div class="small">Laden…</div>`;
+  odStopsWrap.innerHTML = '';
+  showDetailModal(true);
+
+  try{
+    const ds = await getDoc(doc(db,'orders', oid));
+    if(!ds.exists()){
+      orderDetailBody.innerHTML = `<div class="small">— Auftrag nicht gefunden —</div>`;
+      return;
+    }
+    const o = ds.data() || {};
+
+    // ✅ تفاصيل مرتبة (بدون driver.*)
+    orderDetailBody.innerHTML = buildOrderDL(oid, o);
+
+    // Stops (إن وجدت)
+    try{
+      const stSnap = await getDocs(collection(db,'orders', oid, 'stops'));
+      if(!stSnap.empty){
+        const rows = [];
+        stSnap.forEach(s=>{
+          const it = s.data() || {};
+          rows.push({
+            platform: it.platform || '—',
+            price: moneyDE(num(it.price)),
+            status: it.status || '—'
+          });
+        });
+        odStopsWrap.innerHTML = `
+          <div class="od-subttl">Stops</div>
+          <div class="grid" style="grid-template-columns:1fr auto auto; gap:8px; align-items:center">
+            <div class="small" style="color:#6b7280">Plattform</div>
+            <div class="small" style="color:#6b7280">Preis</div>
+            <div class="small" style="color:#6b7280">Status</div>
+            ${rows.map(it => `
+              <div>${it.platform}</div>
+              <div class="mono" style="font-weight:700">${it.price}</div>
+              <div><span class="log-tag">${it.status}</span></div>
+            `).join('')}
+          </div>
+        `;
+      }
+    }catch(_){ /* ignore */ }
+
+  }catch(e){
+    orderDetailBody.innerHTML = `<div class="small">Fehler beim Laden.</div>`;
+    console.error(e);
+  }
+}
+
+// ربط زر Details داخل قائمة السجل
+logList && logList.addEventListener('click', (e)=>{
+  const btn = e.target.closest('.log-details');
+  if(btn){
+    const oid = btn.getAttribute('data-oid');
+    openOrderDetails(oid);
+  }
+});
+
+// إغلاق المودال
+[orderDetailClose, orderDetailOk].forEach(b => b && b.addEventListener('click', ()=> showDetailModal(false)));
+orderDetailModal && orderDetailModal.addEventListener('click', (e)=>{
+  if(e.target === orderDetailModal) showDetailModal(false);
+});
+
+/* Draggable via header (pointer events) */
+(function enableDragDetailModal(){
+  if(!orderDetailModal || !orderDetailHead) return;
+  const box = orderDetailModal.querySelector('.box');
+  if(!box) return;
+
+  let dragging = false, sx=0, sy=0, bx=0, by=0, pid=0;
+  const clamp = (v,min,max)=> Math.max(min, Math.min(max, v));
+
+  orderDetailHead.addEventListener('pointerdown', (ev)=>{
+    dragging = true; pid = ev.pointerId;
+    orderDetailHead.setPointerCapture(pid);
+    const rect = box.getBoundingClientRect();
+    bx = rect.left; by = rect.top; sx = ev.clientX; sy = ev.clientY;
+    box.style.position = 'fixed'; box.style.transform = 'none';
+    ev.preventDefault();
+  });
+  orderDetailHead.addEventListener('pointermove', (ev)=>{
+    if(!dragging) return;
+    const dx = ev.clientX - sx, dy = ev.clientY - sy;
+    const left = clamp(bx + dx, 8, window.innerWidth  - 40);
+    const top  = clamp(by + dy, 8, window.innerHeight - 40);
+    box.style.left = `${left}px`; box.style.top  = `${top}px`;
+  });
+  function stopDrag(){
+    if(!dragging) return; dragging = false;
+    try{ orderDetailHead.releasePointerCapture(pid); }catch(_){}
+  }
+  orderDetailHead.addEventListener('pointerup', stopDrag);
+  orderDetailHead.addEventListener('pointercancel', stopDrag);
+})();
+
   function startOfDay(d){ const x=new Date(d); x.setHours(0,0,0,0); return x; }
   function endOfDay(d){ const x=new Date(d); x.setHours(23,59,59,999); return x; }
   function render(){
@@ -2009,6 +2308,7 @@ const l = Number(feeForView(o) || 0);
       logList.innerHTML = `<div class="small" style="opacity:.8">— Keine Aufträge —</div>`;
       return;
     }
+
 	  // === Export helper for PDF/Print: FULL row data with many optional fields ===
 window.__restExportGetData = function(){
   const filtered = applyFilters(ALL);
@@ -2091,15 +2391,22 @@ const fee     = money(feeNum);
       const dt    = (o.updatedAt?.toDate?.() || o.createdAt?.toDate?.() || null);
       const dtStr = dateISO(dt);
       return `
-        <div class="log-row">
-          <div class="log-id">${id} ${nr}</div>
-          <div>${rest} · ${plat}<div class="small" style="opacity:.8">${dtStr}</div></div>
-          <div class="log-tag">${st}</div>
-          <div>Qty ${qty}</div>
-          <div>${price}</div>
-          <div>${fee}</div>
-        </div>
-      `;
+  <div class="log-row">
+    <div class="log-id">${id} ${nr}</div>
+    <div>
+      ${rest} · ${plat}
+      <div class="small" style="opacity:.8">${dtStr}</div>
+    </div>
+    <div class="log-tag">${st}</div>
+    <div>Qty ${qty}</div>
+    <div>${price}</div>
+    <div>${fee}</div>
+    <div style="text-align:right">
+      <button class="btn-mini log-details" data-oid="${id}" type="button">Details</button>
+    </div>
+  </div>
+`;
+
     }).join('');
   }
   [logFrom, logTo, logProvider].forEach(el=>{
