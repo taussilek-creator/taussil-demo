@@ -414,6 +414,19 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
   display:flex; flex-direction:column; align-items:flex-end; gap:6px;
 }
 .cart-right .q{ display:flex; gap:6px; align-items:center }
+/* Inline row for first 3 filters (mobile-friendly) */
+.filters-inline{
+  display:flex; align-items:center; gap:8px;
+  width:100%; overflow:auto; scrollbar-width:none;
+}
+.filters-inline::-webkit-scrollbar{ display:none }
+
+/* Tighten selects for the row */
+.filters-inline .select{ height:40px; }
+@media (max-width:720px){
+  .filters-inline .select#sort{ min-width:130px }
+  .filters-inline .select#city{ min-width:120px }
+}
 
 </style>
 
@@ -453,19 +466,22 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
   </div>
 
   <!-- Filters -->
-  <div class="filters-bar">
-    <button class="chip" data-chip="open">Jetzt geöffnet</button>
+<div class="filters-bar">
+  <div class="filters-inline">
+    <button class="chip" data-chip="open">Offen</button>
     <select id="sort" class="select">
       <option value="rec">Empfohlen</option>
       <option value="rate">Beste Bewertung</option>
       <option value="fast">Schnellste Zustellung</option>
       <option value="lowfee">Geringe Liefergebühr</option>
     </select>
-    <select id="city" class="select" style="min-width:160px">
-      <option value="">Alle Städte</option>
+    <select id="city" class="select" style="min-width:120px">
+      <option value="">Ort</option>
     </select>
-    <input id="q" class="input" placeholder="Restaurant suchen …" style="flex:1;min-width:200px">
   </div>
+  <input id="q" class="input" placeholder="Restaurant suchen …" style="flex:1;min-width:200px">
+</div>
+
 
   <!-- Grid -->
   <section class="card">
@@ -510,7 +526,7 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
 <!-- PRODUCT DEALS GRID (no slider) -->
 <section id="grid-prod-deals" class="card hidden">
   <div class="section-head">
-    <div class="title">💸 Angebote auf Produkte</div>
+    <div class="title">🔥 Angebote</div>
     <div class="small">Artikel mit Rabatt</div>
   </div>
   <div id="prodDealsGrid" class="pgrid"></div>
@@ -575,7 +591,7 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
 /* ===== i18n ===== */
 const I18N = {
   de:{
-    restaurants:"Restaurants", openNow:"Jetzt geöffnet", search:"Restaurant suchen …", allCities:"Alle Städte",
+    restaurants:"Restaurants", openNow:"geöffnet", search:"Restaurant suchen …", allCities:"Ort",
     sort:{rec:"Empfohlen",rate:"Beste Bewertung",fast:"Schnellste Zustellung",lowfee:"Geringe Liefergebühr"},
     menu:"Menü", viewMenu:"Zur Speisekarte", open:"Geöffnet", closed:"Geschlossen", promo:"Aktion", add:"Hinzufügen",
     cart:n=>`Warenkorb (${n})`, cartTitle:"Warenkorb", emptyCart:"Warenkorb ist leer",
