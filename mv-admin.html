@@ -214,6 +214,18 @@ hr.sep{ border:0; border-top:1px solid rgba(0,0,0,.12); margin:8px 0 }
 @media (max-width: 720px){
   .btn, a.btn, .btn-ghost, .btn-cta{ font-weight: 700; }
 }
+/* === Product discount price styles === */
+.price-old{
+  text-decoration: line-through;
+  color:#9ca3af;
+  font-weight:700;
+}
+.price-new{
+  color:#dc2626;   /* ← هذا هو الأحمر */
+  font-weight:800;
+}
+
+.price-eur{ letter-spacing:.2px; }
 
 </style>
 <!-- Firebase (Compat CDN – يعمل بدون type="module" ويحترم سكربتك الحالي) -->
@@ -490,6 +502,34 @@ hr.sep{ border:0; border-top:1px solid rgba(0,0,0,.12); margin:8px 0 }
           <textarea id="pDesc" placeholder="Kurzbeschreibung …"></textarea>
         </div>
       </div>
+	  <!-- Rabatt pro Produkt -->
+<div class="row" style="grid-template-columns:1fr">
+  <div class="card" style="display:flex;flex-direction:column;gap:8px">
+    <label class="small" style="display:flex;align-items:center;gap:8px">
+      <input type="checkbox" id="pDiscActive">
+      <span>Rabatt für dieses Produkt aktivieren</span>
+    </label>
+
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      <select id="pDiscType" class="input" style="width:160px;height:var(--hit)">
+        <option value="percent">% Prozent</option>
+        <option value="amount">€ Betrag</option>
+      </select>
+      <input id="pDiscValue" class="input" type="number" min="0" step="0.01" style="width:140px" placeholder="z.B. 20">
+      <div class="small" style="opacity:.85">
+        Prozent: 20 ⇒ 20% Rabatt · Betrag: 3 ⇒ 3,00 € Rabatt
+      </div>
+    </div>
+
+    <div>
+      <div class="small">Preis-Vorschau</div>
+      <div id="pPricePreview" style="display:flex;gap:10px;align-items:baseline">
+        <span class="price-eur price-new">— €</span>
+      </div>
+    </div>
+  </div>
+</div>
+
 	  <!-- Größen (optional) -->
 <div class="row" style="grid-template-columns:1fr">
   <div class="card">
@@ -639,8 +679,6 @@ function loadAll(){
   try{ categories = JSON.parse(localStorage.getItem(LS.categories)||'[]'); }catch{ categories=[]; }
   try{ groups = JSON.parse(localStorage.getItem(LS.groups)||'[]'); }catch{ groups=[]; }
   try{ settings = Object.assign(settings, JSON.parse(localStorage.getItem(LS.settings)||'{}')); }catch{}
-  // Seed minimal if empty
-  if(categories.length===0){ categories = [{id:uid(), name:"Pizza", sort:10}, {id:uid(), name:"Getränke", sort:20}]; save('categories'); }
 }
 function save(key){
   if(key==='products') localStorage.setItem(LS.products, JSON.stringify(products));
@@ -654,8 +692,10 @@ const MV = {
   fs: firebase.firestore(),
   st: firebase.storage(),
   uid: null,
-  timers: {}
+  timers: {},
+  readyToSync: false   // نتأكد أننا سحبنا الحقيقة أولًا
 };
+
 
 // استخدم جلسة المطعم الموجودة (لا نسجل مجهول)
 function mvOnAuthReady(cb){
@@ -666,9 +706,11 @@ function mvOnAuthReady(cb){
 
 // تجميع عمليات الحفظ (debounce)
 function mvQueueSync(key){
+  if (!MV.readyToSync) return;           // لا push قبل mvPullAll
   clearTimeout(MV.timers[key]);
   MV.timers[key] = setTimeout(()=> mvPush(key).catch(console.warn), 400);
 }
+
 
 // رفع الصورة لو كانت dataURL
 async function mvUploadDataUrlIfNeeded(uid, p){
@@ -687,6 +729,65 @@ async function mvUploadDataUrlIfNeeded(uid, p){
   }
   return url;
 }
+// يسحب الحقيقة من فايرستور إلى الذاكرة (والـLS ككاش فقط)
+async function mvPullAll(){
+  if (!MV.uid) return;
+  const base = MV.fs.collection('restaurants').doc(MV.uid);
+
+  // categories
+  let remoteCats = [];
+  try{
+    const snap = await base.collection('categories').get();
+    remoteCats = snap.docs.map(d => ({ id:d.id, ...(d.data()||{}) }))
+                          .map(c => ({ id:c.id, name:c.name||'', sort:+(c.sort||0) }));
+  }catch(e){ console.warn('pull categories:', e); }
+
+  // option_groups
+  let remoteGroups = [];
+  try{
+    const snap = await base.collection('option_groups').get();
+    remoteGroups = snap.docs.map(d => ({ id:d.id, ...(d.data()||{}) }))
+                            .map(g => ({
+                              id:g.id,
+                              name:g.name||'',
+                              type:(g.type==='multi'?'multi':'single'),
+                              min:+(g.min||0),
+                              max:(g.max==null? null : +g.max),
+                              options:Array.isArray(g.items)? g.items.map(o=>({name:o.name||'', price:+(o.priceDelta||0)})) : []
+                            }));
+  }catch(e){ console.warn('pull groups:', e); }
+
+  // products
+  let remoteProducts = [];
+  try{
+    const snap = await base.collection('products').get();
+    remoteProducts = snap.docs.map(d => ({ id:d.id, ...(d.data()||{}) }))
+                              .map(p => ({
+                                id: p.id,
+                                name: p.name || '',
+                                desc: p.desc || '',
+                                price: +(p.priceBase ?? p.price ?? 0),
+                                priceFinal: +(p.priceFinal ?? p.price ?? 0),
+                                discount: (typeof p.discount === 'object' && p.discount)
+                                  ? { active: !!p.discount.active, type: (p.discount.type==='amount'?'amount':'percent'), value:+(p.discount.value||0) }
+                                  : { active:false, type:'percent', value:0 },
+                                active: !!p.isAvailable,
+                                cat: p.categoryId || null,
+                                groups: Array.isArray(p.optionGroupIds) ? p.optionGroupIds : [],
+                                sizes: Array.isArray(p.sizes) ? p.sizes.map(s=>({ name:s.name||'', priceDelta:+(s.priceDelta||0) })) : [],
+                                img: Array.isArray(p.images) && p.images[0] ? p.images[0] : null,
+                                createdAt: p.createdAt || Date.now()
+                              }));
+  }catch(e){ console.warn('pull products:', e); }
+
+  // الحقيقة ← إلى الذاكرة ثم نحفظها في LS ككاش (بدون seeding)
+  categories = remoteCats;
+  groups     = remoteGroups;
+  products   = remoteProducts;
+
+  save('categories'); save('groups'); save('products');
+  fillCatSelect(); renderCats(); renderGroups(); renderProducts();
+}
 
 // دفع البيانات إلى Firestore تحت restaurants/{uid}/...
 async function mvPush(key){
@@ -702,6 +803,16 @@ async function mvPush(key){
       batch.set(ref, { name:c.name, sort:+(c.sort||0), updatedAt: ts }, { merge:true });
     });
     await batch.commit();
+	    // --- PRUNE REMOTE categories that are not present locally ---
+    try{
+      const base = MV.fs.collection('restaurants').doc(MV.uid);
+      const localIds = new Set(categories.map(c => c.id));
+      const snap = await base.collection('categories').get();
+      const toDelete = [];
+      snap.forEach(d => { if(!localIds.has(d.id)) toDelete.push(d.id); });
+      await Promise.all(toDelete.map(cid => base.collection('categories').doc(cid).delete()));
+    }catch(e){ console.warn('categories prune skipped:', e); }
+
     return;
   }
 
@@ -717,32 +828,54 @@ async function mvPush(key){
       }, { merge:true });
     });
     await batch.commit();
+	    // --- PRUNE REMOTE option_groups that are not present locally ---
+    try{
+      const base = MV.fs.collection('restaurants').doc(MV.uid);
+      const localIds = new Set(groups.map(g => g.id));
+      const snap = await base.collection('option_groups').get();
+      const toDelete = [];
+      snap.forEach(d => { if(!localIds.has(d.id)) toDelete.push(d.id); });
+      await Promise.all(toDelete.map(gid => base.collection('option_groups').doc(gid).delete()));
+    }catch(e){ console.warn('groups prune skipped:', e); }
+
     return;
   }
 
   if(key==='products'){
   // 1) ارفع/حدّث كل المنتجات الحالية
   for(const p of products){
-    const imgUrl = await mvUploadDataUrlIfNeeded(MV.uid, p);
-    await base.collection('products').doc(p.id).set({
-      name: p.name,
-      desc: p.desc || '',
-      price: +(p.price||0),
-      isAvailable: !!p.active,
-      categoryId: p.cat || null,
-      optionGroupIds: p.groups || [],
-	  sizes: Array.isArray(p.sizes)
-  ? p.sizes.map(s => ({
-      name: s.name || '',
-      priceDelta: Number(s.priceDelta||0)
-    }))
-  : [],
+  const imgUrl = await mvUploadDataUrlIfNeeded(MV.uid, p);
 
-      images: imgUrl ? [imgUrl] : [],
-      createdAt: p.createdAt ? new Date(p.createdAt) : ts,
-      updatedAt: ts
-    }, { merge:true });
-  }
+  // خصم + سعر نهائي
+  const priceBase = +(p.price||0);
+  const d = p?.discount || {};
+  const dActive = !!d.active && Number(d.value||0) > 0;
+  const dType   = (d.type==='amount') ? 'amount' : 'percent';
+  const dVal    = Number(d.value||0);
+  const priceFinal = dActive
+    ? (dType==='percent' ? Math.max(0, priceBase - (priceBase*(dVal/100))) : Math.max(0, priceBase - dVal))
+    : priceBase;
+
+  await base.collection('products').doc(p.id).set({
+    name: p.name,
+    desc: p.desc || '',
+    price: priceBase,                       // لا نكسر العميل الحالي
+    priceBase: priceBase,                   // تخزين واضح للأساسي
+    priceFinal: +(+priceFinal).toFixed(2),  // النهائي بعد الخصم
+    discount: { active: dActive, type: dType, value: dVal },
+
+    isAvailable: !!p.active,
+    categoryId: p.cat || null,
+    optionGroupIds: p.groups || [],
+    sizes: Array.isArray(p.sizes)
+      ? p.sizes.map(s => ({ name: s.name || '', priceDelta: Number(s.priceDelta||0) }))
+      : [],
+    images: imgUrl ? [imgUrl] : [],
+    createdAt: p.createdAt ? new Date(p.createdAt) : ts,
+    updatedAt: ts
+  }, { merge:true });
+}
+
 
   // 2) نظّف أي وثائق موجودة على السحابة ليست ضمن القائمة المحلية
   try{
@@ -791,8 +924,15 @@ async function mvDeleteProduct(pid){
   })();
 })();
 
-// دفع أولي بعد توفر الجلسة (مطعم مسجّل ومعتمد)
-mvOnAuthReady(()=> ['categories','groups','products'].forEach(mvQueueSync));
+// الحقيقة من فايرستور أولًا ثم نسمح بالدفع والحذف (prune) طبيعيًا
+mvOnAuthReady(async ()=>{
+  try{
+    await mvPullAll();      // يعرض الواقع من فايرستور بغض النظر عن البيئة
+  }finally{
+    MV.readyToSync = true;  // الآن أي حفظ لاحق يدفع إلى السحابة
+  }
+});
+
 
 const uid = ()=> 'id_'+Math.random().toString(36).slice(2,9);
 
@@ -815,6 +955,32 @@ function eur(n){
   const x = Number(n||0);
   try{ return new Intl.NumberFormat('de-DE',{style:'currency',currency:'EUR'}).format(x); }catch{ return x.toFixed(2)+' €'; }
 }
+function computeDiscounted(base, type, value){
+  base  = Number(base)||0;
+  value = Number(value)||0;
+  if(base<=0) return { final:0, cut:0 };
+  let cut = 0;
+  if(type==='percent') cut = Math.min(base, base*(value/100));
+  else cut = Math.min(base, value);
+  const final = Math.max(0, base - cut);
+  return { final, cut };
+}
+
+function renderProductPriceHtml(p){
+  const base  = Number(p?.price||0);
+  const d     = p?.discount || {};
+  const active= !!d.active && Number(d.value||0) > 0;
+  if(!active){
+   return `<span class="price-eur">${eur(base)}</span>`;
+  }
+  const { final } = computeDiscounted(base, d.type||'percent', Number(d.value||0));
+  // نعرض السعرين (حتى لو عنده sizes — هذا عمود "السعر الأساسي")
+  return `
+    <span class="price-eur price-old">${eur(base)}</span>
+    <span class="price-eur price-new">${eur(final)}</span>
+  `;
+}
+
 function catName(id){ return categories.find(c=>c.id===id)?.name || '—'; }
 
 function renderProducts(){
@@ -830,7 +996,8 @@ function renderProducts(){
         <td>${p.img ? `<img class="thumb" src="${p.img}" alt="">` : `<span class="pill">Kein Bild</span>`}</td>
         <td><strong>${escapeHtml(p.name||'')}</strong><div class="small">${escapeHtml(p.desc||'')}</div></td>
         <td>${escapeHtml(catName(p.cat))}</td>
-        <td>${eur(p.price)}</td>
+        <td>${renderProductPriceHtml(p)}</td>
+
         <td>${p.active?'<span class="pill">Aktiv</span>':'<span class="pill" style="background:#ffecec;border-color:#ffcdcd">Inaktiv</span>'}</td>
         <td>
           <div class="actions">
@@ -940,6 +1107,40 @@ function fillCatSelect(){
 const pModal = $("#productModal");
 const pName=$("#pName"), pPrice=$("#pPrice"), pCat=$("#pCat"), pActive=$("#pActive"), pDesc=$("#pDesc");
 const pUpload=$("#pUpload"), pImg=$("#pImg"), pPreview=$("#pPreview"), pGroupsBox=$("#pGroups");
+// Discount controls
+const pDiscActive = document.getElementById('pDiscActive');
+const pDiscType   = document.getElementById('pDiscType');
+const pDiscValue  = document.getElementById('pDiscValue');
+const pPricePreview = document.getElementById('pPricePreview');
+
+function renderPricePreview(){
+  const base = (function(){
+    const v = parseEUR(pPrice.value);
+    return v==null ? 0 : v;
+  })();
+  const active = pDiscActive?.checked;
+  const type   = pDiscType?.value || 'percent';
+  const val    = Number(pDiscValue?.value||0);
+
+  if(!pPricePreview) return;
+  pPricePreview.innerHTML = '';
+
+  if(!active || !val){
+    pPricePreview.innerHTML = `<span class="price-eur">${eur(base)}</span>`;
+    return;
+  }
+  const { final } = computeDiscounted(base, type, val);
+  pPricePreview.innerHTML =
+    `<span class="price-eur price-old">${eur(base)}</span>` +
+    `<span class="price-eur price-new">${eur(final)}</span>`;
+}
+
+// حدّث المعاينة عند تغيير أي مدخل
+[pPrice, pDiscActive, pDiscType, pDiscValue].forEach(el=>{
+  el?.addEventListener('input', renderPricePreview);
+  el?.addEventListener('change', renderPricePreview);
+});
+
 // أسماء تُعرّف مجموعة الأحجام
 const SIZE_NAMES = ['Größe','Size','الحجم','Boyut'];
 
@@ -1009,6 +1210,18 @@ function openProductModal(p){
   pActive.checked = p?.active!==false;
   pDesc.value = p?.desc || '';
   if(p?.img){ pPreview.src = p.img; pPreview.classList.remove('hidden'); } else { pPreview.src=''; pPreview.classList.add('hidden'); }
+  // خصم المنتج: تعبئة من الكائن إن وُجد، وإلا افتراضياً معطّل
+if(p && p.discount){
+  pDiscActive.checked = !!p.discount.active;
+  pDiscType.value     = p.discount.type || 'percent';
+  pDiscValue.value    = Number(p.discount.value||0);
+}else{
+  pDiscActive.checked = false;
+  pDiscType.value     = 'percent';
+  pDiscValue.value    = '';
+}
+renderPricePreview();
+
   // groups checklist
   pGroupsBox.innerHTML = groups.map(g=>{
     const checked = (p?.groups||[]).includes(g.id) ? 'checked' : '';
@@ -1076,19 +1289,44 @@ $("#pmSave").addEventListener('click', ()=>{
 
   if(editProductId){
     const p = products.find(x=>x.id===editProductId);
-    Object.assign(p, {
-      name, price: basePrice, cat, active, desc, img,
-      groups: selGroups,
-      sizes: sizesToSave
-    });
+Object.assign(p, {
+  name, price: basePrice, cat, active, desc, img,
+  groups: selGroups,
+  sizes: sizesToSave,
+  discount: {
+    active: !!pDiscActive.checked,
+    type: pDiscType.value,
+    value: Number(pDiscValue.value||0)
+  },
+  // للحاجة: احسب النهائي لعرض سريع (لن نستبدل price الأساسي)
+  priceFinal: (function(){
+    const dAct = pDiscActive.checked;
+    const dVal = Number(pDiscValue.value||0);
+    if(!dAct || !dVal) return basePrice;
+    return computeDiscounted(basePrice, pDiscType.value, dVal).final;
+  })()
+});
+
   }else{
     products.unshift({
-      id: uid(),
-      name, price: basePrice, cat, active, desc, img,
-      groups: selGroups,
-      sizes: sizesToSave,
-      createdAt: Date.now()
-    });
+  id: uid(),
+  name, price: basePrice, cat, active, desc, img,
+  groups: selGroups,
+  sizes: sizesToSave,
+  discount: {
+    active: !!pDiscActive.checked,
+    type: pDiscType.value,
+    value: Number(pDiscValue.value||0)
+  },
+  priceFinal: (function(){
+    const dAct = pDiscActive.checked;
+    const dVal = Number(pDiscValue.value||0);
+    if(!dAct || !dVal) return basePrice;
+    return computeDiscounted(basePrice, pDiscType.value, dVal).final;
+  })(),
+  createdAt: Date.now()
+});
+
   }
 
   save('products'); renderProducts(); closeProductModal(); toast('Gespeichert');
@@ -1211,20 +1449,79 @@ function renderSettings(){
   $("#openNow").checked = !!settings.openNow;
   $("#acceptOrders").checked = settings.acceptOrders!==false;
 }
+
+// === Prefill Bestellregeln (minOrder & deliveryFee) from Firestore ===
+mvOnAuthReady(async ()=>{
+  try{
+    const ref  = MV.fs.collection('restaurants').doc(MV.uid);
+    const snap = await ref.get();
+    if(!snap.exists) return;
+    const r = snap.data() || {};
+
+    // اقرأ من الحقول الجديدة أولاً، ثم القديمة (توافقًا)
+    const minOrder =
+      (typeof r.minOrder === 'number') ? r.minOrder :
+      (typeof r?.order?.min === 'number') ? r.order.min : null;
+
+    const deliveryFee =
+      (typeof r.deliveryFee === 'number') ? r.deliveryFee :
+      (typeof r?.delivery?.fee === 'number') ? r.delivery.fee : null;
+
+    if(minOrder != null){
+      document.getElementById('minOrder').value = String(minOrder).replace('.',',');
+      settings.minOrder = minOrder; save('settings');
+    }
+    if(deliveryFee != null){
+      document.getElementById('flatDelivery').value = String(deliveryFee).replace('.',',');
+      settings.flatDelivery = deliveryFee; save('settings');
+    }
+  }catch(e){ console.warn(e); }
+});
+
 // يكتب isOpen إلى restaurants/{uid}
 // حفظ إعدادات الحد الأدنى والباوشاله فقط (بدون isOpen/acceptOrders)
 // حفظ قيم الحد الأدنى والباوشاله فقط
-$("#saveSettings").addEventListener('click', ()=>{
-  const mo = parseEUR($("#minOrder").value);
-  const fd = parseEUR($("#flatDelivery").value);
-  if (fd!=null && fd>5){ toast('Lieferpauschale max. 5,00 €'); return; }
+$("#saveSettings").addEventListener('click', async ()=>{
+  const mo = parseEUR($("#minOrder").value);      // Mindestbestellwert (€)
+  const fd = parseEUR($("#flatDelivery").value);  // Lieferpauschale (€)
+
+  if (fd!=null && fd>5){
+    toast('Lieferpauschale max. 5,00 €');
+    return;
+  }
+
+  // خزّن محليًا كالسابق
   settings.minOrder = mo;
   settings.flatDelivery = fd;
   save('settings');
-  $("#settingsMsg").textContent = 'Gespeichert';
-  setTimeout(()=>$("#settingsMsg").textContent='', 1500);
-  toast('Einstellungen gespeichert');
+
+  // اكتب إلى Firestore (حقول حديثة + توافق قديم داخل delivery/order)
+  try{
+    if(!MV?.uid){ toast('Nicht angemeldet'); return; }
+
+    const ts = firebase.firestore.FieldValue.serverTimestamp();
+    await MV.fs.collection('restaurants').doc(MV.uid).set({
+      // الحقول الحديثة (يقرأها الفرونت)
+      minOrder: (mo!=null ? +mo : null),
+      deliveryFee: (fd!=null ? +fd : null),
+
+      // توافق مع حقول قديمة داخل خرائط متداخلة
+      order:    { min: (mo!=null ? +mo : null) },
+      delivery: { fee: (fd!=null ? +fd : null) },
+
+      updatedAt: ts
+    }, { merge:true });
+
+    // Feedback UI
+    $("#settingsMsg").textContent = 'Gespeichert';
+    setTimeout(()=>$("#settingsMsg").textContent='', 1500);
+    toast('Einstellungen gespeichert');
+  }catch(e){
+    console.warn(e);
+    toast('Fehler beim Speichern');
+  }
 });
+
 
 /* ============ Market Tags (multi-select) ============ */
 const TAGS_DEF = [
