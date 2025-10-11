@@ -327,14 +327,27 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
     overflow:auto;
   }
 
-  /* سلايدر فئات أفقي بالسحب (بدون أسهم) */
-  .menu-rail{
-    display:flex;
-    gap:8px;
-    overflow:auto;
-    padding:6px 2px;
-    scrollbar-width:none; -ms-overflow-style:none;
-  }
+  /* ثبّت هيدر الديالوج */
+.dlg-head{ position: sticky; top: 0; z-index: 70; }
+
+/* ثبّت سكة الفئات داخل جسم القائمة، تحت الهيدر مباشرة */
+.menu-rail{
+  position: sticky;
+  top: 48px;         /* إن كان الهيدر أعلى/أقل غيّرها 44–56px */
+  z-index: 60;
+  background: var(--card);
+  padding: 8px 6px;
+  margin: 0;
+}
+
+/* طبقات آمنة: عناصر القائمة تبقى تحت الفئات */
+.menu-list{ position: relative; z-index: 1; }
+
+/* تأكد أن العناصر تسمح بخروج شارة الخصم بدون قصّ */
+.item{ position: relative; overflow: visible; }
+.item .ph-wrap{ position: relative; z-index: 1; }
+.badge-disc{ z-index: 5; }
+
   .menu-rail::-webkit-scrollbar{ display:none }
   .menu-chip{
     flex:0 0 auto;
@@ -499,25 +512,6 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
 @media (max-width: 900px){
   #top-rest-products .rail-nav,
   #hot-rest-products .rail-nav{ display: none; }
-}
-/* ==== Mobile menu: keep header and category rail visible ==== */
-@media (max-width: 900px){
-  .dlg{ max-height: 92vh; }                 /* مساحة آمنة للتمرير داخل المنبثق */
-  .dlg-head{ position: sticky; top: 0; z-index: 40; }  /* يثبت هيدر المنبثق */
-
-  /* شريط الفئات يصبح لاصقًا تحت الهيدر داخل المنبثق */
-  .menu-rail{
-    position: sticky;
-    top: 52px;                               /* ارتفاع الهيدر تقريبًا */
-    z-index: 30;                             /* أعلى من المنتجات */
-    background: var(--card);                 /* خلفية حتى لا يظهر ما تحته */
-    padding: 8px 6px;
-    margin: 0 -2px;                          /* يمسح أثر البوردر/الهوامش */
-  }
-
-  /* تأكد أن عناصر المنتجات لا تطفو فوق الفئات */
-  .menu-list{ position: relative; z-index: 1; }
-  .item{ position: relative; z-index: 1; overflow: visible; }
 }
 
 </style>
@@ -1655,7 +1649,11 @@ function renderMenu(r, cats, prods){
 
   // ===== MOBILE: سلايدر أفقي + قائمة كاملة =====
   if (isMobile){
-    let activeCid = cats[0]?.id || '_';
+    // اختر أول فئة فيها عناصر، وإلا أول فئة، وإلا '_' (غير مصنّف)
+    const byCatKeys = cats.map(c=>c.id).concat('_');
+    const firstWithItems = byCatKeys.find(cid => (byCat.get(cid)||[]).length) ?? cats[0]?.id ?? '_';
+    let activeCid = firstWithItems;
+
 
     const rail = document.createElement('div'); rail.className='menu-rail';
     const list = document.createElement('div'); list.className='menu-list';
@@ -1670,6 +1668,8 @@ function renderMenu(r, cats, prods){
         rail.querySelectorAll('.menu-chip').forEach(x=>x.classList.remove('active'));
         btn.classList.add('active');
         paint();
+		btn.scrollIntoView({ inline:'center', block:'nearest', behavior:'smooth' });
+
       });
       return btn;
     };
@@ -2334,7 +2334,7 @@ CART_INFO = {
 window.addEventListener('DOMContentLoaded', ()=>{
   const sel=document.getElementById('lang'); sel.value=LANG; applyLang(); // Make cart button icon-only
 const vc = document.getElementById('viewCart');
-if (vc) vc.innerHTML = `<span class="cart-ico">🛒</span><span id="cartCount" class="cart-badge">0</span>`;
+if (vc) vc.innerHTML = `<span class="cart-ico"></span><span id="cartCount" class="cart-badge">0</span>`;
 
     sel.addEventListener('change',()=>{
     LANG=sel.value; localStorage.setItem('taussil:lang',LANG);
