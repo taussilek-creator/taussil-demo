@@ -314,6 +314,35 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
     width: 100%;
   }
 }
+/* === Menu dialog: keep side categories left (even on mobile) === */
+.menu{ grid-template-columns: 220px 1fr !important; }
+@media (max-width:900px){
+  .menu{ grid-template-columns: 180px 1fr !important; }
+}
+
+/* بطاقة منتج داخل القائمة: صورة يسار / نص (اسم + سعر تحت الاسم + وصف) / زر يمين */
+.item{
+  display:grid;
+  grid-template-columns: 72px 1fr auto;
+  gap:8px;
+  align-items:center;
+}
+.item .txt{
+  display:flex;
+  flex-direction:column;
+  justify-content:center;
+  gap:2px;
+  min-height:72px; /* يطابق ارتفاع الصورة */
+}
+.item .nm{ font-weight:800; line-height:1.2; }
+.item .pr{ font-weight:800; }
+.item .ds{ font-size:12px; color:#555; }
+
+/* زر الإضافة كأيقونة مربعة صغيرة */
+.item .act .btn-sm{
+  width:34px; min-width:34px; height:34px; padding:0;
+  display:inline-flex; align-items:center; justify-content:center;
+}
 
 </style>
 
@@ -1090,25 +1119,28 @@ const discHtml = (effDisc > 0) ? `<span class="badge-disc">-${Math.round(effDisc
 
 
 row.innerHTML = `
- <div class="ph-wrap">
-  <div class="ph">
-    ${imgUrl
-      ? `<img class="im" src="${esc(imgUrl)}" loading="lazy" decoding="async" alt="">`
-      : `<div class="im" style="display:flex;align-items:center;justify-content:center;font-size:12px;color:#999">—</div>`}
+  <div class="ph-wrap">
+    <div class="ph">
+      ${imgUrl
+        ? `<img class="im" src="${esc(imgUrl)}" loading="lazy" decoding="async" alt="">`
+        : `<div class="im" style="display:flex;align-items:center;justify-content:center;font-size:12px;color:#999">—</div>`}
+    </div>
+    ${discHtml}
   </div>
-  ${discHtml}
-</div>
 
+  <div class="txt">
     <div class="nm line-1">${esc(name)}</div>
+    <div class="pr">${priceBlock}</div>
     ${desc ? `<div class="ds line-1">${esc(desc)}</div>` : ``}
   </div>
-  <div style="display:flex;gap:8px;align-items:center">
-  <div class="pr">${priceBlock}</div>
-  ${hasOpts
-    ? `<button class="btn-sm" data-cfg="${it.id}">${T('choose')}</button>`
-    : `<button class="btn-sm" data-add="${it.id}">${T('add')}</button>`}
-</div>
+
+  <div class="act">
+    ${hasOpts
+      ? `<button class="btn-sm" data-cfg="${it.id}" title="${T('choose')}">＋</button>`
+      : `<button class="btn-sm" data-add="${it.id}" title="${T('add')}">＋</button>`}
+  </div>
 `;
+
 list.appendChild(row);
 }
     list.querySelectorAll('[data-add]').forEach(b=>{
