@@ -427,6 +427,36 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
   .filters-inline .select#sort{ min-width:130px }
   .filters-inline .select#city{ min-width:120px }
 }
+/* Hot restaurant products rail (compact product slides) */
+#hotRestProd { gap: 10px; }
+.prod-slide {
+  flex: 0 0 auto;
+  min-width: 240px;
+  max-width: 280px;
+  background:#fff; border:1px solid rgba(0,0,0,.12); border-radius:14px;
+  box-shadow:0 4px 12px rgba(0,0,0,.08);
+  display:grid; grid-template-columns:84px 1fr auto;
+  align-items:center; gap:10px; padding:8px 10px;
+}
+.prod-slide .thumb {
+  width:84px; height:84px; border-radius:10px; border:1px solid rgba(0,0,0,.1);
+  background:#fff; display:flex; align-items:center; justify-content:center; overflow:hidden;
+}
+.prod-slide .thumb img { width:100%; height:100%; object-fit:contain; object-position:center; display:block }
+.prod-slide .mid { display:flex; flex-direction:column; gap:4px; min-width:0 }
+.prod-slide .name { font-weight:800; font-size:12px; line-height:1.2; white-space:nowrap; overflow:hidden; text-overflow:ellipsis }
+.prod-slide .price { font-weight:800; font-size:12px }
+.prod-slide .price s { opacity:.6; margin-inline-end:6px }
+.prod-slide .act { display:flex; align-items:center; justify-content:flex-end }
+.prod-slide .btn-sm { height:34px; padding:0 10px; border-radius:10px; }
+
+/* شارة الخصم الصغيرة */
+.prod-slide .disc {
+  position:absolute; top:6px; right:6px;
+  font-size:11px; font-weight:800; padding:2px 6px; border-radius:999px;
+  background:#fee2e2; color:#b91c1c; border:1px solid #fecaca;
+}
+.prod-slide .thumb-wrap { position:relative; width:84px; height:84px }
 
 </style>
 
@@ -481,6 +511,13 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
   </div>
   <input id="q" class="input" placeholder="Restaurant suchen …" style="flex:1;min-width:200px">
 </div>
+<!-- CATEGORIES (moved up under filters) -->
+<section id="rail-cats" class="rail-card card">
+  <div class="rail-head">
+    <div class="rail-title" data-i18n="categories">Kategorien</div>
+  </div>
+  <div id="catRail" class="cat-rail"></div>
+</section>
 
 
   <!-- Grid -->
@@ -502,13 +539,18 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
     <button class="rail-nav next" data-nav="hot">›</button>
   </div>
 </section>
-<!-- CATEGORIES (chips) -->
-<section id="rail-cats" class="rail-card card">
+<!-- HOT RESTAURANT PRODUCTS (dynamic under HOT rail) -->
+<section id="hot-rest-products" class="rail-card card hidden">
   <div class="rail-head">
-    <div class="rail-title" data-i18n="categories">Kategorien</div>
+    <div class="rail-title" id="hotRestTitle">Produkte von diesem Restaurant</div>
+    <div class="small" id="hotRestSub">Scroll in der oberen Leiste, um die Produkte zu wechseln</div>
   </div>
-  <div id="catRail" class="cat-rail"></div>
+  <div class="rail">
+    <!-- لا أزرار -->
+    <div id="hotRestProd" class="rail-inner"></div>
+  </div>
 </section>
+
 
 <!-- TOP RATED -->
 <section id="rail-top-sec" class="rail-card card hidden">
@@ -967,8 +1009,13 @@ const minOrderHtml = (moNum!=null && moNum>0)
     cont.innerHTML = '';
     if (!items.length){ sec.classList.add('hidden'); return; }
     const frag = document.createDocumentFragment();
-    items.forEach(r=> frag.appendChild(createCard(r)));
-    cont.appendChild(frag);
+    items.forEach(r=>{
+  const el = createCard(r);
+  el.dataset.rid = r.id;              // ← مهم لتتبع البطاقة الوسطى
+  frag.appendChild(el);
+});
+cont.appendChild(frag);
+
     sec.classList.remove('hidden');
   };
   
@@ -992,6 +1039,8 @@ const minOrderHtml = (moNum!=null && moNum>0)
   // 3) رسم السكّتين
   renderRail('rail-hot-sec', 'railHot', hot);
   renderRail('rail-top-sec', 'railTop', top);
+// فعّل تتبع مركز سكة HOT مرة واحدة بعد الرسم
+initHotCenterTracking();
 
   // 4) الشبكة
   grid.innerHTML = '';
@@ -1136,6 +1185,166 @@ renderProductDealsGrid(deals.slice(0,24));  // ← بدل renderProductDealsRail
     });
   });
 }
+
+// === Helper: جلب منتجات المطعم (مع كاش)
+async function getRestaurantProductsCached(rid){
+  if (PROD_CACHE.has(rid)) {
+    const { prods } = PROD_CACHE.get(rid);
+    return prods || [];
+  }
+  // في حال لم تُحمّل بعد: اجلبها وخزنها بالكاش البسيط
+  const proSnap = await fs.collection('restaurants').doc(rid).collection('products').get();
+  const prods = [];
+  proSnap.forEach(d => prods.push({ id:d.id, ...d.data() }));
+  const old = PROD_CACHE.get(rid) || { cats:[] };
+  PROD_CACHE.set(rid, { cats: old.cats || [], prods });
+  return prods;
+}
+
+// === Helper: بناء بطاقة منتج صغيرة لسكة المنتجات
+function buildHotProdSlide(r, p){
+  const img =
+    (Array.isArray(p.images) && p.images[0]) ? p.images[0] :
+    (typeof p.img === 'string' && p.img) ? p.img :
+    (typeof p.imageUrl === 'string' && p.imageUrl) ? p.imageUrl : '';
+
+  const { unit, unitOld, discPct } = computeUnitPrice(r, p, 0);
+
+  const hasOpts =
+    (Array.isArray(p.optionGroupIds) && p.optionGroupIds.length>0) ||
+    (Array.isArray(p.sizes) && p.sizes.length>0);
+
+  const el = document.createElement('div');
+  el.className = 'prod-slide';
+
+  el.innerHTML = `
+    <div class="thumb-wrap">
+      <div class="thumb">
+        ${img ? `<img src="${esc(img)}" loading="lazy" decoding="async" alt="">`
+              : `<div style="font-size:13px;color:#999">—</div>`}
+      </div>
+      ${discPct>0 ? `<span class="disc">-${Math.round(discPct)}%</span>` : ``}
+    </div>
+    <div class="mid">
+      <div class="name">${esc(p.name || p.title || '(—)')}</div>
+      <div class="price">
+        ${unitOld > unit
+          ? `<s>${eur(unitOld)}</s><strong>${eur(unit)}</strong>`
+          : `<strong>${eur(unit)}</strong>`}
+      </div>
+    </div>
+    <div class="act">
+      ${hasOpts
+        ? `<button class="btn-sm" data-cfg="${r.id}::${p.id}" title="${T('choose')}">＋</button>`
+        : `<button class="btn-sm" data-add="${r.id}::${p.id}" title="${T('add')}">＋</button>`}
+    </div>
+  `;
+
+  // أربط الأزرار
+  const addBtn = el.querySelector('[data-add]');
+  if (addBtn){
+    addBtn.addEventListener('click', ()=>{
+      addToCart(r, p);
+    });
+  }
+  const cfgBtn = el.querySelector('[data-cfg]');
+  if (cfgBtn){
+    cfgBtn.addEventListener('click', async ()=>{
+      await openConfigurator(r, p);
+    });
+  }
+  return el;
+}
+
+// === Render السكشن وفق مطعم محدّد
+async function showHotRestaurantProductsById(rid){
+  const sec  = document.getElementById('hot-rest-products');
+  const cont = document.getElementById('hotRestProd');
+  const title= document.getElementById('hotRestTitle');
+  if(!sec || !cont) return;
+
+  // ابحث عن المطعم من القائمة الحالية
+  const r = RESTAURANTS.find(x=> x.id === rid);
+  if(!r){ sec.classList.add('hidden'); return; }
+
+  title.textContent = `Produkte – ${r.name || ''}`;
+  cont.innerHTML = '';
+
+  // اجلب المنتجات (المتاحة فقط)
+  const all = await getRestaurantProductsCached(rid);
+  const prods = all.filter(p => p.isAvailable !== false);
+
+  // خذ 12 منتج كحد أقصى لخفّة الواجهة
+  const list = prods.slice(0, 12);
+
+  if(!list.length){
+    sec.classList.add('hidden');
+    return;
+  }
+
+  const frag = document.createDocumentFragment();
+  list.forEach(p => frag.appendChild(buildHotProdSlide(r, p)));
+  cont.appendChild(frag);
+  sec.classList.remove('hidden');
+}
+
+// === احسب المطعم الواقع في منتصف سكة HOT
+function getCenteredHotRid(){
+  const rail = document.getElementById('railHot');
+  if(!rail) return null;
+  const railRect = rail.getBoundingClientRect();
+  const railCenter = railRect.left + railRect.width/2;
+
+  let best = { rid:null, dist:Infinity };
+  rail.querySelectorAll('.tile[data-rid]').forEach(el=>{
+    const r = el.getBoundingClientRect();
+    const center = r.left + r.width/2;
+    const d = Math.abs(center - railCenter);
+    if (d < best.dist){ best = { rid: el.dataset.rid, dist: d }; }
+  });
+  return best.rid;
+}
+
+// === استمع لتمرير سكة HOT وحدّث السكشن
+function initHotCenterTracking(){
+  const rail = document.getElementById('railHot');
+  if(!rail) return;
+
+  // حدّث dataset.rid على بطاقات HOT (يُستدعى بعد رسمها)
+  // (لو كانت محددة مسبقًا نتجاهل)
+  rail.querySelectorAll('.tile').forEach(el=>{
+    if(!el.dataset.rid){
+      // يُملأ في renderRail عند عدّ العناصر (سنضيفه هناك)
+    }
+  });
+
+  let raf = null;
+  const onScroll = ()=>{
+    if(raf) cancelAnimationFrame(raf);
+    raf = requestAnimationFrame(async ()=>{
+      const rid = getCenteredHotRid();
+      if (rid) await showHotRestaurantProductsById(rid);
+    });
+  };
+  rail.addEventListener('scroll', onScroll, { passive:true });
+
+  // تهيئة أوليّة
+  setTimeout(async ()=>{
+    const rid = getCenteredHotRid();
+    if (rid) await showHotRestaurantProductsById(rid);
+  }, 50);
+
+  // لو عندك أزرار prev/next لسكة HOT: حدّث بعد النقر (بعد اكتمال السحب السلس)
+  document.querySelectorAll('.rail-nav[data-nav="hot"]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      setTimeout(()=>{
+        const rid = getCenteredHotRid();
+        if (rid) showHotRestaurantProductsById(rid);
+      }, 420);
+    }, { passive:true });
+  });
+}
+
 
 
 /* ===== Menu & Products (مختصر ولا تكرار) ===== */
