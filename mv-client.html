@@ -389,6 +389,31 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
     box-shadow:0 2px 6px rgba(0,0,0,.25);
   }
 }
+/* === Cart icon-only button in header === */
+#viewCart{
+  padding:0 12px; min-width:48px;
+  display:inline-flex; align-items:center; justify-content:center; gap:6px;
+}
+.cart-ico{ font-size:18px; line-height:1 }
+.cart-badge{
+  min-width:20px; height:20px; padding:0 6px;
+  border-radius:999px; background:#fff; color:#111;
+  font-weight:800; font-size:12px;
+  display:inline-flex; align-items:center; justify-content:center;
+}
+
+/* === Cart rows: put qty BELOW price in the right column === */
+.cart-row{
+  display:grid;
+  grid-template-columns: 64px 1fr auto; /* img | info | right(price+qty) */
+  gap:8px;
+  border-bottom:1px solid #eee;
+  padding:8px 0;
+}
+.cart-right{
+  display:flex; flex-direction:column; align-items:flex-end; gap:6px;
+}
+.cart-right .q{ display:flex; gap:6px; align-items:center }
 
 </style>
 
@@ -1381,7 +1406,12 @@ const { unit, unitOld, discPct } = computeUnitPrice(r, p, 0);
   toast(T('added'));
 }
 
-function updateCartBadge(){ const n=CART.reduce((s,x)=>s+x.qty,0); document.getElementById('viewCart').textContent=T('cart')(n); }
+function updateCartBadge(){
+  const n = CART.reduce((s,x)=> s + x.qty, 0);
+  const badge = document.getElementById('cartCount');
+  if (badge) badge.textContent = String(n);
+}
+
 function openCart(){
   const dlg=$("#cartDialog"), body=$("#cartBody"); body.innerHTML='';
   if(!CART.length){ body.innerHTML=`<div class="small">${T('emptyCart')}</div>`; }
@@ -1393,29 +1423,33 @@ function openCart(){
   for(const row of CART){
     const line = document.createElement('div'); line.className='cart-row';
 
-    const imgHtml = row.img
-      ? `<img class="cart-thumb" src="${esc(row.img)}" alt="">`
-      : `<div class="cart-thumb" style="display:flex;align-items:center;justify-content:center;font-size:12px;color:#888">🍽️</div>`;
-    const lineOldTotal = (row.unitOld!=null ? row.unitOld*row.qty : null);
-    const lineNewTotal = row.price * row.qty;
+const imgHtml = row.img
+  ? `<img class="cart-thumb" src="${esc(row.img)}" alt="">`
+  : `<div class="cart-thumb" style="display:flex;align-items:center;justify-content:center;font-size:12px;color:#888">🍽️</div>`;
 
-    const priceBlock = (lineOldTotal!=null && lineOldTotal > lineNewTotal)
-      ? `<span style="text-decoration:line-through;opacity:.6;margin-inline-end:6px">${eur(lineOldTotal)}</span><strong>${eur(lineNewTotal)}</strong>`
-      : `<strong>${eur(lineNewTotal)}</strong>`;
+const lineOldTotal = (row.unitOld!=null ? row.unitOld*row.qty : null);
+const lineNewTotal = row.price * row.qty;
 
-    line.innerHTML = `
-      ${imgHtml}
-      <div>
-        <strong class="line-1">${esc(row.title)}</strong>
-        <div class="small line-1">${esc(row.rname)}</div>
-      </div>
-      <div class="q">
-        <button class="btn-sm" data-dec="${row.key}">−</button>
-        <span>${row.qty}</span>
-        <button class="btn-sm" data-inc="${row.key}">+</button>
-      </div>
-      <div>${priceBlock}</div>
-    `;
+const priceBlock = (lineOldTotal!=null && lineOldTotal > lineNewTotal)
+  ? `<span style="text-decoration:line-through;opacity:.6;margin-inline-end:6px">${eur(lineOldTotal)}</span><strong>${eur(lineNewTotal)}</strong>`
+  : `<strong>${eur(lineNewTotal)}</strong>`;
+
+line.innerHTML = `
+  ${imgHtml}
+  <div>
+    <strong class="line-1">${esc(row.title)}</strong>
+    <div class="small line-1">${esc(row.rname)}</div>
+  </div>
+  <div class="cart-right">
+    <div>${priceBlock}</div>
+    <div class="q">
+      <button class="btn-sm" data-dec="${row.key}">−</button>
+      <span>${row.qty}</span>
+      <button class="btn-sm" data-inc="${row.key}">+</button>
+    </div>
+  </div>
+`;
+
     body.appendChild(line);
   }
 
@@ -1832,7 +1866,10 @@ CART_INFO = {
 
 /* ===== Bindings ===== */
 window.addEventListener('DOMContentLoaded', ()=>{
-  const sel=document.getElementById('lang'); sel.value=LANG; applyLang();
+  const sel=document.getElementById('lang'); sel.value=LANG; applyLang(); // Make cart button icon-only
+const vc = document.getElementById('viewCart');
+if (vc) vc.innerHTML = `<span class="cart-ico">🛒</span><span id="cartCount" class="cart-badge">0</span>`;
+
     sel.addEventListener('change',()=>{
     LANG=sel.value; localStorage.setItem('taussil:lang',LANG);
     applyLang(); buildCatRail(); renderCatalog();
