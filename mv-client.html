@@ -327,27 +327,14 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
     overflow:auto;
   }
 
-  /* ثبّت هيدر الديالوج */
-.dlg-head{ position: sticky; top: 0; z-index: 70; }
-
-/* ثبّت سكة الفئات داخل جسم القائمة، تحت الهيدر مباشرة */
-.menu-rail{
-  position: sticky;
-  top: 48px;         /* إن كان الهيدر أعلى/أقل غيّرها 44–56px */
-  z-index: 60;
-  background: var(--card);
-  padding: 8px 6px;
-  margin: 0;
-}
-
-/* طبقات آمنة: عناصر القائمة تبقى تحت الفئات */
-.menu-list{ position: relative; z-index: 1; }
-
-/* تأكد أن العناصر تسمح بخروج شارة الخصم بدون قصّ */
-.item{ position: relative; overflow: visible; }
-.item .ph-wrap{ position: relative; z-index: 1; }
-.badge-disc{ z-index: 5; }
-
+  /* سلايدر فئات أفقي بالسحب (بدون أسهم) */
+  .menu-rail{
+    display:flex;
+    gap:8px;
+    overflow:auto;
+    padding:6px 2px;
+    scrollbar-width:none; -ms-overflow-style:none;
+  }
   .menu-rail::-webkit-scrollbar{ display:none }
   .menu-chip{
     flex:0 0 auto;
