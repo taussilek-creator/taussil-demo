@@ -300,120 +300,38 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
 
 /* ضمان أن البطاقة/العنصر تسمح بخروج الشارة قليلاً */
 .pitem, .item{ position:relative; overflow:visible }
-<style id="mobile-fixes">
-/* ===== Mobile layout fixes for customer menu ===== */
-@media (max-width: 720px){
+/* ===== Mobile tidy (≤ 480px) ===== */
+@media (max-width:480px){
+  /* شريط الفلاتر: 3 عناصر في صف واحد والبحث تحتهم بعرض كامل */
+  .filters-bar{ gap:8px; }
+  .filters-bar .chip,
+  .filters-bar .select{ flex:0 0 auto; }
+  .filters-bar .input{ flex:0 0 100%; }
 
-  /* الكروت: إجبار المحتوى يبقى داخل الكرت */
-  .card, .product-card, .meal-card {
-    display: grid;
-    grid-template-columns: 1fr;
-    gap: 8px;
-    border-radius: 14px;
-    overflow: hidden;              /* مهم: يمنع خروج الخيارات/السعر */
-  }
+  /* صِغَر فئات السلايدر */
+  .cat-chip{ font-size:13px; padding:6px 10px; }
+  .cat-chip .ico{ font-size:16px; }
 
-  /* صف المنتج الداخلي (إن كان Flex افقي) خليه عمودي */
-  .product-row, .meal-row, .menu-item, .menu-product {
-    display: grid !important;
-    grid-template-columns: 1fr;
-    align-items: start;
-    gap: 8px;
-  }
+  /* المينيو: عمود فئات صغير يسار + المنتجات يمين حتى على الموبايل */
+  .menu{ grid-template-columns:34% 1fr; max-height:70vh; }
+  .menu-side{ max-height:70vh; overflow:auto; position:sticky; top:0; }
+  .menu-list{ max-height:70vh; overflow:auto; }
+  .menu-cat{ font-size:14px; padding:10px; border-radius:12px; }
 
-  /* الصورة */
-  .product-img, .meal-img, .thumb, .cover {
-    width: 100% !important;
-    max-width: 100% !important;
-    height: auto !important;
-    object-fit: cover;
-    border-radius: 12px;
-  }
-
-  /* معلومات المنتج */
-  .product-body, .meal-body, .info, .content {
-    display: grid;
-    gap: 6px;
-  }
-
-  /* العنوان + السعر على صفين مرتبين */
-  .title-price, .header-line {
-    display: grid;
-    grid-template-columns: 1fr auto;
-    align-items: baseline;
-    gap: 6px;
-  }
-  .product-title, .meal-title, .name {
-    font-weight: 800;
-    line-height: 1.2;
-    word-wrap: break-word;       /* يلف الكلمات الطويلة */
-    overflow-wrap: anywhere;
-  }
-  .price, .price-eur, .meal-price {
-    font-weight: 800;
-    white-space: nowrap;
-    justify-self: end;
-  }
-
-  /* خيارات/إضافات تبقى داخل الكرت */
-  .options, .extras, .variants, .option-groups {
-    display: grid;
-    gap: 6px;
-    padding: 8px;
-    background: #fff;
-    border: 1px solid rgba(0,0,0,.06);
-    border-radius: 12px;
-  }
-  /* صف الخيار */
-  .option-row, .variant-row {
-    display: grid;
-    grid-template-columns: 1fr auto;
-    align-items: center;
-    gap: 8px;
-  }
-
-  /* أزرار +/− والكمية تبقى بمحاذاة أسفل الكرت */
-  .actions, .buy-row, .cta-row, .qty-row {
-    display: grid;
-    grid-template-columns: 1fr auto;
-    gap: 8px;
-    align-items: center;
-  }
-  .qty, .counter {
-    display: inline-grid;
-    grid-auto-flow: column;
-    gap: 6px;
-    align-items: center;
-  }
-  .btn, .btn-cta, .add-btn {
-    min-height: 44px;
-    border-radius: 12px;
-  }
-
-  /* نصوص طويلة للوصف */
-  .desc, .product-desc {
-    color: #555;
-    line-height: 1.4;
-    overflow-wrap: anywhere;
-  }
-
-  /* هوامش عامة بين العناصر */
-  .menu, .menu-section, .products-grid, .list {
-    display: grid;
-    gap: 10px;
-  }
-
-  /* في حال الشبكة كانت عمودين — على الجوال خليها عمود واحد */
-  .products-grid, .grid-products, .grid {
-    grid-template-columns: 1fr !important;
-  }
-
-  /* منع “طفح” السعر/الخيارات خارج الكرت إن كان فيه position */
-  .product-card *, .meal-card * {
-    max-width: 100%;
-  }
+  /* زر الإضافة في كل مكان يظهر كرمز + فقط */
+  .btn-sm[data-add], .btn-sm[data-cfg]{ width:40px; min-width:40px; height:40px; padding:0; border-radius:12px; font-size:22px; line-height:1; }
+  .btn-sm[data-add]::before, .btn-sm[data-cfg]::before{ content:'+'; }
+  .btn-sm[data-add], .btn-sm[data-cfg]{ color:inherit; }
 }
-</style>
+
+/* زر السلة: إخفاء النص وإظهار الرمز دوماً */
+#viewCart .cart-icon{ font-size:18px; margin-right:2px; }
+#viewCart .cart-text{ display:none; } /* يبقى العدد فقط "(0)" بجانب الأيقونة */
+
+/* إصلاح تراكب عناصر بطاقة المنتج داخل المينيو */
+.item{ display:grid; grid-template-columns:72px 1fr auto; gap:8px; align-items:center; }
+.item .txt{ display:flex; flex-direction:column; justify-content:center; min-height:72px; }
+.item .act{ display:flex; gap:8px; align-items:center; }
 
 </style>
 
@@ -448,7 +366,10 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
         <option value="ar">العربية</option>
         <option value="tr">Türkçe</option>
       </select>
-      <button id="viewCart" class="btn-cta">Warenkorb (0)</button>
+      <button id="viewCart" class="btn-cta">
+  <span class="cart-icon">🛒</span><span id="cartCount">(0)</span><span class="cart-text"> Warenkorb</span>
+</button>
+
     </div>
   </div>
 
@@ -1190,25 +1111,28 @@ const discHtml = (effDisc > 0) ? `<span class="badge-disc">-${Math.round(effDisc
 
 
 row.innerHTML = `
- <div class="ph-wrap">
-  <div class="ph">
-    ${imgUrl
-      ? `<img class="im" src="${esc(imgUrl)}" loading="lazy" decoding="async" alt="">`
-      : `<div class="im" style="display:flex;align-items:center;justify-content:center;font-size:12px;color:#999">—</div>`}
+  <div class="ph-wrap">
+    <div class="ph">
+      ${imgUrl
+        ? `<img class="im" src="${esc(imgUrl)}" loading="lazy" decoding="async" alt="">`
+        : `<div class="im" style="display:flex;align-items:center;justify-content:center;font-size:12px;color:#999">—</div>`}
+    </div>
+    ${discHtml}
   </div>
-  ${discHtml}
-</div>
 
+  <div class="txt">
     <div class="nm line-1">${esc(name)}</div>
     ${desc ? `<div class="ds line-1">${esc(desc)}</div>` : ``}
+    <div class="pr">${priceBlock}</div>
   </div>
-  <div style="display:flex;gap:8px;align-items:center">
-  <div class="pr">${priceBlock}</div>
-  ${hasOpts
-    ? `<button class="btn-sm" data-cfg="${it.id}">${T('choose')}</button>`
-    : `<button class="btn-sm" data-add="${it.id}">${T('add')}</button>`}
-</div>
+
+  <div class="act">
+    ${hasOpts
+      ? `<button class="btn-sm" data-cfg="${it.id}" title="${T('choose')}">＋</button>`
+      : `<button class="btn-sm" data-add="${it.id}" title="${T('add')}">＋</button>`}
+  </div>
 `;
+
 list.appendChild(row);
 }
     list.querySelectorAll('[data-add]').forEach(b=>{
@@ -1281,7 +1205,12 @@ const { unit, unitOld, discPct } = computeUnitPrice(r, p, 0);
   toast(T('added'));
 }
 
-function updateCartBadge(){ const n=CART.reduce((s,x)=>s+x.qty,0); document.getElementById('viewCart').textContent=T('cart')(n); }
+function updateCartBadge(){
+  const n = CART.reduce((s,x)=> s + x.qty, 0);
+  const cnt = document.getElementById('cartCount');
+  if (cnt) cnt.textContent = `(${n})`;
+}
+
 function openCart(){
   const dlg=$("#cartDialog"), body=$("#cartBody"); body.innerHTML='';
   if(!CART.length){ body.innerHTML=`<div class="small">${T('emptyCart')}</div>`; }
