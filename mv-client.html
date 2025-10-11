@@ -500,6 +500,25 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
   #top-rest-products .rail-nav,
   #hot-rest-products .rail-nav{ display: none; }
 }
+/* ==== Mobile menu: keep header and category rail visible ==== */
+@media (max-width: 900px){
+  .dlg{ max-height: 92vh; }                 /* مساحة آمنة للتمرير داخل المنبثق */
+  .dlg-head{ position: sticky; top: 0; z-index: 40; }  /* يثبت هيدر المنبثق */
+
+  /* شريط الفئات يصبح لاصقًا تحت الهيدر داخل المنبثق */
+  .menu-rail{
+    position: sticky;
+    top: 52px;                               /* ارتفاع الهيدر تقريبًا */
+    z-index: 30;                             /* أعلى من المنتجات */
+    background: var(--card);                 /* خلفية حتى لا يظهر ما تحته */
+    padding: 8px 6px;
+    margin: 0 -2px;                          /* يمسح أثر البوردر/الهوامش */
+  }
+
+  /* تأكد أن عناصر المنتجات لا تطفو فوق الفئات */
+  .menu-list{ position: relative; z-index: 1; }
+  .item{ position: relative; z-index: 1; overflow: visible; }
+}
 
 </style>
 
