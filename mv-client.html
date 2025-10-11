@@ -318,6 +318,121 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
   };
   try{ firebase.initializeApp(firebaseConfig); }catch(e){}
 </script>
+<style id="mobile-fixes">
+/* ===== Mobile layout fixes for customer menu ===== */
+@media (max-width: 720px){
+
+  /* الكروت: إجبار المحتوى يبقى داخل الكرت */
+  .card, .product-card, .meal-card {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 8px;
+    border-radius: 14px;
+    overflow: hidden;              /* مهم: يمنع خروج الخيارات/السعر */
+  }
+
+  /* صف المنتج الداخلي (إن كان Flex افقي) خليه عمودي */
+  .product-row, .meal-row, .menu-item, .menu-product {
+    display: grid !important;
+    grid-template-columns: 1fr;
+    align-items: start;
+    gap: 8px;
+  }
+
+  /* الصورة */
+  .product-img, .meal-img, .thumb, .cover {
+    width: 100% !important;
+    max-width: 100% !important;
+    height: auto !important;
+    object-fit: cover;
+    border-radius: 12px;
+  }
+
+  /* معلومات المنتج */
+  .product-body, .meal-body, .info, .content {
+    display: grid;
+    gap: 6px;
+  }
+
+  /* العنوان + السعر على صفين مرتبين */
+  .title-price, .header-line {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: baseline;
+    gap: 6px;
+  }
+  .product-title, .meal-title, .name {
+    font-weight: 800;
+    line-height: 1.2;
+    word-wrap: break-word;       /* يلف الكلمات الطويلة */
+    overflow-wrap: anywhere;
+  }
+  .price, .price-eur, .meal-price {
+    font-weight: 800;
+    white-space: nowrap;
+    justify-self: end;
+  }
+
+  /* خيارات/إضافات تبقى داخل الكرت */
+  .options, .extras, .variants, .option-groups {
+    display: grid;
+    gap: 6px;
+    padding: 8px;
+    background: #fff;
+    border: 1px solid rgba(0,0,0,.06);
+    border-radius: 12px;
+  }
+  /* صف الخيار */
+  .option-row, .variant-row {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: center;
+    gap: 8px;
+  }
+
+  /* أزرار +/− والكمية تبقى بمحاذاة أسفل الكرت */
+  .actions, .buy-row, .cta-row, .qty-row {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 8px;
+    align-items: center;
+  }
+  .qty, .counter {
+    display: inline-grid;
+    grid-auto-flow: column;
+    gap: 6px;
+    align-items: center;
+  }
+  .btn, .btn-cta, .add-btn {
+    min-height: 44px;
+    border-radius: 12px;
+  }
+
+  /* نصوص طويلة للوصف */
+  .desc, .product-desc {
+    color: #555;
+    line-height: 1.4;
+    overflow-wrap: anywhere;
+  }
+
+  /* هوامش عامة بين العناصر */
+  .menu, .menu-section, .products-grid, .list {
+    display: grid;
+    gap: 10px;
+  }
+
+  /* في حال الشبكة كانت عمودين — على الجوال خليها عمود واحد */
+  .products-grid, .grid-products, .grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* منع “طفح” السعر/الخيارات خارج الكرت إن كان فيه position */
+  .product-card *, .meal-card * {
+    max-width: 100%;
+  }
+}
+</style>
+
 </head>
 <body>
 <div class="app">
