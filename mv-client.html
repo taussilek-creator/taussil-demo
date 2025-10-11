@@ -457,6 +457,49 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
   background:#fee2e2; color:#b91c1c; border:1px solid #fecaca;
 }
 .prod-slide .thumb-wrap { position:relative; width:84px; height:84px }
+/* Arrows for desktop only */
+#hot-rest-products .rail-nav {
+  background: rgba(255,255,255,0.9);
+  border: 1px solid rgba(0,0,0,0.1);
+  border-radius: 50%;
+  width: 36px; height: 36px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 20px; font-weight: 600;
+  cursor: pointer; box-shadow: 0 2px 6px rgba(0,0,0,.15);
+  color: var(--ink, #222);
+  position: absolute; top: 40%;
+  z-index: 5; transition: all .2s ease;
+}
+#hot-rest-products .rail-nav:hover { background: var(--cta,#eee); color:#fff; }
+#hot-rest-products .rail-nav.left { left: -18px; }
+#hot-rest-products .rail-nav.right { right: -18px; }
+
+/* Hide on mobile */
+@media (max-width: 900px) {
+  #hot-rest-products .rail-nav { display: none; }
+}
+/* Arrows (desktop only) for linked products rails */
+#top-rest-products .rail-nav,
+#hot-rest-products .rail-nav{
+  background: rgba(255,255,255,0.9);
+  border: 1px solid rgba(0,0,0,0.1);
+  border-radius: 50%;
+  width: 36px; height: 36px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 20px; font-weight: 600;
+  cursor: pointer; box-shadow: 0 2px 6px rgba(0,0,0,.15);
+  color: var(--ink, #222);
+  position: absolute; top: 40%;
+  z-index: 5; transition: all .2s ease;
+}
+#top-rest-products .rail-nav.left,  #hot-rest-products .rail-nav.left{ left: -18px; }
+#top-rest-products .rail-nav.right, #hot-rest-products .rail-nav.right{ right: -18px; }
+
+/* Hide arrows on mobile */
+@media (max-width: 900px){
+  #top-rest-products .rail-nav,
+  #hot-rest-products .rail-nav{ display: none; }
+}
 
 </style>
 
@@ -546,10 +589,12 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
     <div class="small" id="hotRestSub">Scroll in der oberen Leiste, um die Produkte zu wechseln</div>
   </div>
   <div class="rail">
-    <!-- لا أزرار -->
+    <button class="rail-nav left" data-nav="hotprod-prev">‹</button>
     <div id="hotRestProd" class="rail-inner"></div>
+    <button class="rail-nav right" data-nav="hotprod-next">›</button>
   </div>
 </section>
+
 
 
 <!-- TOP RATED -->
@@ -562,6 +607,18 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
     <button class="rail-nav prev" data-nav="top">‹</button>
     <div id="railTop" class="rail-inner"></div>
     <button class="rail-nav next" data-nav="top">›</button>
+  </div>
+</section>
+<!-- LINKED PRODUCTS: Top Rated -->
+<section id="top-rest-products" class="rail-card card hidden">
+  <div class="rail-head">
+    <div class="rail-title" id="topRestTitle">Produkte von diesem Restaurant</div>
+    <div class="small" id="topRestSub">Scrollen Sie oben in „Top bewertet“, um die Produkte zu wechseln</div>
+  </div>
+  <div class="rail">
+    <button class="rail-nav left" data-nav="topprod-prev">‹</button>
+    <div id="topRestProd" class="rail-inner"></div>
+    <button class="rail-nav right" data-nav="topprod-next">›</button>
   </div>
 </section>
 
@@ -858,6 +915,128 @@ function bindRailNav(){
   });
 }
 
+// يبني بطاقة منتج صغيرة للسلايدر المرتبط
+function buildSmallProductCard(r, p){
+  const pic =
+    (Array.isArray(p.images) && p.images[0]) ? p.images[0] :
+    (typeof p.img === 'string' && p.img) ? p.img :
+    (typeof p.imageUrl === 'string' && p.imageUrl) ? p.imageUrl : '';
+
+  const { unit, unitOld, discPct } = computeDealUnit(r, p);
+  const discHtml = (discPct > 0) ? `<span class="badge-disc">-${Math.round(discPct)}%</span>` : '';
+  const priceHtml = (unitOld > unit)
+    ? `<div class="pprice"><s>${eur(unitOld)}</s><strong>${eur(unit)}</strong></div>`
+    : `<div class="pprice"><strong>${eur(unit)}</strong></div>`;
+
+  const hasOpts =
+    (Array.isArray(p.optionGroupIds) && p.optionGroupIds.length>0) ||
+    (Array.isArray(p.sizes) && p.sizes.length>0);
+
+  const el = document.createElement('div');
+  el.className = 'pitem';
+  el.style.minWidth = '260px'; // يعطي عرضاً مناسباً في السكة الأفقية
+  el.innerHTML = `
+    <div class="pitem-left-wrap">
+      <div class="pitem-left">
+        ${pic ? `<img src="${esc(pic)}" loading="lazy" decoding="async" alt="">`
+              : `<div style="font-size:13px;color:#999">—</div>`}
+      </div>
+      ${discHtml}
+    </div>
+    <div class="pitem-mid">
+      <div class="pname">${esc(p.name || p.title || '(—)')}</div>
+      <div class="prest">${esc(r.name || '')}</div>
+      ${priceHtml}
+    </div>
+    <div class="pitem-right">
+      ${hasOpts
+        ? `<button class="btn-sm" data-cfg="${r.id}::${p.id}" title="${T('choose')}">＋</button>`
+        : `<button class="btn-sm" data-add="${r.id}::${p.id}" title="${T('add')}">＋</button>`}
+    </div>
+  `;
+
+  el.querySelector('[data-add]')?.addEventListener('click', ()=>{
+    addToCart(r, p);
+  });
+  el.querySelector('[data-cfg]')?.addEventListener('click', async ()=>{
+    await openConfigurator(r, p);
+  });
+
+  return el;
+}
+
+// يرسم منتجات مطعم معيّن داخل سكة مرتبطة (يستعمل buildSmallProductCard)
+async function showLinkedProductsByRid(rid, { secId, contId, titleId }){
+  try{
+    const rDoc = await fs.collection('restaurants').doc(rid).get();
+    if(!rDoc.exists) return;
+    const r = { id: rid, ...rDoc.data() };
+
+    const ps = await fs.collection('restaurants').doc(rid).collection('products').get();
+    const list = [];
+    ps.forEach(d => {
+      const p = { id: d.id, ...d.data() };
+      if (p.isAvailable === false) return;
+      list.push(p);
+    });
+    // ترتيب بسيط: بالحسم ثم بالاسم
+    list.sort((a,b)=>{
+      const da = getProductDiscount(a), db = getProductDiscount(b);
+      if (db !== da) return db - da;
+      return String(a.name||'').localeCompare(String(b.name||''));
+    });
+
+    const cont = document.getElementById(contId);
+    const sec  = document.getElementById(secId);
+    if(!cont || !sec) return;
+
+    cont.innerHTML = '';
+    const frag = document.createDocumentFragment();
+    (list.slice(0, 16)).forEach(p => frag.appendChild(buildSmallProductCard(r, p)));
+    cont.appendChild(frag);
+    sec.classList.remove('hidden');
+
+    if (titleId){
+      const t = document.getElementById(titleId);
+      if (t) t.textContent = `Produkte – ${r.name || ''}`;
+    }
+  }catch(e){ /* تجاهل */ }
+}
+
+// راصد «المركز» لسكة معيّنة: يحدّد العنصر .tile الأقرب لمركز السكة
+function observeRailCenter(railEl, onRid){
+  if(!railEl) return;
+  const pickCenter = ()=>{
+    const rect = railEl.getBoundingClientRect();
+    const cx = rect.left + rect.width/2;
+    let best = null, bestDist = 1e9;
+    railEl.querySelectorAll('.tile').forEach(card=>{
+      const r = card.getBoundingClientRect();
+      const mid = r.left + r.width/2;
+      const d = Math.abs(mid - cx);
+      if (d < bestDist){ bestDist = d; best = card; }
+    });
+    const rid = best?.dataset?.rid;
+    if (rid) onRid(rid);
+  };
+  let t = null;
+  railEl.addEventListener('scroll', ()=>{
+    clearTimeout(t); t = setTimeout(pickCenter, 80);
+  }, { passive:true });
+  // التحديد الأولي أيضاً
+  setTimeout(pickCenter, 0);
+}
+
+// أسهم تنقّل للسكة المرتبطة (ديسكتوب فقط؛ تُخفى على الجوال بالـCSS)
+function initLinkedArrows(contId, prefix){
+  const cont = document.getElementById(contId);
+  const prev = document.querySelector(`[data-nav="${prefix}-prev"]`);
+  const next = document.querySelector(`[data-nav="${prefix}-next"]`);
+  if(!cont || !prev || !next) return;
+  const step = 320;
+  prev.addEventListener('click', ()=> cont.scrollBy({ left: -step, behavior:'smooth' }));
+  next.addEventListener('click', ()=> cont.scrollBy({ left:  step, behavior:'smooth' }));
+}
 
 // استدعاء Builder البطاقة الحالي لديك
 // إن كان لديك buildRestaurantCard(r) فسنستعمله كما هو.
@@ -973,7 +1152,10 @@ const minOrderHtml = (moNum!=null && moNum>0)
       ? `<span class="badge">⭐️ ${rate.toFixed(1)}</span>`
       : `<span class="badge">Neu</span>`;
 
-    const card = document.createElement('div'); card.className='tile';
+    const card = document.createElement('div'); 
+card.className = 'tile';
+card.dataset.rid = r.id;   // ← مهم: نحتاجه لاكتشاف المطعم الوسطي
+
     card.innerHTML = `
       <div class="tile-media">
   ${showCover ? `<img class="tile-cover" src="${coverUrl}" alt="" loading="lazy" decoding="async">` : ``}
@@ -1039,6 +1221,27 @@ cont.appendChild(frag);
   // 3) رسم السكّتين
   renderRail('rail-hot-sec', 'railHot', hot);
   renderRail('rail-top-sec', 'railTop', top);
+  // === Link products section to CENTER of Top Rated rail ===
+(() => {
+  const railTop = document.getElementById('railTop');
+  const already = railTop?.dataset?.linkedInit === '1';
+  if (!railTop || already) return;
+
+  railTop.dataset.linkedInit = '1';
+
+  // عندما يحطّ كارت مطعم في وسط السكة → اعرض منتجاته في القسم أسفل Top Rated
+  observeRailCenter(railTop, rid => {
+    showLinkedProductsByRid(rid, {
+      secId: 'top-rest-products',
+      contId: 'topRestProd',
+      titleId: 'topRestTitle'
+    });
+  });
+
+  // فعّل الأسهم (تظهر فقط على الديسكتوب)
+  initLinkedArrows('topRestProd', 'topprod');
+})();
+
 // فعّل تتبع مركز سكة HOT مرة واحدة بعد الرسم
 initHotCenterTracking();
 
@@ -1286,6 +1489,25 @@ async function showHotRestaurantProductsById(rid){
   list.forEach(p => frag.appendChild(buildHotProdSlide(r, p)));
   cont.appendChild(frag);
   sec.classList.remove('hidden');
+  initHotProdArrows();
+
+}
+// === Arrows navigation for desktop (hot products rail)
+function initHotProdArrows(){
+  const rail = document.getElementById('hotRestProd');
+  if(!rail) return;
+  const btnPrev = document.querySelector('[data-nav="hotprod-prev"]');
+  const btnNext = document.querySelector('[data-nav="hotprod-next"]');
+  if(!btnPrev || !btnNext) return;
+
+  const scrollStep = 320; // px per click
+
+  btnPrev.addEventListener('click', ()=>{
+    rail.scrollBy({ left: -scrollStep, behavior: 'smooth' });
+  });
+  btnNext.addEventListener('click', ()=>{
+    rail.scrollBy({ left: scrollStep, behavior: 'smooth' });
+  });
 }
 
 // === احسب المطعم الواقع في منتصف سكة HOT
