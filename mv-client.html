@@ -300,24 +300,6 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
 
 /* ضمان أن البطاقة/العنصر تسمح بخروج الشارة قليلاً */
 .pitem, .item{ position:relative; overflow:visible }
-
-</style>
-
-<!-- Firebase Compat -->
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-<script>
-  const firebaseConfig = {
-    apiKey: "AIzaSyD0g9T3amjuPodsLS6ZQkHYWrzV1UrX_QI",
-    authDomain: "taussil-lieferservice-8bbe9.firebaseapp.com",
-    projectId: "taussil-lieferservice-8bbe9",
-    storageBucket: "taussil-lieferservice-8bbe9.firebasestorage.app",
-    messagingSenderId: "583536892937",
-    appId: "1:583536892937:web:5d5ff133de4d8b3b28ecd8",
-    databaseURL: "https://taussil-lieferservice-8bbe9-default-rtdb.europe-west1.firebasedatabase.app"
-  };
-  try{ firebase.initializeApp(firebaseConfig); }catch(e){}
-</script>
 <style id="mobile-fixes">
 /* ===== Mobile layout fixes for customer menu ===== */
 @media (max-width: 720px){
@@ -433,6 +415,23 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
 }
 </style>
 
+</style>
+
+<!-- Firebase Compat -->
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script>
+  const firebaseConfig = {
+    apiKey: "AIzaSyD0g9T3amjuPodsLS6ZQkHYWrzV1UrX_QI",
+    authDomain: "taussil-lieferservice-8bbe9.firebaseapp.com",
+    projectId: "taussil-lieferservice-8bbe9",
+    storageBucket: "taussil-lieferservice-8bbe9.firebasestorage.app",
+    messagingSenderId: "583536892937",
+    appId: "1:583536892937:web:5d5ff133de4d8b3b28ecd8",
+    databaseURL: "https://taussil-lieferservice-8bbe9-default-rtdb.europe-west1.firebasedatabase.app"
+  };
+  try{ firebase.initializeApp(firebaseConfig); }catch(e){}
+</script>
 </head>
 <body>
 <div class="app">
