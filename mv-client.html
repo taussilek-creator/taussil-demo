@@ -314,34 +314,80 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
     width: 100%;
   }
 }
-/* === Menu dialog: keep side categories left (even on mobile) === */
-.menu{ grid-template-columns: 220px 1fr !important; }
+/* ==== Mobile-only menu layout ==== */
 @media (max-width:900px){
-  .menu{ grid-template-columns: 180px 1fr !important; }
-}
+  /* منبثق القائمة يصبح عمودياً */
+  .menu{
+    display:flex !important;
+    flex-direction:column;
+    gap:10px;
+    padding:12px;
+    background:var(--card);
+    max-height:72vh;
+    overflow:auto;
+  }
 
-/* بطاقة منتج داخل القائمة: صورة يسار / نص (اسم + سعر تحت الاسم + وصف) / زر يمين */
-.item{
-  display:grid;
-  grid-template-columns: 72px 1fr auto;
-  gap:8px;
-  align-items:center;
-}
-.item .txt{
-  display:flex;
-  flex-direction:column;
-  justify-content:center;
-  gap:2px;
-  min-height:72px; /* يطابق ارتفاع الصورة */
-}
-.item .nm{ font-weight:800; line-height:1.2; }
-.item .pr{ font-weight:800; }
-.item .ds{ font-size:12px; color:#555; }
+  /* سلايدر فئات أفقي بالسحب (بدون أسهم) */
+  .menu-rail{
+    display:flex;
+    gap:8px;
+    overflow:auto;
+    padding:6px 2px;
+    scrollbar-width:none; -ms-overflow-style:none;
+  }
+  .menu-rail::-webkit-scrollbar{ display:none }
+  .menu-chip{
+    flex:0 0 auto;
+    display:flex; align-items:center; gap:8px;
+    padding:8px 12px;
+    border-radius:999px;
+    border:1px solid rgba(0,0,0,.12);
+    background:#fff;
+    cursor:pointer; user-select:none;
+    box-shadow:0 2px 8px rgba(0,0,0,.06);
+    font-weight:800; font-size:13px;
+    white-space:nowrap;
+  }
+  .menu-chip.active{ background:#e6f7fb; border-color:#aee7f5 }
 
-/* زر الإضافة كأيقونة مربعة صغيرة */
-.item .act .btn-sm{
-  width:34px; min-width:34px; height:34px; padding:0;
-  display:inline-flex; align-items:center; justify-content:center;
+  /* قائمة المنتجات تحت السلايدر بعرض كامل */
+  .menu-list{
+    background:#fff;
+    border:1px solid rgba(0,0,0,.08);
+    border-radius:12px;
+    padding:10px;
+    display:flex;
+    flex-direction:column;
+    gap:8px;
+  }
+
+  /* بطاقة المنتج للجوال (صورة يسار، نص وسط، زر يمين + السعر تحت الاسم) */
+  .item{
+    display:grid;
+    grid-template-columns:72px 1fr auto;
+    gap:8px;
+    align-items:center;
+    border-top:1px dashed #e5e7eb;
+    padding-top:8px;
+  }
+  .item:first-child{ border-top:0; padding-top:0 }
+  .item .ph{ width:72px; height:72px; border-radius:12px; border:1px solid rgba(0,0,0,.08); background:#fff; overflow:hidden; display:flex; align-items:center; justify-content:center }
+  .item .im{ width:100%; height:100%; object-fit:contain; object-position:center }
+  .item .txt{ display:flex; flex-direction:column; justify-content:center; gap:2px; min-height:72px }
+  .item .nm{ font-weight:800; line-height:1.2 }
+  .item .ds{ font-size:12px; color:#555 }
+  .item .pr{ font-weight:800 } /* السعر أسفل الاسم */
+  .item .act .btn-sm{ width:34px; min-width:34px; height:34px; padding:0; display:inline-flex; align-items:center; justify-content:center }
+
+  /* شارة الخصم خارج إطار الصورة */
+  .item .ph-wrap{ position:relative; width:72px; height:72px }
+  .badge-disc{
+    position:absolute; top:-8px; right:-8px; z-index:5; pointer-events:none;
+    display:inline-flex; align-items:center; justify-content:center;
+    min-width:34px; height:22px; padding:0 8px; border-radius:999px;
+    background:#ef4444; color:#fff; font-weight:800; font-size:12px; line-height:1;
+    box-shadow:0 2px 6px rgba(0,0,0,.25);
+  }
 }
 
 </style>
@@ -1072,94 +1118,216 @@ async function openMenu(rid){
 
   PROD_CACHE.set(rid,{cats,prods}); renderMenu(r,cats,prods);
 }
-function renderMenu(r,cats,prods){
-  const body=$("#menuBody");
-  const byCat=new Map(); cats.forEach(c=>byCat.set(c.id,[])); byCat.set('_',[]);
-  for(const p of prods){ const cid=(p.categoryId&&byCat.has(p.categoryId))?p.categoryId:'_'; byCat.get(cid).push(p); }
+// إعادة بناء عرض القائمة عند تغيير الحجم (لو الديالوج مفتوح)
+(function(){
+  let ridOpen = null;
+  const dlg = document.getElementById('menuDialog');
 
+  // التتبع عند فتح القائمة
+  const _openMenu = openMenu;
+  openMenu = async function(rid){
+    ridOpen = rid;
+    return _openMenu.apply(this, arguments);
+  };
+
+  // عند تغيير العرض—أعد الرسم إن كان مفتوحًا
+  let t;
+  window.addEventListener('resize', ()=>{
+    if (!dlg || !dlg.open || !ridOpen) return;
+    clearTimeout(t);
+    t = setTimeout(async ()=>{
+      try{
+        const rDoc = await fs.collection('restaurants').doc(ridOpen).get();
+        const r = { id: ridOpen, ...rDoc.data() };
+        let cats = [], prods = [];
+        const cs = await fs.collection('restaurants').doc(ridOpen).collection('categories').get();
+        cs.forEach(d=> cats.push({id:d.id, ...d.data()}));
+        const ps = await fs.collection('restaurants').doc(ridOpen).collection('products').get();
+        ps.forEach(d=> prods.push({id:d.id, ...d.data()}));
+        prods = prods.filter(p=> p.isAvailable !== false);
+        renderMenu(r, cats.sort((a,b)=>(a.sort??0)-(b.sort??0)), prods);
+      }catch(_){}
+    }, 200);
+  });
+})();
+
+function renderMenu(r, cats, prods){
+  const body = document.getElementById('menuBody');
+  const isMobile = window.matchMedia('(max-width: 900px)').matches;
+
+  // فهرسة المنتجات حسب الفئة
+  const byCat = new Map(); cats.forEach(c=>byCat.set(c.id,[])); byCat.set('_',[]);
+  for (const p of prods){
+    const cid = (p.categoryId && byCat.has(p.categoryId)) ? p.categoryId : '_';
+    byCat.get(cid).push(p);
+  }
+
+  // ===== MOBILE: سلايدر أفقي + قائمة كاملة =====
+  if (isMobile){
+    let activeCid = cats[0]?.id || '_';
+
+    const rail = document.createElement('div'); rail.className='menu-rail';
+    const list = document.createElement('div'); list.className='menu-list';
+
+    const makeChip = (c)=>{
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'menu-chip' + (activeCid===c.id?' active':'');
+      btn.textContent = c.name || c.title || '—';
+      btn.addEventListener('click', ()=>{
+        activeCid = c.id;
+        rail.querySelectorAll('.menu-chip').forEach(x=>x.classList.remove('active'));
+        btn.classList.add('active');
+        paint();
+      });
+      return btn;
+    };
+
+    rail.innerHTML = '';
+    cats.forEach(c => rail.appendChild(makeChip(c)));
+    if ((byCat.get('_')||[]).length){ rail.appendChild(makeChip({id:'_', name:'…'})); }
+
+    function paint(){
+      list.innerHTML = '';
+      const items = (byCat.get(activeCid) || []).sort((a,b)=>(a.sort??0)-(b.sort??0));
+      if (!items.length){ list.innerHTML = `<div class="small">—</div>`; return; }
+
+      for (const it of items){
+        const name  = it.name || it.title || '(—)';
+        const desc  = it.desc || '';
+        const price = (typeof it.price === 'number') ? it.price : Number(it.price||0);
+        const imgUrl =
+          (Array.isArray(it.images) && it.images[0]) ? it.images[0] :
+          (typeof it.img === 'string' && it.img) ? it.img :
+          (typeof it.imageUrl === 'string' && it.imageUrl) ? it.imageUrl : '';
+
+        const restDisc = getRestaurantDiscount(r);
+        const prodDisc = getProductDiscount(it);
+        const effDisc  = prodDisc > 0 ? prodDisc : restDisc;
+
+        const hasOpts =
+          (Array.isArray(it.optionGroupIds) && it.optionGroupIds.length>0) ||
+          (Array.isArray(it.sizes) && it.sizes.length>0);
+
+        const hasSizes = Array.isArray(it.sizes) && it.sizes.length > 0;
+        const priceBlock = priceHtml(price, effDisc, { prefixFrom: hasSizes });
+
+        const row = document.createElement('div'); row.className='item';
+        row.innerHTML = `
+          <div class="ph-wrap">
+            <div class="ph">
+              ${imgUrl
+                ? `<img class="im" src="${esc(imgUrl)}" loading="lazy" decoding="async" alt="">`
+                : `<div class="im" style="display:flex;align-items:center;justify-content:center;font-size:12px;color:#999">—</div>`}
+            </div>
+            ${effDisc>0 ? `<span class="badge-disc">-${Math.round(effDisc)}%</span>` : ``}
+          </div>
+
+          <div class="txt">
+            <div class="nm line-1">${esc(name)}</div>
+            <div class="pr">${priceBlock}</div>
+            ${desc ? `<div class="ds line-1">${esc(desc)}</div>` : ``}
+          </div>
+
+          <div class="act">
+            ${hasOpts
+              ? `<button class="btn-sm" data-cfg="${it.id}" title="${T('choose')}">＋</button>`
+              : `<button class="btn-sm" data-add="${it.id}" title="${T('add')}">＋</button>`}
+          </div>
+        `;
+        list.appendChild(row);
+      }
+
+      // Bind
+      list.querySelectorAll('[data-add]').forEach(b=>{
+        b.addEventListener('click',()=>{
+          const pid=b.getAttribute('data-add'); const it=prods.find(x=>x.id===pid);
+          addToCart(r,it);
+        });
+      });
+      list.querySelectorAll('[data-cfg]').forEach(b=>{
+        b.addEventListener('click', async ()=>{
+          const pid=b.getAttribute('data-cfg'); const it=prods.find(x=>x.id===pid);
+          await openConfigurator(r,it);
+        });
+      });
+    }
+
+    body.innerHTML=''; body.appendChild(rail); body.appendChild(list); paint();
+    return;
+  }
+
+  // ===== DESKTOP (كما كان): عمود فئات يسار + قائمة يمين =====
   const side=document.createElement('div'); side.className='menu-side';
   cats.forEach((c,i)=>{ const b=document.createElement('button'); b.className='menu-cat'+(i===0?' active':''); b.textContent=c.name||c.title||'—'; b.dataset.cid=c.id; side.appendChild(b); });
   if((byCat.get('_')||[]).length){ const b=document.createElement('button'); b.className='menu-cat'; b.textContent='…'; b.dataset.cid='_'; side.appendChild(b); }
 
   const list=document.createElement('div'); list.className='menu-list';
+
   const paint=(cid)=>{
     list.innerHTML=''; const items=(byCat.get(cid)||[]).sort((a,b)=>(a.sort??0)-(b.sort??0));
     if(!items.length){ list.innerHTML=`<div class="small">—</div>`; return; }
     for (const it of items) {
-  const name = it.name || it.title || '(—)';
-  const desc = it.desc || '';
-  const price = (typeof it.price === 'number') ? it.price : Number(it.price || 0);
+      const name = it.name || it.title || '(—)';
+      const desc = it.desc || '';
+      const price = (typeof it.price === 'number') ? it.price : Number(it.price || 0);
+      const imgUrl =
+        (Array.isArray(it.images) && it.images[0]) ? it.images[0] :
+        (typeof it.img === 'string' && it.img) ? it.img :
+        (typeof it.imageUrl === 'string' && it.imageUrl) ? it.imageUrl : '';
 
-  // التقط رابط الصورة من الحقول الشائعة (images[], img, image)
-  const pic =
-  (Array.isArray(it.images) && it.images[0]) ||
-  it.img || it.image || (it.images && it.images.url) || null;
+      const restDisc = getRestaurantDiscount(r);
+      const prodDisc = getProductDiscount(it);
+      const effDisc  = prodDisc > 0 ? prodDisc : restDisc;
 
-const row = document.createElement('div'); row.className = 'item';
-const hasOpts =
-  (Array.isArray(it.optionGroupIds) && it.optionGroupIds.length>0) ||
-  (Array.isArray(it.sizes) && it.sizes.length>0);
+      const hasOpts =
+        (Array.isArray(it.optionGroupIds) && it.optionGroupIds.length>0) ||
+        (Array.isArray(it.sizes) && it.sizes.length>0);
 
+      const hasSizes = Array.isArray(it.sizes) && it.sizes.length > 0;
+      const priceBlock = priceHtml(price, effDisc, { prefixFrom: hasSizes });
 
-// استنتاج صورة المنتج من الحقول المتاحة
-const imgUrl =
-  (Array.isArray(it.images) && it.images[0]) ? it.images[0] :
-  (typeof it.img === 'string' && it.img) ? it.img :
-  (typeof it.imageUrl === 'string' && it.imageUrl) ? it.imageUrl : '';
-  // حساب خصم هذا المنتج (يغلب على خصم المطعم إن وجد على مستوى المطعم)
-  const restDisc = getRestaurantDiscount(r);
-const prodDisc = getProductDiscount(it);
-const effDisc  = prodDisc > 0 ? prodDisc : restDisc;
+      const row = document.createElement('div'); row.className='item';
+      row.innerHTML = `
+        <div class="ph">
+          ${imgUrl
+            ? `<img class="im" src="${esc(imgUrl)}" loading="lazy" decoding="async" alt="">`
+            : `<div class="im" style="display:flex;align-items:center;justify-content:center;font-size:12px;color:#999">—</div>`}
+        </div>
+        <div class="txt">
+          <div class="nm line-1">${esc(name)}</div>
+          ${desc ? `<div class="ds line-1">${esc(desc)}</div>` : ``}
+        </div>
+        <div class="act" style="display:flex;gap:8px;align-items:center">
+          <div class="pr">${priceBlock}</div>
+          ${hasOpts
+            ? `<button class="btn-sm" data-cfg="${it.id}">${T('choose')}</button>`
+            : `<button class="btn-sm" data-add="${it.id}">${T('add')}</button>`}
+        </div>
+      `;
+      list.appendChild(row);
+    }
 
-const hasSizes = Array.isArray(it.sizes) && it.sizes.length > 0;
-const priceBlock = priceHtml(price, effDisc, { prefixFrom: hasSizes });
-
-
-const discHtml = (effDisc > 0) ? `<span class="badge-disc">-${Math.round(effDisc)}%</span>` : '';
-
-
-row.innerHTML = `
-  <div class="ph-wrap">
-    <div class="ph">
-      ${imgUrl
-        ? `<img class="im" src="${esc(imgUrl)}" loading="lazy" decoding="async" alt="">`
-        : `<div class="im" style="display:flex;align-items:center;justify-content:center;font-size:12px;color:#999">—</div>`}
-    </div>
-    ${discHtml}
-  </div>
-
-  <div class="txt">
-    <div class="nm line-1">${esc(name)}</div>
-    <div class="pr">${priceBlock}</div>
-    ${desc ? `<div class="ds line-1">${esc(desc)}</div>` : ``}
-  </div>
-
-  <div class="act">
-    ${hasOpts
-      ? `<button class="btn-sm" data-cfg="${it.id}" title="${T('choose')}">＋</button>`
-      : `<button class="btn-sm" data-add="${it.id}" title="${T('add')}">＋</button>`}
-  </div>
-`;
-
-list.appendChild(row);
-}
     list.querySelectorAll('[data-add]').forEach(b=>{
-  b.addEventListener('click',()=>{
-    const pid=b.getAttribute('data-add'); const it=prods.find(x=>x.id===pid);
-    addToCart(r,it);
-  });
-});
-list.querySelectorAll('[data-cfg]').forEach(b=>{
-  b.addEventListener('click', async ()=>{
-    const pid=b.getAttribute('data-cfg'); const it=prods.find(x=>x.id===pid);
-    await openConfigurator(r,it);
-  });
-});
-
+      b.addEventListener('click',()=>{
+        const pid=b.getAttribute('data-add'); const it=prods.find(x=>x.id===pid);
+        addToCart(r,it);
+      });
+    });
+    list.querySelectorAll('[data-cfg]').forEach(b=>{
+      b.addEventListener('click', async ()=>{
+        const pid=b.getAttribute('data-cfg'); const it=prods.find(x=>x.id===pid);
+        await openConfigurator(r,it);
+      });
+    });
   };
+
   paint(cats[0]?.id||'_');
   side.querySelectorAll('.menu-cat').forEach(btn=>{
-    btn.addEventListener('click',()=>{ side.querySelectorAll('.menu-cat').forEach(x=>x.classList.remove('active')); btn.classList.add('active'); paint(btn.dataset.cid); });
+    btn.addEventListener('click',()=>{
+      side.querySelectorAll('.menu-cat').forEach(x=>x.classList.remove('active'));
+      btn.classList.add('active'); paint(btn.dataset.cid);
+    });
   });
 
   body.innerHTML=''; body.appendChild(side); body.appendChild(list);
