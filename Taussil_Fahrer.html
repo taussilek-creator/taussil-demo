@@ -195,8 +195,12 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
 .neo-bottom .neo-circle.pin{ color:#e5f1ff; }
 /* نص “Abholung in …” أسود وواضح */
 .neo-driver .eta-line{
-  font-weight:800; color:#000; font-size:20px; margin-bottom:2px;
+  font-weight:800;
+  color: var(--ok) !important; /* أخضر */
+  font-size:20px;
+  margin-bottom:2px;
 }
+
 /* اجعل حواف البطاقات مستوحاة من الصورة */
 .neo-driver .card-order{ border-radius:24px }
 /* === Multi-Stops inside a card: light tile + border + shadow + black text === */
@@ -761,6 +765,13 @@ html, body { width:100%; max-width:100%; overflow-x:hidden; }
   font-weight: 800;
   flex: 0 0 auto;                 /* لا تتمدد ولا تنضغط */
 }
+/* Center ETA line full-width inside the flex .kv row */
+#etaLine{
+  flex: 0 0 100%;      /* يأخذ صف كامل */
+  text-align: center;  /* يوسّط النص */
+  display: block;      /* يضمن السلوك */
+  margin-top: 4px;     /* مسافة بسيطة اختيارية */
+}
 
 </style>
 </head>
@@ -874,6 +885,7 @@ html, body { width:100%; max-width:100%; overflow-x:hidden; }
 
     <div class="kv"><div class="small">Qty</div><div class="small" id="md_qty">—</div></div>
     <div class="kv"><div class="small">Abholzeit</div><div class="small" id="md_pickup">—</div></div>
+	<div class="kv"><div class="small">Erstellt am</div><div class="small" id="md_created">—</div></div>
     <div class="row" style="margin-top:8px">
 	<!-- Preis row (editable) -->
 <div class="kv">
@@ -961,10 +973,11 @@ html, body { width:100%; max-width:100%; overflow-x:hidden; }
 import { initializeApp, getApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 // أضف getDocs هنا:
 import {
-  getFirestore, collection, query, where, limit, onSnapshot, doc,
+  getFirestore, collection, query, where, orderBy, limit, onSnapshot, doc,
   setDoc, updateDoc, getDoc, getDocs, Timestamp, serverTimestamp,
   runTransaction, increment
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
 
 import {
   getDatabase, ref, onDisconnect, update as rUpdate, onValue, serverTimestamp as rServerTs
@@ -1410,6 +1423,8 @@ const navModal=$("#navModal"), navClose=$("#nav_close"), navSave=$("#nav_save");
 const listEl=$("#ordersList"), ordersInfo=$("#ordersInfo");
 const md=$("#orderModal"), mdClose=$("#md_close");
 const md_id=$("#md_id"), md_status=$("#md_status"), md_platform=$("#md_platform"), md_rest=$("#md_rest"), md_addr=$("#md_addr"), md_qty=$("#md_qty"), md_pickup=$("#md_pickup"), md_title=$("#md_title");
+const md_created=$("#md_created");
+
 const md_phone_link = document.getElementById('md_phone_link'); // قد يكون null لو ما لُصق الـHTML بعد
 
 const md_start=$("#md_start"), md_done=$("#md_done"), md_nav=$("#md_nav");
@@ -2198,20 +2213,33 @@ function mapStatusLabel(s){ const low=String(s||"").toLowerCase(); if(low==="bea
 function attachOrders(){
   detachOrders();
   if(!uid){ ordersInfo.textContent="—"; return; }
-  const qMine=query(collection(db,"orders"), where("driver.id","==", uid), limit(50));
+  const qMine = query(
+    collection(db,"orders"),
+    where("driver.id","==", uid)
+  );
   unsubOrders = onSnapshot(qMine,(snap)=>{
     const items = snap.docs.map(d=>({ id:d.id, o:d.data()||{} }))
+      // ترتيب على الواجهة: استخدم updatedAt ثم fallback على createdAt
       .sort((a,b)=>{
-        const ta=(a.o.updatedAt&&a.o.updatedAt.toMillis)?a.o.updatedAt.toMillis():0;
-        const tb=(b.o.updatedAt&&b.o.updatedAt.toMillis)?b.o.updatedAt.toMillis():0;
-        return tb-ta;
+        const ta =
+          (a.o.updatedAt && a.o.updatedAt.toMillis) ? a.o.updatedAt.toMillis() :
+          (a.o.createdAt && a.o.createdAt.toMillis) ? a.o.createdAt.toMillis() : 0;
+
+        const tb =
+          (b.o.updatedAt && b.o.updatedAt.toMillis) ? b.o.updatedAt.toMillis() :
+          (b.o.createdAt && b.o.createdAt.toMillis) ? b.o.createdAt.toMillis() : 0;
+
+        return tb - ta; // الأحدث أولاً
       });
+
     lastOrders = items.slice();
     renderOrders(lastOrders);
-	
+
     snap.docChanges().forEach(ch=>{
-      const now=String(ch.doc.data()?.status||'').toLowerCase();
-      if(now==='zugewiesen' || now==='assigned'){ showIncoming({id:ch.doc.id, o:ch.doc.data()||{}}); }
+      const now = String(ch.doc.data()?.status||'').toLowerCase();
+      if(now==='zugewiesen' || now==='assigned'){
+        showIncoming({id:ch.doc.id, o:ch.doc.data()||{}});
+      }
     });
   }, ()=>{ ordersInfo.textContent="Wird geprüft…"; });
 }
@@ -2587,12 +2615,7 @@ async function openEarningsModal(){
   setTimeout(()=> document.getElementById('earnings_close')?.focus(), 0);
 
   // جلب حتى 500 طلب لهذا السائق ثم فلترة "Geliefert"
-  // بعد: غير محدود + ترتيب بالأحدث
-const qMine = query(
-  collection(db,"orders"),
-  where("driver.id","==", uid),
-  orderBy("updatedAt","desc")   // قد يطلب فهرس مركّب أول مرة
-);
+  const qMine = query(collection(db,"orders"), where("driver.id","==", uid), limit(500));
   const snap  = await getDocs(qMine);
   const all   = snap.docs.map(d=>({ id:d.id, o:d.data()||{} }));
   const delivered = all.filter(x => String(x.o.status||'').trim().toLowerCase() === 'geliefert');
@@ -3086,6 +3109,16 @@ async function openDetail(id){
   md_qty.textContent=Number(o.qty||0)||0;
   md_pickup.textContent=o.pickupTime || "—";
   md_title.textContent=o.restaurant?.name||"Auftrag";
+  // createdAt بالتاريخ/الوقت (de-DE)
+const createdMs =
+  (o?.createdAt?.toMillis?.() ? o.createdAt.toMillis() :
+   (typeof o?.createdAt?._seconds==='number' ? o.createdAt._seconds*1000 : null));
+
+md_created.textContent = createdMs
+  ? new Intl.DateTimeFormat('de-DE',{ dateStyle:'medium', timeStyle:'short' })
+      .format(new Date(createdMs))
+  : '—';
+
   const priceEUR = Number(o.price||0) || 0;
 md_price_value.textContent = formatEUR(priceEUR);
 md_price_edit.disabled = !canEditPrice(o);
