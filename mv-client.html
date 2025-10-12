@@ -1682,9 +1682,11 @@ if (isMobile){
     cats.forEach(c => rail.appendChild(makeChip(c)));
     if ((byCat.get('_')||[]).length){ rail.appendChild(makeChip({id:'_', name:'…'})); }
 
-    function paint(){
-      list.innerHTML = '';
-      const items = (byCat.get(activeCid) || []).sort((a,b)=>(a.sort??0)-(b.sort??0));
+    function paint(opts = {}){
+  const { resetScroll = false } = opts;
+  const keepScroll = list.scrollTop;   // احفظ الموضع الحالي
+  list.innerHTML = '';
+  const items = (byCat.get(activeCid) || []).sort((a,b)=>(a.sort??0)-(b.sort??0));
       if (!items.length){ list.innerHTML = `<div class="small">—</div>`; return; }
 
       for (const it of items){
