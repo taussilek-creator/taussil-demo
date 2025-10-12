@@ -2587,7 +2587,12 @@ async function openEarningsModal(){
   setTimeout(()=> document.getElementById('earnings_close')?.focus(), 0);
 
   // جلب حتى 500 طلب لهذا السائق ثم فلترة "Geliefert"
-  const qMine = query(collection(db,"orders"), where("driver.id","==", uid), limit(500));
+  // بعد: غير محدود + ترتيب بالأحدث
+const qMine = query(
+  collection(db,"orders"),
+  where("driver.id","==", uid),
+  orderBy("updatedAt","desc")   // قد يطلب فهرس مركّب أول مرة
+);
   const snap  = await getDocs(qMine);
   const all   = snap.docs.map(d=>({ id:d.id, o:d.data()||{} }));
   const delivered = all.filter(x => String(x.o.status||'').trim().toLowerCase() === 'geliefert');
