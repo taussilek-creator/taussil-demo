@@ -1044,6 +1044,8 @@ function initLinkedArrows(contId, prefix){
 
 /* ===== State ===== */
 let RESTAURANTS=[]; let CART=[]; let PROD_CACHE=new Map();
+let MENU_ACTIVE_CAT = {}; // rid -> last active category id (mobile)
+
 // معلومات سلة مرتبطة بالمطعم (رسم التوصيل…)
 let CART_INFO = null; // { rid, rname, delivery }
 // Pickup toggle: عندما يكون true نتجاهل الحد الأدنى ورسوم التوصيل في السلة
@@ -1649,8 +1651,13 @@ function renderMenu(r, cats, prods){
   }
 
   // ===== MOBILE: سلايدر أفقي + قائمة كاملة =====
-  if (isMobile){
-    let activeCid = cats[0]?.id || '_';
+  // ===== MOBILE: سلايدر أفقي + قائمة كاملة =====
+if (isMobile){
+    // استخدم آخر فئة نشطة محفوظة لهذا المطعم إن وُجدت وصالحة
+    let activeCid = (MENU_ACTIVE_CAT[r.id] && cats.some(c => c.id === MENU_ACTIVE_CAT[r.id]))
+      ? MENU_ACTIVE_CAT[r.id]
+      : (cats[0]?.id || '_');
+
 
     const rail = document.createElement('div'); rail.className='menu-rail';
     const list = document.createElement('div'); list.className='menu-list';
@@ -1661,11 +1668,13 @@ function renderMenu(r, cats, prods){
       btn.className = 'menu-chip' + (activeCid===c.id?' active':'');
       btn.textContent = c.name || c.title || '—';
       btn.addEventListener('click', ()=>{
-        activeCid = c.id;
-        rail.querySelectorAll('.menu-chip').forEach(x=>x.classList.remove('active'));
-        btn.classList.add('active');
-        paint();
-      });
+  activeCid = c.id;
+  MENU_ACTIVE_CAT[r.id] = activeCid;     // ← حفظ الفئة
+  rail.querySelectorAll('.menu-chip').forEach(x=>x.classList.remove('active'));
+  btn.classList.add('active');
+  paint({ resetScroll:true });
+});
+
       return btn;
     };
 
