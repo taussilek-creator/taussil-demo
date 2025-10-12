@@ -1399,8 +1399,10 @@ async function getRestaurantProductsCached(rid){
   const proSnap = await fs.collection('restaurants').doc(rid).collection('products').get();
   const prods = [];
   proSnap.forEach(d => prods.push({ id:d.id, ...d.data() }));
-  const old = PROD_CACHE.get(rid) || { cats:[] };
-  PROD_CACHE.set(rid, { cats: old.cats || [], prods });
+  const old = PROD_CACHE.get(rid) || {};
+// لا تمسّ cats أبداً هنا — خزّن المنتجات فقط
+PROD_CACHE.set(rid, { ...old, prods });
+
   return prods;
 }
 
@@ -1580,7 +1582,16 @@ async function openMenu(rid){
   const r={id:rid, ...rDoc.data()};
   title.textContent = `${T('menu')} – ${r.name||''}`;
 
-  if(PROD_CACHE.has(rid)){ const {cats,prods}=PROD_CACHE.get(rid); renderMenu(r,cats,prods); return; }
+  if (PROD_CACHE.has(rid)) {
+  const cached = PROD_CACHE.get(rid);
+  // إن كانت الفئات موجودة بالكاش، استخدمها مباشرة
+  if (Array.isArray(cached.cats) && cached.cats.length){
+    renderMenu(r, cached.cats, cached.prods || []);
+    return;
+  }
+  // غير ذلك: كمّل لتحميل الفئات من فايرستور
+}
+
 
   const catsSnap=await fs.collection('restaurants').doc(rid).collection('categories').get();
   const cats=[]; catsSnap.forEach(d=> cats.push({id:d.id, ...d.data()})); cats.sort((a,b)=>(a.sort??0)-(b.sort??0));
@@ -1588,7 +1599,10 @@ async function openMenu(rid){
   let prods=[]; proSnap.forEach(d=> prods.push({id:d.id, ...d.data()}));
   prods = prods.filter(p=> p.isAvailable !== false);
 
-  PROD_CACHE.set(rid,{cats,prods}); renderMenu(r,cats,prods);
+  const existing = PROD_CACHE.get(rid) || {};
+PROD_CACHE.set(rid, { ...existing, cats, prods });
+renderMenu(r, cats, prods);
+
 }
 // إعادة بناء عرض القائمة عند تغيير الحجم (لو الديالوج مفتوح)
 (function(){
@@ -1636,11 +1650,7 @@ function renderMenu(r, cats, prods){
 
   // ===== MOBILE: سلايدر أفقي + قائمة كاملة =====
   if (isMobile){
-    // اختر أول فئة فيها عناصر، وإلا أول فئة، وإلا '_' (غير مصنّف)
-    const byCatKeys = cats.map(c=>c.id).concat('_');
-    const firstWithItems = byCatKeys.find(cid => (byCat.get(cid)||[]).length) ?? cats[0]?.id ?? '_';
-    let activeCid = firstWithItems;
-
+    let activeCid = cats[0]?.id || '_';
 
     const rail = document.createElement('div'); rail.className='menu-rail';
     const list = document.createElement('div'); list.className='menu-list';
@@ -1655,8 +1665,6 @@ function renderMenu(r, cats, prods){
         rail.querySelectorAll('.menu-chip').forEach(x=>x.classList.remove('active'));
         btn.classList.add('active');
         paint();
-		btn.scrollIntoView({ inline:'center', block:'nearest', behavior:'smooth' });
-
       });
       return btn;
     };
