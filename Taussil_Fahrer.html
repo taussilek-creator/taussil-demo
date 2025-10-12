@@ -736,6 +736,19 @@ html, body { width:100%; max-width:100%; overflow-x:hidden; }
 /* تأكد إن العناصر ما توسّع البطاقة */
 .neo-driver .card-order .info,
 .neo-driver .card-order .info *{ min-width:0; overflow-wrap:anywhere; }
+/* === Contain restaurant logo (no crop) === */
+.neo-driver .card-order .logo{
+  display:flex; align-items:center; justify-content:center;
+}
+.neo-driver .card-order .logo img{
+  width:72px; height:72px;              /* نفس المقاس المعتمد عندك */
+  object-fit:contain !important;         /* احتواء بدل cover */
+  background:#fff;                       /* خلفية بيضاء للشفاف */
+  padding:6px;                           /* هامش داخلي بسيط */
+  border-radius:16px;                    /* مطابق لتصميمك */
+  border:1px solid #0002;                /* نفس الحد */
+  display:block;                         /* يمنع فجوات inline */
+}
 
 </style>
 </head>
@@ -2369,30 +2382,109 @@ if (geofenceBlocks()){ if(etaEl()) etaEl().textContent='Abholung —'; return; }
     if(etaEl()) etaEl().textContent = 'Abholung —';
   }
 }
+// === Restaurant Logo (Firestore) — by id OR name (lazy + cache) ===
+const __restLogoCache = new Map();
+
+function getRestId(o){
+  return (
+    o?.restaurant?.id ||
+    o?.restaurantId ||
+    o?.restId ||
+    o?.restaurant?.ref?.id ||
+    null
+  );
+}
+function getRestName(o){
+  return String(o?.restaurant?.name || '').trim() || null;
+}
+
+async function fetchRestLogoById(restId){
+  if(!restId) return null;
+  if(__restLogoCache.has(restId)) return __restLogoCache.get(restId) || null;
+  try{
+    const snap = await getDoc(doc(db, 'restaurants', restId));
+    if (snap.exists()){
+      const d = snap.data() || {};
+      const url = d.logoUrl || d.logo || d.photoUrl || d.imageUrl || d.image || null;
+      __restLogoCache.set(restId, url || null);
+      return url || null;
+    }
+  }catch(_) {}
+  __restLogoCache.set(restId, null);
+  return null;
+}
+
+async function fetchRestLogoByName(name){
+  if(!name) return null;
+  const key = 'name:'+name;
+  if(__restLogoCache.has(key)) return __restLogoCache.get(key) || null;
+  try{
+    // بحث سريع بالاسم المطابق
+    const q1 = query(collection(db,'restaurants'), where('name','==', name), limit(1));
+    const s1 = await getDocs(q1);
+    if(!s1.empty){
+      const d = s1.docs[0].data() || {};
+      const url = d.logoUrl || d.logo || d.photoUrl || d.imageUrl || d.image || null;
+      __restLogoCache.set(key, url || null);
+      return url || null;
+    }
+  }catch(_) {}
+  __restLogoCache.set(key, null);
+  return null;
+}
+
+async function hydrateCardLogo(cardEl, o){
+  try{
+    const logoBox = cardEl.querySelector('.logo');
+    if(!logoBox || logoBox.querySelector('img')) return; // صورة موجودة بالفعل
+
+    const restId = getRestId(o);
+    const restName = getRestName(o) || '';
+    let url = await fetchRestLogoById(restId);
+    if(!url) url = await fetchRestLogoByName(restName);
+    if(!url) return;
+
+    const img = document.createElement('img');
+    img.src = url;
+    img.alt = restName;
+    img.onerror = () => { try{ img.remove(); }catch(_){} }; // لا تكسر البطاقة
+    logoBox.innerHTML = '';
+    logoBox.appendChild(img);
+  }catch(_){}
+}
 
 function renderOrders(items){
   const filtered = items.filter(({o})=> inTab(o, currentTab));
   ordersInfo.textContent = `${filtered.length} sichtbar (${currentTab})`;
   if(filtered.length===0){ listEl.innerHTML = `<div class="small" style="opacity:.8">— Keine Aufträge —</div>`; return; }
 
-  listEl.innerHTML = filtered.map(({id,o})=>{
+  listEl.innerHTML = filtered.map(({id,o}, idx)=>{
+
     const stRaw=o.status||"—", st=mapStatusLabel(stRaw);
     const rest=o.restaurant?.name||"—";
     const addr=(o.restaurant?.addressText || o.restaurant?.address_text || "").trim();
     const qty =Number(o.qty||0)||0;
     const plat=Array.isArray(o.platform)? o.platform.join(" / ") : (o.platform||"—");
     const lower=String(stRaw).toLowerCase();
+	// رقم تسلسلي داخل القائمة الحالية (يبدأ من 1)
+const serial = idx + 1;
+// أظهره لكل الحالات النشطة + Geliefert (اخفي فقط Abgebrochen)
+const showSerial = (lower !== 'abgebrochen');
+const serialTag = showSerial ? `<span class="tag">#${serial}</span>` : '';
+
     const showStart = (lower==="angenommen" || lower==="zugewiesen" || lower==="assigned" || lower==="bearbeitung");
     const showDone  = (lower==="unterwegs");
-    const logoUrl = o.logoUrl || o.restaurant?.logoUrl || "";
-    const logoHTML = logoUrl? `<img src="${logoUrl}" alt="${rest}">` : `<div class="ph">${(rest||"—").slice(0,2).toUpperCase()}</div>`;
+        const initials = (rest || "—").slice(0,2).toUpperCase();
+    const logoHTML = `<div class="ph">${initials}</div>`; // placeholder أولي
+
     const navHref = addr ? makeNavUrl(addr) : '#';
     return `
       <div class="card-order" data-id="${id}" data-addr="${encodeURIComponent(addr)}" data-status="${st}">
 
         <div class="logo">${logoHTML}</div>
         <div class="info">
-          <div class="line"><strong>${rest}</strong> <span class="tag">${st}</span></div>
+         <div class="line"><strong>${rest}</strong> <span class="tag">${st}</span> ${serialTag}</div>
+
           <div class="small">${plat} · Qty ${qty}</div>
           <div class="small" style="opacity:.85;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${addr || '—'}</div>
 		  <div class="multi-stops" data-stops-of="${id}" style="grid-column:1 / -1; display:none"></div>
@@ -2416,7 +2508,15 @@ listEl.querySelectorAll(".card-order").forEach(el=>{
     if(e.target.closest(".btn-icon")) return;
     openDetail(id);
   });
-
+// Lazy: استبدال الأحرف المختصرة بلوغو المطعم من وثيقته في Firestore
+const omap = new Map(filtered.map(({id,o})=>[id,o])); // موجود عندك؛ أعِد استخدامه إن وُجد
+listEl.querySelectorAll('.card-order').forEach(card=>{
+  const id = card.getAttribute('data-id');
+  const o = omap.get(id) || {};
+  if (!card.querySelector('.logo img')) {
+    hydrateCardLogo(card, o);
+  }
+});
   // أزرارك القديمة كما هي
   const startA = el.querySelector('a[data-act="start"]');
   if(startA){
@@ -2979,6 +3079,58 @@ md_price_edit.onclick = (e)=>{
   if(md_price_edit.disabled) return;
   openPriceModal(priceEUR);
 };
+  // === Upsert KV rows for ServiceFee & Distance ===
+  function upsertKV(id, label){
+    let el = document.getElementById(id);
+    if (el) return el;
+    const sheet = md.querySelector('.sheet');
+    const anchor = md.querySelector('.row'); // مرساة قبل صف الأزرار
+    const row = document.createElement('div');
+    row.className = 'kv';
+    row.innerHTML = `<div class="small">${label}</div><div class="small" id="${id}">—</div>`;
+    sheet.insertBefore(row, anchor);
+    return row.querySelector('#'+id);
+  }
+
+  // serviceFee (EUR)
+  const __svc = Number.isFinite(+o.serviceFee) ? +o.serviceFee : null;
+  upsertKV('md_service_fee','Service Fee')
+    .textContent = (__svc!=null) ? formatEUR(__svc) : '—';
+
+  // distance_km_total (km, fallback إلى distance_km إن لزم)
+  const __dist = Number.isFinite(+o.distance_km_total) ? +o.distance_km_total
+                : (Number.isFinite(+o.distance_km) ? +o.distance_km : null);
+  upsertKV('md_distance_total','Distanz gesamt')
+    .textContent = (__dist!=null) ? (Math.round(__dist*100)/100).toFixed(2) + ' km' : '—';
+
+  // === Disable action buttons for delivered orders ===
+  const __isDelivered = String(o.status || '').trim().toLowerCase() === 'geliefert';
+
+  if (__isDelivered) {
+    // أخفِ الأزرار الثلاثة + عطّل أي Handlers
+    [md_nav, md_start, md_done].forEach(btn => {
+      if (!btn) return;
+      try {
+        btn.style.display = 'none';
+        btn.disabled = true;
+        btn.setAttribute('aria-disabled','true');
+        // إلغاء أي مستمعات قد تكون مضافة سابقًا
+        btn.replaceWith(btn.cloneNode(true));
+      } catch(_) {}
+    });
+  } else {
+    // حالات غير Geliefert: تأكد من ظهور الأزرار بشكل طبيعي
+    if (md_nav)   { md_nav.style.display   = ''; md_nav.disabled   = false; md_nav.setAttribute('aria-disabled','false'); }
+    if (md_start) { md_start.style.display = ''; md_start.disabled = false; md_start.setAttribute('aria-disabled','false'); }
+    if (md_done)  { md_done.style.display  = ''; md_done.disabled  = false; md_done.setAttribute('aria-disabled','false'); }
+  }
+  // ضمن if (__isDelivered) {...}
+  if (md_price_edit) {
+    md_price_edit.style.display = 'none';
+    md_price_edit.disabled = true;
+    md_price_edit.setAttribute('aria-disabled','true');
+    md_price_edit.replaceWith(md_price_edit.cloneNode(true)); // قتل أي Listeners قديمة
+  }
 
   md.classList.add("show");
   md_start.onclick=async (e)=>{
