@@ -1,4 +1,1614 @@
-  let lastW = window.innerWidth;
+<!DOCTYPE html>
+<html lang="de" dir="ltr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+<title>Taussil – Jetzt bestellen</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#5a5a5a; --card:#f1f1f1; --ink:#111; --muted:#555; --cta:#33BBDF;
+  --bar:#1d2021; --ok:#22c55e; --warn:#f59e0b; --err:#ef4444;
+  --border:1px solid rgba(0,0,0,.12); --radius:16px;
+  --shadow:0 12px 28px rgba(0,0,0,.18), 0 2px 8px rgba(0,0,0,.08);
+  --hit:48px;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif}
+
+/* Shell */
+.app{max-width:1200px;margin:0 auto;padding:16px 14px 28px;display:flex;flex-direction:column;gap:12px}
+
+/* Toolbar */
+.toolbar{
+  position:sticky; top:8px; z-index:20; display:flex; align-items:center; justify-content:space-between; gap:12px;
+  background:var(--bar); color:#fff; border-radius:24px; padding:10px 14px; border:1px solid rgba(255,255,255,.12);
+  box-shadow:0 8px 24px rgba(0,0,0,.35)
+}
+.brand{display:flex; align-items:center; gap:10px}
+.brand-logo{ width:40px; height:40px; border-radius:10px; object-fit:contain; background:#fff; padding:4px; border:1px solid rgba(255,255,255,.24) }
+.brand-name{font-weight:800}
+.header-actions{display:flex; gap:8px; align-items:center}
+.lang{height:40px; border-radius:12px; border:1px solid rgba(255,255,255,.25); background:#0f1112; color:#fff; padding:0 10px; font-weight:700; cursor:pointer}
+.btn,.btn-cta{ height:var(--hit); padding:0 14px; border-radius:14px; border:1px solid rgba(0,0,0,.15); display:inline-flex; align-items:center; justify-content:center; gap:8px; font-weight:800; cursor:pointer }
+.btn{ background:#fff; color:#111 }
+.btn-cta{ background:linear-gradient(180deg,#33BBDF,#1da9cf); color:#fff; border:none; box-shadow:0 6px 18px rgba(29,169,207,.32) }
+.btn-sm{ height:34px; padding:0 10px; border-radius:10px; border:1px solid rgba(0,0,0,.15); background:#fff; font-weight:700; cursor:pointer }
+
+/* Filters */
+.filters-bar{ background:var(--card); border:var(--border); border-radius:12px; box-shadow:var(--shadow); padding:10px; display:flex; gap:8px; align-items:center; flex-wrap:wrap }
+.input,.select{ height:40px; border-radius:12px; border:1px solid rgba(0,0,0,.14); padding:0 12px; font-size:14px; background:#fff }
+.chip{ padding:6px 10px; border:1px solid rgba(0,0,0,.14); border-radius:999px; background:#fff; cursor:pointer; font-size:12px }
+.chip.active{ background:#c7f9ff; border-color:#9be5f1 }
+
+.card{ background:var(--card); border:var(--border); border-radius:var(--radius); box-shadow:var(--shadow); padding:12px }
+.section-head{ display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:8px }
+.title{ font-weight:800; font-size:18px }
+.small{ font-size:12px; color:var(--muted) }
+.badge{ font-size:11px; padding:3px 8px; border-radius:999px; background:#eee; color:#222; border:1px solid transparent }
+.badge.open{ background:rgba(34,197,94,.12); color:#16a34a; border-color:rgba(34,197,94,.25) }
+.badge.closed{ background:rgba(239,68,68,.12); color:#ef4444; border-color:rgba(239,68,68,.25) }
+
+/* GRID: Desktop 3 → Wide 4 → Mobile 2 */
+.grid{ display:grid; grid-template-columns: repeat(3, 1fr); gap:12px }
+@media (min-width:1280px){ .grid{ grid-template-columns: repeat(4, 1fr) } }
+@media (max-width:720px){ .grid{ grid-template-columns: repeat(2, 1fr) } }
+
+/* Tile card */
+.tile{
+  background:#fff; border:1px solid rgba(0,0,0,.12); border-radius:14px; overflow:hidden;
+  display:flex; flex-direction:column; box-shadow:0 4px 12px rgba(0,0,0,.08); min-height:270px
+}
+/* === Product deals: compact horizontal cards in a grid === */
+.pgrid{
+  display:grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap:10px;
+}
+@media (min-width:1280px){ .pgrid{ grid-template-columns: repeat(4, 1fr) } }
+@media (max-width:720px){ .pgrid{ grid-template-columns: repeat(2, 1fr) } }
+
+.pitem{
+  background:#fff; border:1px solid rgba(0,0,0,.12); border-radius:14px;
+  box-shadow:0 4px 12px rgba(0,0,0,.08);
+  display:grid; grid-template-columns: 84px 1fr auto; /* صورة يسار، معلومات، زر يمين */
+  align-items:center; gap:10px; padding:8px 10px;
+  min-height:120px; /* ~ نصف بطاقة المطعم */
+}
+.pitem-left{
+  width:84px; height:84px; border:1px solid rgba(0,0,0,.1); border-radius:10px;
+  background:#fff; display:flex; align-items:center; justify-content:center; overflow:hidden;
+}
+.pitem-left img{ width:100%; height:100%; object-fit:contain; object-position:center; display:block }
+
+.pitem-mid{ display:flex; flex-direction:column; gap:4px; min-width:0 }
+.pname{ font-weight:800; font-size:12px; line-height:1.2; white-space:nowrap; overflow:hidden; text-overflow:ellipsis }
+.prest{ font-size:11px; color:#555; white-space:nowrap; overflow:hidden; text-overflow:ellipsis }
+.pprice{ font-weight:800; font-size:12px }
+.pprice s{ opacity:.6; margin-inline-end:6px }
+
+.pitem-right{ display:flex; align-items:center; justify-content:flex-end }
+.pitem-right .btn-sm{ height:34px; padding:0 10px; border-radius:10px; }
+
+
+/* Cover frame (contain) */
+.tile-media{
+  position:relative; aspect-ratio: 16 / 9; background:#fff; border-bottom:1px solid rgba(0,0,0,.06);
+  overflow:hidden; display:flex; align-items:center; justify-content:center;
+}
+.tile-media > img.tile-cover{
+  width:100% !important; height:100% !important; display:block;
+  object-fit:contain !important; object-position:center; image-rendering:auto;
+}
+/* Logo */
+.tile-logo{
+  position:absolute; bottom:8px; left:8px; width:42px; height:42px; border-radius:10px;
+  object-fit:contain; background:#fff; border:1px solid rgba(0,0,0,.12); padding:4px
+}
+/* Restaurant discount badge over the cover (top-left) */
+.rest-disc{
+  position:absolute;
+  top:10px; left:8px;
+  z-index:3;
+}
+.tile-meta-right{ flex-wrap:wrap } /* يسمح لبقية الشارات بالالتفاف داخل السطر */
+
+[dir="rtl"] .tile-logo{ left:auto; right:8px }
+/* Text */
+.tile-body{ padding:10px; display:flex; flex-direction:column; gap:6px; flex:1 1 auto; min-height:120px }
+.line-1{ display:-webkit-box; -webkit-line-clamp:1; -webkit-box-orient:vertical; overflow:hidden; text-overflow:ellipsis; white-space:normal }
+.tile-name{ font-weight:800; font-size:15px }
+.tile-sub{ font-size:12px; color:#444 }
+/* Full-width action button with outer margins */
+.tile-actions{
+  padding: 0 10px 10px;           /* يمين/يسار 5px + أسفل 5px */
+}
+.tile-actions .btn-cta{
+  display:block;
+  width:100%;                   /* يمتد على عرض البطاقة */
+}
+
+/* Meta: left/right */
+.tile-meta{ display:flex; align-items:center; justify-content:space-between; gap:8px; font-size:12px; color:#333 }
+.tile-meta-left{ display:flex; align-items:center; gap:6px }
+.tile-meta-right{ display:flex; align-items:center; gap:8px }
+.meta-time{ white-space:nowrap; display:inline-flex; align-items:center; gap:4px }
+/* Discount base (size only – colors inline from JS) */
+.badge.sale{ font-size:20px; padding:5px 20px; font-weight:800; border-radius:999px; }
+/* Product discount badge */
+.pdisc{
+  font-size:11px; font-weight:800; padding:2px 6px; border-radius:999px;
+  background:#fee2e2; color:#b91c1c; border:1px solid #fecaca;
+}
+/* badge أعلى يمين الصورة */
+.pdisc-abs{
+  position:absolute; top:6px; right:6px;
+  z-index:2;
+}
+[dir="rtl"] .pdisc-abs{ right:auto; left:6px }
+
+/* Dialogs (menu/cart) — مختصرة */
+.dlg{ width:min(980px,96%); border:none; border-radius:16px; padding:0; overflow:hidden }
+.dlg::backdrop{ background:rgba(0,0,0,.45) }
+.dlg-head{ display:flex; align-items:center; justify-content:space-between; padding:10px 12px; background:var(--bar); color:#fff }
+.dlg-title{ font-weight:800 }
+.menu{ display:grid; grid-template-columns: 260px 1fr; gap:12px; padding:12px; background:var(--card); max-height:72vh; overflow:auto }
+@media (max-width:900px){ .menu{ grid-template-columns: 1fr } }
+.menu-side{ background:#fff; border:1px solid rgba(0,0,0,.08); border-radius:12px; padding:10px; display:flex; flex-direction:column; gap:6px; position:sticky; top:0; height:fit-content }
+.menu-cat{ padding:10px; border-radius:10px; border:1px solid rgba(0,0,0,.08); background:#f8fafc; cursor:pointer; font-weight:700; text-align:start }
+.menu-cat.active{ background:#e6f7fb; border-color:#aee7f5 }
+.menu-list{ background:#fff; border:1px solid rgba(0,0,0,.08); border-radius:12px; padding:10px; display:flex; flex-direction:column; gap:8px }
+.item{
+  display:grid; grid-template-columns: 72px 1fr auto; gap:8px;
+  border-top:1px dashed #e5e7eb; padding-top:8px;
+  align-items:center;
+}
+.item:first-child{ border-top:0; padding-top:0 }
+
+/* إطار صورة المنتج */
+.item .ph{
+  width:72px; height:72px; border-radius:12px;
+  background:#fff; border:1px solid rgba(0,0,0,.08);
+  display:flex; align-items:center; justify-content:center; overflow:hidden;
+}
+.item .im{ width:100%; height:100%; object-fit:contain; object-position:center }
+
+.item:first-child{ border-top:0; padding-top:0 }
+.item .nm{ font-weight:800 }
+.item .ds{ font-size:12px; color:#555 }
+.item .pr{ font-weight:800 }
+/* توسيط عمودي بين صورة/اسم/أكشن */
+.item{ align-items:center }                   /* يوسّط أعمدة العنصر كلها */
+.item .txt{
+  display:flex; flex-direction:column;
+  justify-content:center;                     /* ينزّل الاسم للوسط */
+  min-height:72px;                            /* نفس ارتفاع الصورة .ph (72px) */
+}
+.item .act{ display:flex; gap:8px; align-items:center }  /* السعر + زر الإضافة */
+
+/* Product image (menu) */
+.item .ph{
+  width:72px; height:72px; border-radius:12px; border:1px solid rgba(0,0,0,.08);
+  background:#fff; overflow:hidden; display:flex; align-items:center; justify-content:center;
+}
+.item .ph img{ width:100%; height:100%; object-fit:contain; object-position:center; display:block }
+
+/* Cart (مختصر) */
+.cart{ padding:12px; background:#fff; max-height:60vh; overflow:auto }
+/* صورة + تفاصيل + كمية + المجموع */
+.cart-row{
+  display:grid;
+  grid-template-columns: 64px 1fr auto auto;
+  gap:8px;
+  border-bottom:1px solid #eee;
+  padding:8px 0;
+}
+
+/* مصغّر المنتج داخل السلة */
+.cart-thumb{
+  width:56px; height:56px;
+  border-radius:10px;
+  border:1px solid rgba(0,0,0,.12);
+  object-fit:contain;
+  background:#fff;
+}
+
+.cart-row .q{ display:flex; gap:6px; align-items:center }
+.cart-foot{ display:flex; align-items:center; justify-content:space-between; padding:10px 12px; background:#f6f8fc; border-top:1px solid #e5e7eb }
+.total{ font-weight:800 }
+
+/* Toast */
+.toast{ position:fixed; left:50%; transform:translateX(-50%); bottom:18px; background:#1d2021; color:#fff; border-radius:12px; padding:10px 14px; opacity:0; transition:opacity .18s; z-index:2000 }
+.toast.show{ opacity:1 }
+
+/* Skeleton */
+.skel{ border-radius:12px; background:linear-gradient(90deg,#efefef,#f6f6f6,#efefef); background-size:200% 100%; animation:shine 1.6s linear infinite }
+@keyframes shine{ 0%{background-position:200% 0} 100%{background-position:-200% 0} }
+.tile .skel{ height:160px }
+/* --- Horizontal rails (carousels) --- */
+/* Category rail (between HOT and TOP) */
+.cat-rail{display:flex; gap:10px; overflow:auto; padding:6px 2px; scrollbar-width:none}
+.cat-rail::-webkit-scrollbar{display:none}
+.cat-chip{
+  flex:0 0 auto; display:flex; align-items:center; gap:8px; padding:8px 12px;
+  border-radius:999px; border:1px solid rgba(0,0,0,.12); background:#fff; cursor:pointer; user-select:none;
+  box-shadow:0 2px 8px rgba(0,0,0,.06); font-weight:700
+}
+.cat-chip .ico{font-size:18px; line-height:1}
+.cat-chip.active{background:#e6f7fb; border-color:#aee7f5}
+
+.rail-card { margin-bottom:12px }
+.rail-head { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:8px }
+.rail-title { font-weight:800; font-size:16px }
+.rail {
+  position:relative;
+  background:#fff; border:1px solid rgba(0,0,0,.08); border-radius:12px; padding:6px;
+}
+.rail-inner{
+  display:flex; gap:12px; overflow:auto; scroll-snap-type:x mandatory; padding:2px;
+  scrollbar-width:none; -ms-overflow-style:none;
+}
+.rail-inner::-webkit-scrollbar{ display:none }
+.rail .tile{ flex:0 0 auto; min-width:280px; max-width:340px; scroll-snap-align:start }
+.rail-nav{
+  position:absolute; top:50%; transform:translateY(-50%); z-index:2;
+  width:36px; height:36px; border-radius:10px; border:1px solid rgba(0,0,0,.12);
+  background:#fff; cursor:pointer; display:flex; align-items:center; justify-content:center; font-weight:800;
+  box-shadow:0 6px 14px rgba(0,0,0,.12);
+}
+.rail-nav.prev{ left:6px } .rail-nav.next{ right:6px }
+@media (max-width:720px){
+  .rail .tile{ min-width: 78vw; max-width: 78vw; }
+}
+/* === Configurator (Optionen) === */
+.cfg{ width:min(720px,96%); border:none; border-radius:16px; padding:0; overflow:hidden }
+.cfg::backdrop{ background:rgba(0,0,0,.45) }
+.cfg-head{ display:flex; align-items:center; justify-content:space-between; padding:10px 12px; background:var(--bar); color:#fff }
+.cfg-title{ font-weight:800 }
+.cfg-body{ background:var(--card); padding:12px; display:flex; flex-direction:column; gap:10px; max-height:70vh; overflow:auto }
+.cfg-row{ background:#fff; border:1px solid rgba(0,0,0,.08); border-radius:12px; padding:10px; }
+.cfg-row .hdr{ display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:6px; font-weight:800 }
+.cfg-hint{ font-size:12px; color:#666 }
+.opt{ display:flex; align-items:center; justify-content:space-between; gap:8px; padding:6px 0; border-top:1px dashed #eee }
+.opt:first-child{ border-top:0 }
+.opt-left{ display:flex; align-items:center; gap:10px }
+.opt-name{ font-weight:600 }
+.opt-price{ font-size:12px; color:#333 }
+.opt-qty{ display:flex; align-items:center; gap:6px }
+.opt-qty .btn-sm{ width:28px; min-width:28px; padding:0; text-align:center }
+.cfg-foot{ display:flex; align-items:center; justify-content:space-between; gap:10px; padding:10px 12px; background:#f6f8fc; border-top:1px solid #e5e7eb }
+.cfg-total{ font-weight:800 }
+/* الشارة خارج إطار الصورة */
+.badge-disc{
+  position:absolute; top:-8px; right:-8px; z-index:5; pointer-events:none;
+  display:inline-flex; align-items:center; justify-content:center;
+  min-width:34px; height:22px; padding:0 8px; border-radius:999px;
+  background:#ef4444; color:#fff; font-weight:800; font-size:12px; line-height:1;
+  box-shadow:0 2px 6px rgba(0,0,0,.25);
+}
+[dir="rtl"] .badge-disc{ right:auto; left:-8px }
+
+/* غلاف للصورة لنُسقِط فوقه الشارة بدون التأثير على إطار الصورة نفسه */
+.pitem-left-wrap{ position:relative; width:84px; height:84px }
+.item .ph-wrap{ position:relative; width:72px; height:72px }
+
+/* اجعل الحاويات الأصلية تملأ الغلاف فقط */
+.pitem-left{ width:100%; height:100% }
+.item .ph{ width:100%; height:100% }
+
+/* ضمان أن البطاقة/العنصر تسمح بخروج الشارة قليلاً */
+.pitem, .item{ position:relative; overflow:visible }
+/* ==== Product deals: mobile = single-column list ==== */
+@media (max-width:720px){
+  /* اجعل شبكة العروض عموداً واحداً */
+  .pgrid{
+    grid-template-columns: 1fr !important;
+    gap: 10px;                 /* مسافة مريحة بين البطاقات */
+  }
+
+  /* بطاقة المنتج تبقى أفقية: صورة يسار + نص + زر يمين */
+  .pitem{
+    grid-template-columns: 84px 1fr auto;  /* كما هي، لكن تمتد بعرض الحاوية */
+    width: 100%;
+  }
+}
+/* ==== Mobile-only menu layout ==== */
+@media (max-width:900px){
+  /* منبثق القائمة يصبح عمودياً */
+  .menu{
+    display:flex !important;
+    flex-direction:column;
+    gap:10px;
+    padding:12px;
+    background:var(--card);
+    max-height:72vh;
+    overflow:auto;
+  }
+
+  /* سلايدر فئات أفقي بالسحب (بدون أسهم) */
+  .menu-rail{
+    display:flex;
+    gap:8px;
+    overflow:auto;
+    padding:6px 2px;
+    scrollbar-width:none; -ms-overflow-style:none;
+  }
+  .menu-rail::-webkit-scrollbar{ display:none }
+  .menu-chip{
+    flex:0 0 auto;
+    display:flex; align-items:center; gap:8px;
+    padding:8px 12px;
+    border-radius:999px;
+    border:1px solid rgba(0,0,0,.12);
+    background:#fff;
+    cursor:pointer; user-select:none;
+    box-shadow:0 2px 8px rgba(0,0,0,.06);
+    font-weight:800; font-size:13px;
+    white-space:nowrap;
+  }
+  .menu-chip.active{ background:#e6f7fb; border-color:#aee7f5 }
+
+  /* قائمة المنتجات تحت السلايدر بعرض كامل */
+  .menu-list{
+    background:#fff;
+    border:1px solid rgba(0,0,0,.08);
+    border-radius:12px;
+    padding:10px;
+    display:flex;
+    flex-direction:column;
+    gap:8px;
+  }
+
+  /* بطاقة المنتج للجوال (صورة يسار، نص وسط، زر يمين + السعر تحت الاسم) */
+  .item{
+    display:grid;
+    grid-template-columns:72px 1fr auto;
+    gap:8px;
+    align-items:center;
+    border-top:1px dashed #e5e7eb;
+    padding-top:8px;
+  }
+  .item:first-child{ border-top:0; padding-top:0 }
+  .item .ph{ width:72px; height:72px; border-radius:12px; border:1px solid rgba(0,0,0,.08); background:#fff; overflow:hidden; display:flex; align-items:center; justify-content:center }
+  .item .im{ width:100%; height:100%; object-fit:contain; object-position:center }
+  .item .txt{ display:flex; flex-direction:column; justify-content:center; gap:2px; min-height:72px }
+  .item .nm{ font-weight:800; line-height:1.2 }
+  .item .ds{ font-size:12px; color:#555 }
+  .item .pr{ font-weight:800 } /* السعر أسفل الاسم */
+  .item .act .btn-sm{ width:34px; min-width:34px; height:34px; padding:0; display:inline-flex; align-items:center; justify-content:center }
+
+  /* شارة الخصم خارج إطار الصورة */
+  .item .ph-wrap{ position:relative; width:72px; height:72px }
+  .badge-disc{
+    position:absolute; top:-8px; right:-8px; z-index:5; pointer-events:none;
+    display:inline-flex; align-items:center; justify-content:center;
+    min-width:34px; height:22px; padding:0 8px; border-radius:999px;
+    background:#ef4444; color:#fff; font-weight:800; font-size:12px; line-height:1;
+    box-shadow:0 2px 6px rgba(0,0,0,.25);
+  }
+}
+/* === Cart icon-only button in header === */
+#viewCart{
+  padding:0 12px; min-width:48px;
+  display:inline-flex; align-items:center; justify-content:center; gap:6px;
+}
+.cart-ico{ font-size:18px; line-height:1 }
+.cart-badge{
+  min-width:20px; height:20px; padding:0 6px;
+  border-radius:999px; background:#fff; color:#111;
+  font-weight:800; font-size:12px;
+  display:inline-flex; align-items:center; justify-content:center;
+}
+
+/* === Cart rows: put qty BELOW price in the right column === */
+.cart-row{
+  display:grid;
+  grid-template-columns: 64px 1fr auto; /* img | info | right(price+qty) */
+  gap:8px;
+  border-bottom:1px solid #eee;
+  padding:8px 0;
+}
+.cart-right{
+  display:flex; flex-direction:column; align-items:flex-end; gap:6px;
+}
+.cart-right .q{ display:flex; gap:6px; align-items:center }
+/* Inline row for first 3 filters (mobile-friendly) */
+.filters-inline{
+  display:flex; align-items:center; gap:8px;
+  width:100%; overflow:auto; scrollbar-width:none;
+}
+.filters-inline::-webkit-scrollbar{ display:none }
+
+/* Tighten selects for the row */
+.filters-inline .select{ height:40px; }
+@media (max-width:720px){
+  .filters-inline .select#sort{ min-width:130px }
+  .filters-inline .select#city{ min-width:120px }
+}
+/* Hot restaurant products rail (compact product slides) */
+#hotRestProd { gap: 10px; }
+.prod-slide {
+  flex: 0 0 auto;
+  min-width: 240px;
+  max-width: 280px;
+  background:#fff; border:1px solid rgba(0,0,0,.12); border-radius:14px;
+  box-shadow:0 4px 12px rgba(0,0,0,.08);
+  display:grid; grid-template-columns:84px 1fr auto;
+  align-items:center; gap:10px; padding:8px 10px;
+}
+.prod-slide .thumb {
+  width:84px; height:84px; border-radius:10px; border:1px solid rgba(0,0,0,.1);
+  background:#fff; display:flex; align-items:center; justify-content:center; overflow:hidden;
+}
+.prod-slide .thumb img { width:100%; height:100%; object-fit:contain; object-position:center; display:block }
+.prod-slide .mid { display:flex; flex-direction:column; gap:4px; min-width:0 }
+.prod-slide .name { font-weight:800; font-size:12px; line-height:1.2; white-space:nowrap; overflow:hidden; text-overflow:ellipsis }
+.prod-slide .price { font-weight:800; font-size:12px }
+.prod-slide .price s { opacity:.6; margin-inline-end:6px }
+.prod-slide .act { display:flex; align-items:center; justify-content:flex-end }
+.prod-slide .btn-sm { height:34px; padding:0 10px; border-radius:10px; }
+
+/* شارة الخصم الصغيرة */
+.prod-slide .disc {
+  position:absolute; top:6px; right:6px;
+  font-size:11px; font-weight:800; padding:2px 6px; border-radius:999px;
+  background:#fee2e2; color:#b91c1c; border:1px solid #fecaca;
+}
+.prod-slide .thumb-wrap { position:relative; width:84px; height:84px }
+/* Arrows for desktop only */
+#hot-rest-products .rail-nav {
+  background: rgba(255,255,255,0.9);
+  border: 1px solid rgba(0,0,0,0.1);
+  border-radius: 50%;
+  width: 36px; height: 36px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 20px; font-weight: 600;
+  cursor: pointer; box-shadow: 0 2px 6px rgba(0,0,0,.15);
+  color: var(--ink, #222);
+  position: absolute; top: 40%;
+  z-index: 5; transition: all .2s ease;
+}
+#hot-rest-products .rail-nav:hover { background: var(--cta,#eee); color:#fff; }
+#hot-rest-products .rail-nav.left { left: -18px; }
+#hot-rest-products .rail-nav.right { right: -18px; }
+
+/* Hide on mobile */
+@media (max-width: 900px) {
+  #hot-rest-products .rail-nav { display: none; }
+}
+/* Arrows (desktop only) for linked products rails */
+#top-rest-products .rail-nav,
+#hot-rest-products .rail-nav{
+  background: rgba(255,255,255,0.9);
+  border: 1px solid rgba(0,0,0,0.1);
+  border-radius: 50%;
+  width: 36px; height: 36px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 20px; font-weight: 600;
+  cursor: pointer; box-shadow: 0 2px 6px rgba(0,0,0,.15);
+  color: var(--ink, #222);
+  position: absolute; top: 40%;
+  z-index: 5; transition: all .2s ease;
+}
+#top-rest-products .rail-nav.left,  #hot-rest-products .rail-nav.left{ left: -18px; }
+#top-rest-products .rail-nav.right, #hot-rest-products .rail-nav.right{ right: -18px; }
+
+/* Hide arrows on mobile */
+@media (max-width: 900px){
+  #top-rest-products .rail-nav,
+  #hot-rest-products .rail-nav{ display: none; }
+}
+
+</style>
+
+<!-- Firebase Compat -->
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script>
+  const firebaseConfig = {
+    apiKey: "AIzaSyD0g9T3amjuPodsLS6ZQkHYWrzV1UrX_QI",
+    authDomain: "taussil-lieferservice-8bbe9.firebaseapp.com",
+    projectId: "taussil-lieferservice-8bbe9",
+    storageBucket: "taussil-lieferservice-8bbe9.firebasestorage.app",
+    messagingSenderId: "583536892937",
+    appId: "1:583536892937:web:5d5ff133de4d8b3b28ecd8",
+    databaseURL: "https://taussil-lieferservice-8bbe9-default-rtdb.europe-west1.firebasedatabase.app"
+  };
+  try{ firebase.initializeApp(firebaseConfig); }catch(e){}
+</script>
+</head>
+<body>
+<div class="app">
+  <!-- Topbar -->
+  <div class="toolbar">
+    <div class="brand">
+      <img class="brand-logo" src="https://firebasestorage.googleapis.com/v0/b/taussil-lieferservice-8bbe9.firebasestorage.app/o/Stampel%20400%20ohne.png?alt=media&token=6f98c1db-751c-47bc-872d-1628b634b3e2" alt="Taussil">
+      <div class="brand-name">Taussil</div>
+    </div>
+    <div class="header-actions">
+      <select id="lang" class="lang" aria-label="Sprache">
+        <option value="de" selected>Deutsch</option>
+        <option value="en">English</option>
+        <option value="ar">العربية</option>
+        <option value="tr">Türkçe</option>
+      </select>
+      <button id="viewCart" class="btn-cta">Warenkorb (0)</button>
+    </div>
+  </div>
+
+  <!-- Filters -->
+<div class="filters-bar">
+  <div class="filters-inline">
+    <button class="chip" data-chip="open">Offen</button>
+    <select id="sort" class="select">
+      <option value="rec">Empfohlen</option>
+      <option value="rate">Beste Bewertung</option>
+      <option value="fast">Schnellste Zustellung</option>
+      <option value="lowfee">Geringe Liefergebühr</option>
+    </select>
+    <select id="city" class="select" style="min-width:120px">
+      <option value="">Ort</option>
+    </select>
+  </div>
+  <input id="q" class="input" placeholder="Restaurant suchen …" style="flex:1;min-width:200px">
+</div>
+<!-- CATEGORIES (moved up under filters) -->
+<section id="rail-cats" class="rail-card card">
+  <div class="rail-head">
+    <div class="rail-title" data-i18n="categories">Kategorien</div>
+  </div>
+  <div id="catRail" class="cat-rail"></div>
+</section>
+
+
+  <!-- Grid -->
+  <section class="card">
+    <div class="section-head">
+      <div class="title" data-i18n="restaurants">Restaurants</div>
+      <div class="small" id="countInfo"></div>
+    </div>
+	<!-- HOT DEALS (>=25%) -->
+<section id="rail-hot-sec" class="rail-card card hidden">
+  <div class="rail-head">
+    <div class="rail-title">🔥 Rabatte über 20%</div>
+
+    <div class="small">Top-Deals heute</div>
+  </div>
+  <div class="rail">
+    <button class="rail-nav prev" data-nav="hot">‹</button>
+    <div id="railHot" class="rail-inner"></div>
+    <button class="rail-nav next" data-nav="hot">›</button>
+  </div>
+</section>
+<!-- HOT RESTAURANT PRODUCTS (dynamic under HOT rail) -->
+<section id="hot-rest-products" class="rail-card card hidden">
+  <div class="rail-head">
+    <div class="rail-title" id="hotRestTitle">Produkte von diesem Restaurant</div>
+    <div class="small" id="hotRestSub">Scroll in der oberen Leiste, um die Produkte zu wechseln</div>
+  </div>
+  <div class="rail">
+    <button class="rail-nav left" data-nav="hotprod-prev">‹</button>
+    <div id="hotRestProd" class="rail-inner"></div>
+    <button class="rail-nav right" data-nav="hotprod-next">›</button>
+  </div>
+</section>
+
+
+
+<!-- TOP RATED -->
+<section id="rail-top-sec" class="rail-card card hidden">
+  <div class="rail-head">
+    <div class="rail-title">⭐️ Top bewertet</div>
+    <div class="small">Unsere Bestseller</div>
+  </div>
+  <div class="rail">
+    <button class="rail-nav prev" data-nav="top">‹</button>
+    <div id="railTop" class="rail-inner"></div>
+    <button class="rail-nav next" data-nav="top">›</button>
+  </div>
+</section>
+<!-- LINKED PRODUCTS: Top Rated -->
+<section id="top-rest-products" class="rail-card card hidden">
+  <div class="rail-head">
+    <div class="rail-title" id="topRestTitle">Produkte von diesem Restaurant</div>
+    <div class="small" id="topRestSub">Scrollen Sie oben in „Top bewertet“, um die Produkte zu wechseln</div>
+  </div>
+  <div class="rail">
+    <button class="rail-nav left" data-nav="topprod-prev">‹</button>
+    <div id="topRestProd" class="rail-inner"></div>
+    <button class="rail-nav right" data-nav="topprod-next">›</button>
+  </div>
+</section>
+
+<!-- PRODUCT DEALS GRID (no slider) -->
+<section id="grid-prod-deals" class="card hidden">
+  <div class="section-head">
+    <div class="title">🔥 Angebote</div>
+    <div class="small">Artikel mit Rabatt</div>
+  </div>
+  <div id="prodDealsGrid" class="pgrid"></div>
+</section>
+
+
+
+    <div id="grid" class="grid">
+      <!-- skeleton tiles -->
+      <div class="tile"><div class="tile-media"><div class="skel" style="width:100%;height:100%"></div></div></div>
+      <div class="tile"><div class="tile-media"><div class="skel" style="width:100%;height:100%"></div></div></div>
+      <div class="tile"><div class="tile-media"><div class="skel" style="width:100%;height:100%"></div></div></div>
+    </div>
+  </section>
+</div>
+
+<!-- Menu dialog -->
+<dialog id="menuDialog" class="dlg">
+  <div class="dlg-head">
+    <div class="dlg-title" id="menuTitle">Menü</div>
+    <button id="menuClose" class="btn">✕</button>
+  </div>
+  <div id="menuBody" class="menu"></div>
+</dialog>
+
+<!-- Cart dialog -->
+<dialog id="cartDialog" class="dlg">
+  <div class="dlg-head">
+    <div class="dlg-title" data-i18n="cartTitle">Warenkorb</div>
+    <button id="cartClose" class="btn">✕</button>
+  </div>
+  <div id="cartBody" class="cart"></div>
+  <div class="cart-foot">
+    <div id="cartTotal" class="total">Summe: 0,00 €</div>
+    <button id="checkout" class="btn-cta">Bestellung bestätigen</button>
+  </div>
+</dialog>
+<!-- Configurator dialog -->
+<dialog id="cfgDialog" class="cfg">
+  <div class="cfg-head">
+    <div class="cfg-title" id="cfgTitle">Optionen</div>
+    <button id="cfgClose" class="btn">✕</button>
+  </div>
+  <div id="cfgBody" class="cfg-body"><!-- filled by JS --></div>
+  <div class="cfg-foot">
+    <div class="cfg-total" id="cfgTotal">—</div>
+    <div style="display:flex;gap:8px;align-items:center">
+      <div class="opt-qty">
+        <button id="cfgQtyMinus" class="btn-sm">−</button>
+        <span id="cfgQty">1</span>
+        <button id="cfgQtyPlus" class="btn-sm">+</button>
+      </div>
+      <button id="cfgDone" class="btn-cta" disabled>OK</button>
+    </div>
+  </div>
+</dialog>
+
+<div id="toast" class="toast">OK</div>
+
+<script>
+/* ===== i18n ===== */
+/* ===== i18n ===== */
+const I18N = {
+  de:{
+    restaurants:"Restaurants", openNow:"geöffnet", search:"Restaurant suchen …", allCities:"Ort",
+    sort:{rec:"Empfohlen",rate:"Beste Bewertung",fast:"Schnellste Zustellung",lowfee:"Geringe Liefergebühr"},
+    menu:"Menü", viewMenu:"Zur Speisekarte", open:"Geöffnet", closed:"Geschlossen", promo:"Aktion", add:"Hinzufügen",
+    cart:n=>`Warenkorb (${n})`, cartTitle:"Warenkorb", emptyCart:"Warenkorb ist leer",
+    multiWarn:"Hinweis: Der Warenkorb enthält Artikel von mehreren Restaurants.",
+    sum:v=>`Summe: ${v}`, checkout:"Bestellung bestätigen", added:"Zum Warenkorb hinzugefügt",
+    noItems:"Keine Artikel verfügbar", noRestaurants:"Keine Restaurants verfügbar", city:"Stadt",
+    options:"Optionen", quantity:"Menge", choose:"Auswählen", done:"Hinzufügen",
+    delivery:"Lieferung", freeDelivery:"Lieferung kostenlos", pickup:"Abholung",
+    subtotal:v=>`Zwischensumme: ${v}`, minOrder:"Mindestbestellwert",
+    needMore:n=>`Noch ${n} bis zum Mindestbestellwert`,
+    belowMinWarn:"Mindestbestellwert nicht erreicht", 
+    invalidSel:"Bitte Optionen prüfen", from:"ab" 
+  },
+
+  en:{
+    restaurants:"Restaurants", openNow:"Open now", search:"Search restaurant…", allCities:"All cities",
+    sort:{rec:"Recommended",rate:"Top rated",fast:"Fastest",lowfee:"Low fee"},
+    menu:"Menu", viewMenu:"View menu", open:"Open", closed:"Closed", promo:"Promo", add:"Add",
+    cart:n=>`Cart (${n})`, cartTitle:"Cart", emptyCart:"Cart is empty",
+    multiWarn:"Note: Your cart has items from multiple restaurants.",
+    sum:v=>`Total: ${v}`, checkout:"Checkout", added:"Added to cart",
+    noItems:"No items available", noRestaurants:"No restaurants available", city:"City",
+    delivery:"Delivery", freeDelivery:"Free delivery", pickup:"Pickup",
+    subtotal:v=>`Subtotal: ${v}`, minOrder:"Minimum order",
+    needMore:n=>`Add ${n} to reach the minimum order`,
+    belowMinWarn:"Minimum order not reached"
+  },
+
+  ar:{
+    restaurants:"المطاعم", openNow:"مفتوح الآن", search:"ابحث عن مطعم…", allCities:"كل المدن",
+    sort:{rec:"موصى به",rate:"الأعلى تقييماً",fast:"الأسرع",lowfee:"أقل رسوم"},
+    menu:"القائمة", viewMenu:"عرض القائمة", open:"مفتوح", closed:"مغلق", promo:"عرض", add:"أضِف",
+    cart:n=>`سلة الطلبات (${n})`, cartTitle:"سلة الطلبات", emptyCart:"السلة فارغة",
+    multiWarn:"ملاحظة: السلة تحتوي عناصر من أكثر من مطعم.",
+    sum:v=>`المجموع: ${v}`, checkout:"تأكيد الطلب", added:"أُضيف إلى السلة",
+    noItems:"لا توجد عناصر متاحة", noRestaurants:"لا توجد مطاعم متاحة", city:"المدينة",
+    delivery:"التوصيل", freeDelivery:"توصيل مجاني", pickup:"استلام من المطعم",
+    subtotal:v=>`المجموع الفرعي: ${v}`, minOrder:"الحد الأدنى للطلب",
+    needMore:n=>`أضف ${n} للوصول إلى الحد الأدنى`,
+    belowMinWarn:"الحد الأدنى للطلب غير مُتحقق"
+  },
+
+  tr:{
+    restaurants:"Restoranlar", openNow:"Şimdi açık", search:"Restoran ara…", allCities:"Tüm şehirler",
+    sort:{rec:"Önerilen",rate:"En yüksek puan",fast:"En hızlı",lowfee:"Düşük ücret"},
+    menu:"Menü", viewMenu:"Menüyü gör", open:"Açık", closed:"Kapalı", promo:"Kampanya", add:"Ekle",
+    cart:n=>`Sepet (${n})`, cartTitle:"Sepet", emptyCart:"Sepet boş",
+    multiWarn:"Not: Sepette birden fazla restorandan ürün var.",
+    sum:v=>`Toplam: ${v}`, checkout:"Siparişi onayla", added:"Sepete eklendi",
+    noItems:"Ürün yok", noRestaurants:"Restoran yok", city:"Şehir",
+    delivery:"Teslimat", freeDelivery:"Ücretsiz teslimat",
+    subtotal:v=>`Ara toplam: ${v}`, minOrder:"Asgari sipariş", pickup:"Gel-al (Pickup)",
+    needMore:n=>`Asgari sipariş için ${n} daha ekleyin`,
+    belowMinWarn:"Asgari sipariş tutarı sağlanmadı"
+  }
+};
+
+let LANG = localStorage.getItem('taussil:lang') || 'de';
+const T = (k)=>{ const v=k.split('.').reduce((o,p)=>(o||{})[p],I18N[LANG]); return typeof v==='function'?v:k?v: k; };
+function applyLang(){
+  document.querySelectorAll('[data-i18n]').forEach(el=>{ const key=el.getAttribute('data-i18n'); const v=T(key); if(typeof v==='string') el.textContent=v; });
+  document.getElementById('q').placeholder = T('search');
+  document.querySelector('.chip[data-chip="open"]').textContent = T('openNow');
+  document.querySelector('#city option[value=""]').textContent = T('allCities');
+  const sort=document.getElementById('sort');
+  sort.options[0].textContent=T('sort.rec'); sort.options[1].textContent=T('sort.rate'); sort.options[2].textContent=T('sort.fast'); sort.options[3].textContent=T('sort.lowfee');
+  document.getElementById('checkout').textContent=T('checkout');
+  document.querySelector('#cartDialog .dlg-title').textContent=T('cartTitle');
+  const rtl = (LANG==='ar'); document.documentElement.lang=LANG; document.documentElement.dir= rtl?'rtl':'ltr';
+}
+
+/* ===== Firestore ===== */
+const fs = firebase.firestore();
+/* ===== Categories (chips) ===== */
+const CATS=[
+  {key:'bbq',     ico:'🍖', label:{de:'Grill/BBQ',            en:'BBQ',      ar:'شواء',            tr:'Izgara'}},
+  {key:'seafood', ico:'🐟', label:{de:'Fisch & Meeresfrüchte', en:'Seafood',  ar:'مأكولات بحرية',   tr:'Deniz ürünleri'}},
+  {key:'vegan',   ico:'🌿', label:{de:'Vegan',                 en:'Vegan',    ar:'نباتي',           tr:'Vegan'}},
+  {key:'asian',   ico:'🍜', label:{de:'Asiatisch',             en:'Asian',    ar:'آسيوي',           tr:'Asya'}},
+  {key:'pizza',   ico:'🍕', label:{de:'Pizza',                 en:'Pizza',    ar:'بيتزا',           tr:'Pizza'}},
+  {key:'burger',  ico:'🍔', label:{de:'Burger',                en:'Burgers',  ar:'برغر',            tr:'Burger'}},
+  {key:'dessert', ico:'🍰', label:{de:'Desserts',              en:'Desserts', ar:'حلويات',          tr:'Tatlı'}},
+  {key:'coffee',  ico:'☕',  label:{de:'Kaffee',                en:'Coffee',   ar:'قهوة',            tr:'Kahve'}}
+];
+let SELECTED_CAT='';
+const catLabel = k => { const c=CATS.find(x=>x.key===k); return c ? (c.label[LANG]||c.label.de) : k; };
+
+function buildCatRail(){
+  const rail=document.getElementById('catRail'); if(!rail) return;
+  rail.innerHTML='';
+  const frag=document.createDocumentFragment();
+  CATS.forEach(c=>{
+    const btn=document.createElement('button');
+    btn.className='cat-chip'+(SELECTED_CAT===c.key?' active':'');
+    btn.setAttribute('data-cat',c.key);
+    btn.innerHTML = `<span class="ico">${c.ico}</span><span>${esc(catLabel(c.key))}</span>`;
+    btn.addEventListener('click',()=>{
+      SELECTED_CAT = (SELECTED_CAT===c.key) ? '' : c.key;
+      buildCatRail();
+      renderCatalog();
+    });
+    frag.appendChild(btn);
+  });
+  rail.appendChild(frag);
+}
+
+function matchCat(r){
+  if(!SELECTED_CAT) return true;
+  // الأفضل: مصفوفة marketTags
+  if (Array.isArray(r.marketTags) && r.marketTags.includes(SELECTED_CAT)) return true;
+  // بدائل لانسجام الخلفيات القديمة
+  const c1 = String(r.cuisine||'').toLowerCase();
+  const c2 = String(r.category||'').toLowerCase();
+  return c1.includes(SELECTED_CAT) || c2.includes(SELECTED_CAT);
+}
+
+/* ===== Helpers ===== */
+const $ = s=>document.querySelector(s);
+const toast = t=>{ const el=$("#toast"); el.textContent=t; el.classList.add("show"); setTimeout(()=>el.classList.remove("show"),1600); };
+const eur = n=> new Intl.NumberFormat(LANG==='tr'?'tr-TR':LANG==='ar'?'ar-EG':LANG==='en'?'en-GB':'de-DE',{style:'currency',currency:'EUR'}).format(Number(n||0));
+const esc = s=> String(s||'').replace(/[&<>"']/g, m=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[m]));
+const lastPart = t=> (String(t||'').split(',').map(s=>s.trim()).pop()||'');
+const isOpenNow = r=> typeof r.isOpen==='boolean'?r.isOpen:(r.status==='active');
+// --- discounts (restaurant vs product) ---
+function getRestaurantDiscount(r){
+  const raw = (r.discountPercent ?? r.discount ?? r?.promo?.discountPercent ?? null);
+  if (raw == null) return 0;
+  const n = Number(String(raw).replace(/[^\d.]/g,''));
+  return Number.isFinite(n) ? n : 0;
+}
+
+function getProductDiscount(p){
+  if (!p) return 0;
+
+  if (p.discountPercent != null){
+    const n = Number(String(p.discountPercent).replace(/[^\d.]/g,''));
+    return Number.isFinite(n) ? n : 0;
+  }
+
+  if (typeof p.discount === 'object' && p.discount){
+    if (p.discount.active === false) return 0;
+    if (p.discount.type === 'percent'){
+      return Number(p.discount.value)||0;
+    }
+    if (p.discount.type === 'amount'){
+      const base = Number(p.price||0), val = Number(p.discount.value)||0;
+      return base>0 ? Math.min(100, Math.round((val/base)*100)) : 0;
+    }
+  }
+
+  if (p.discount != null){
+    const n = Number(String(p.discount).replace(/[^\d.]/g,''));
+    return Number.isFinite(n) ? n : 0;
+  }
+
+  if (p?.promo?.discountPercent != null){
+    const n = Number(String(p.promo.discountPercent).replace(/[^\d.]/g,''));
+    return Number.isFinite(n) ? n : 0;
+  }
+  return 0;
+}
+
+// price builder (old+new) — supports "from" label
+function priceHtml(base, discPct, {prefixFrom=false}={}){
+  const b = Number(base||0), d = Number(discPct||0);
+  if (d>0){
+    const n = Math.max(0, Math.round(b*(100-d))/100);
+    return (prefixFrom?(T('from')+' '):'') +
+      `<span style="text-decoration:line-through;opacity:.6;margin-inline-end:6px">${eur(b)}</span>`+
+      `<span class="pr">${eur(n)}</span>`;
+  }
+  return (prefixFrom?(T('from')+' '):'') + `<span class="pr">${eur(b)}</span>`;
+}
+
+// canonical unit price (used by cart/configurator)
+function computeUnitPrice(r, p, extraPerUnit = 0){
+  const restPct = getRestaurantDiscount(r);
+  const prodPct = getProductDiscount(p);
+  const effPct  = prodPct > 0 ? prodPct : restPct;
+
+  const base = Number(p.price||0);
+  const discounted = effPct>0 ? Math.max(0, Math.round(base*(100-effPct))/100) : base;
+
+  return {
+    unit: discounted + Number(extraPerUnit||0),
+    unitOld: base + Number(extraPerUnit||0),
+    discPct: effPct
+  };
+}
+
+// keep API for product-deals grid
+function computeDealUnit(r, p){
+  const { unit, unitOld, discPct } = computeUnitPrice(r, p, 0);
+  return { unit, unitOld, discPct };
+}
+// --- Aliases للحفاظ على التوافق مع النداءات القديمة ---
+// كانت الدوال القديمة تُسمّى getDiscountPercent / getProductDiscountPercent
+// نعرّف مداخل توافقية تربطها بالدوال الجديدة.
+function getDiscountPercent(r){
+  return getRestaurantDiscount(r);
+}
+function getProductDiscountPercent(p, restaurantLevel = 0){
+  const prod = getProductDiscount(p);
+  const rest = Number(restaurantLevel || 0);
+  return prod > 0 ? prod : rest;
+}
+
+
+// أسهم تنقّل rails
+function bindRailNav(){
+  document.querySelectorAll('.rail-nav').forEach(btn=>{
+    if (btn.dataset.bound) return;       // امنع التكرار
+    btn.dataset.bound = '1';
+    btn.addEventListener('click', ()=>{
+      const key = btn.dataset.nav;
+      const el  = key==='hot' ? document.getElementById('railHot')
+                 : /* key==='top' */ document.getElementById('railTop');
+      if(!el) return;
+      const dir = btn.classList.contains('next') ? 1 : -1;
+      el.scrollBy({ left: dir * (el.clientWidth * 0.9), behavior:'smooth' });
+    });
+  });
+}
+
+// يبني بطاقة منتج صغيرة للسلايدر المرتبط
+function buildSmallProductCard(r, p){
+  const pic =
+    (Array.isArray(p.images) && p.images[0]) ? p.images[0] :
+    (typeof p.img === 'string' && p.img) ? p.img :
+    (typeof p.imageUrl === 'string' && p.imageUrl) ? p.imageUrl : '';
+
+  const { unit, unitOld, discPct } = computeDealUnit(r, p);
+  const discHtml = (discPct > 0) ? `<span class="badge-disc">-${Math.round(discPct)}%</span>` : '';
+  const priceHtml = (unitOld > unit)
+    ? `<div class="pprice"><s>${eur(unitOld)}</s><strong>${eur(unit)}</strong></div>`
+    : `<div class="pprice"><strong>${eur(unit)}</strong></div>`;
+
+  const hasOpts =
+    (Array.isArray(p.optionGroupIds) && p.optionGroupIds.length>0) ||
+    (Array.isArray(p.sizes) && p.sizes.length>0);
+
+  const el = document.createElement('div');
+  el.className = 'pitem';
+  el.style.minWidth = '260px'; // يعطي عرضاً مناسباً في السكة الأفقية
+  el.innerHTML = `
+    <div class="pitem-left-wrap">
+      <div class="pitem-left">
+        ${pic ? `<img src="${esc(pic)}" loading="lazy" decoding="async" alt="">`
+              : `<div style="font-size:13px;color:#999">—</div>`}
+      </div>
+      ${discHtml}
+    </div>
+    <div class="pitem-mid">
+      <div class="pname">${esc(p.name || p.title || '(—)')}</div>
+      <div class="prest">${esc(r.name || '')}</div>
+      ${priceHtml}
+    </div>
+    <div class="pitem-right">
+      ${hasOpts
+        ? `<button class="btn-sm" data-cfg="${r.id}::${p.id}" title="${T('choose')}">＋</button>`
+        : `<button class="btn-sm" data-add="${r.id}::${p.id}" title="${T('add')}">＋</button>`}
+    </div>
+  `;
+
+  el.querySelector('[data-add]')?.addEventListener('click', ()=>{
+    addToCart(r, p);
+  });
+  el.querySelector('[data-cfg]')?.addEventListener('click', async ()=>{
+    await openConfigurator(r, p);
+  });
+
+  return el;
+}
+
+// يرسم منتجات مطعم معيّن داخل سكة مرتبطة (يستعمل buildSmallProductCard)
+async function showLinkedProductsByRid(rid, { secId, contId, titleId }){
+  try{
+    const rDoc = await fs.collection('restaurants').doc(rid).get();
+    if(!rDoc.exists) return;
+    const r = { id: rid, ...rDoc.data() };
+
+    const ps = await fs.collection('restaurants').doc(rid).collection('products').get();
+    const list = [];
+    ps.forEach(d => {
+      const p = { id: d.id, ...d.data() };
+      if (p.isAvailable === false) return;
+      list.push(p);
+    });
+    // ترتيب بسيط: بالحسم ثم بالاسم
+    list.sort((a,b)=>{
+      const da = getProductDiscount(a), db = getProductDiscount(b);
+      if (db !== da) return db - da;
+      return String(a.name||'').localeCompare(String(b.name||''));
+    });
+
+    const cont = document.getElementById(contId);
+    const sec  = document.getElementById(secId);
+    if(!cont || !sec) return;
+
+    cont.innerHTML = '';
+    const frag = document.createDocumentFragment();
+    (list.slice(0, 16)).forEach(p => frag.appendChild(buildSmallProductCard(r, p)));
+    cont.appendChild(frag);
+    sec.classList.remove('hidden');
+
+    if (titleId){
+      const t = document.getElementById(titleId);
+      if (t) t.textContent = `Produkte – ${r.name || ''}`;
+    }
+  }catch(e){ /* تجاهل */ }
+}
+
+// راصد «المركز» لسكة معيّنة: يحدّد العنصر .tile الأقرب لمركز السكة
+function observeRailCenter(railEl, onRid){
+  if(!railEl) return;
+  const pickCenter = ()=>{
+    const rect = railEl.getBoundingClientRect();
+    const cx = rect.left + rect.width/2;
+    let best = null, bestDist = 1e9;
+    railEl.querySelectorAll('.tile').forEach(card=>{
+      const r = card.getBoundingClientRect();
+      const mid = r.left + r.width/2;
+      const d = Math.abs(mid - cx);
+      if (d < bestDist){ bestDist = d; best = card; }
+    });
+    const rid = best?.dataset?.rid;
+    if (rid) onRid(rid);
+  };
+  let t = null;
+  railEl.addEventListener('scroll', ()=>{
+    clearTimeout(t); t = setTimeout(pickCenter, 80);
+  }, { passive:true });
+  // التحديد الأولي أيضاً
+  setTimeout(pickCenter, 0);
+}
+
+// أسهم تنقّل للسكة المرتبطة (ديسكتوب فقط؛ تُخفى على الجوال بالـCSS)
+function initLinkedArrows(contId, prefix){
+  const cont = document.getElementById(contId);
+  const prev = document.querySelector(`[data-nav="${prefix}-prev"]`);
+  const next = document.querySelector(`[data-nav="${prefix}-next"]`);
+  if(!cont || !prev || !next) return;
+  const step = 320;
+  prev.addEventListener('click', ()=> cont.scrollBy({ left: -step, behavior:'smooth' }));
+  next.addEventListener('click', ()=> cont.scrollBy({ left:  step, behavior:'smooth' }));
+}
+
+// استدعاء Builder البطاقة الحالي لديك
+// إن كان لديك buildRestaurantCard(r) فسنستعمله كما هو.
+// إن لم يكن لديك، لفّ كود بناء البطاقة الحالي في دالة بهذا الاسم واستعملها أدناه.
+
+/* ===== State ===== */
+let RESTAURANTS=[]; let CART=[]; let PROD_CACHE=new Map();
+let MENU_ACTIVE_CAT = {}; // rid -> last active category id (mobile)
+
+// معلومات سلة مرتبطة بالمطعم (رسم التوصيل…)
+let CART_INFO = null; // { rid, rname, delivery }
+// Pickup toggle: عندما يكون true نتجاهل الحد الأدنى ورسوم التوصيل في السلة
+let PICKUP = false;
+
+/* ===== Load & Render ===== */
+async function loadRestaurants(){
+  const grid=$("#grid");
+  grid.innerHTML = `
+    <div class="tile"><div class="tile-media"><div class="skel" style="width:100%;height:100%"></div></div></div>
+    <div class="tile"><div class="tile-media"><div class="skel" style="width:100%;height:100%"></div></div></div>
+    <div class="tile"><div class="tile-media"><div class="skel" style="width:100%;height:100%"></div></div></div>`;
+  const snap = await fs.collection('restaurants').get();
+  const rows=[]; snap.forEach(d=> rows.push({id:d.id, ...d.data()}));
+  RESTAURANTS = rows;
+  buildCityFilter(rows);
+  renderCatalog();
+  loadProductDeals().catch(()=>{ /* تجاهل أخطاء طفيفة */ });
+
+}
+function buildCityFilter(rows){
+  const citySel=$("#city");
+  const cities=[...new Set(rows.map(r=> r.city || lastPart(r.address_text||'')).filter(Boolean))].sort((a,b)=>a.localeCompare(b));
+  const keep=citySel.value;
+  citySel.innerHTML = `<option value="">${T('allCities')}</option>` + cities.map(c=>`<option value="${esc(c)}">${esc(c)}</option>`).join('');
+  if(cities.includes(keep)) citySel.value=keep;
+}
+function renderCatalog(){
+  const grid = $("#grid");
+  const q = ($("#q").value||'').trim().toLowerCase();
+  const openOnly = document.querySelector('.chip[data-chip="open"]').classList.contains('active');
+  const city = $("#city").value || '';
+  
+  const sort = $("#sort").value;
+
+    // حدّ العروض الساخنة: خصم أكبر من 20%
+  const HOT = 20;
+
+  // تحديث عنوان البانر (ثابت "über 20%")
+  const hotTitle = document.querySelector('#rail-hot-sec .rail-title');
+  if (hotTitle) hotTitle.textContent = `🔥 Rabatte über 20%`;
+
+
+  // 1) بناء rows
+  let rows = RESTAURANTS.slice();
+  if (openOnly) rows = rows.filter(isOpenNow);
+  if (city) rows = rows.filter(r => (r.city || lastPart(r.address_text||'')) === city);
+  if (q) rows = rows.filter(r =>
+    (r.name||'').toLowerCase().includes(q) ||
+    String(r.address_text||'').toLowerCase().includes(q)
+  );
+rows = rows.filter(matchCat);
+  if (sort==='rate') rows.sort((a,b)=>(b.rating||0)-(a.rating||0));
+  else if (sort==='fast') rows.sort((a,b)=>
+    ((typeof a.etaExtraMinutes==='number'?a.etaExtraMinutes:999) -
+     (typeof b.etaExtraMinutes==='number'?b.etaExtraMinutes:999))
+  );
+  else if (sort==='lowfee') rows.sort((a,b)=>(a.deliveryFee||999)-(b.deliveryFee||999));
+  else rows.sort((a,b)=>(b.priorityScore||0)-(a.priorityScore||0));
+
+  $("#countInfo").textContent = rows.length ? `${rows.length} ${T('restaurants')}` : T('noRestaurants');
+
+  // Helpers محلية
+  const getDisc = (r)=>{
+    const raw = (r.discountPercent ?? r.discount ?? (r.promo && r.promo.discountPercent) ?? null);
+    if (raw==null) return 0;
+    const n = Number(String(raw).replace(/[^\d.]/g,''));
+    return Number.isFinite(n) ? n : 0;
+  };
+  const createCard = (r)=>{
+    const addrText = (r.address_text && String(r.address_text).trim())
+      || [r.zip, r.city].filter(Boolean).join(' ').trim();
+    const coverUrl = r.coverUrl || '';
+    const logoUrl  = r.logoUrl  || '';
+    const showCover = !!coverUrl && coverUrl !== logoUrl;
+    const showLogo  = !!logoUrl;
+    const deliveryMinutes = (typeof r.etaExtraMinutes === 'number' && r.etaExtraMinutes >= 0) ? r.etaExtraMinutes : null;
+// Delivery fee & Min order (from restaurant doc; with backward-compat keys)
+const feeRaw = (r.deliveryFee ?? (r.delivery && r.delivery.fee) ?? null);
+const feeNum = (feeRaw==null ? null : Number(feeRaw));
+const freeDelivery = (feeNum===0 || feeNum==null);
+
+// badge: Lieferung kostenlos (green) OR Lieferung: €X
+const deliveryHtml = freeDelivery
+  ? `<span class="badge" style="background:rgba(34,197,94,.12);color:#16a34a;border-color:rgba(34,197,94,.25)">Lieferung kostenlos</span>`
+  : `<span class="badge">Lieferung: ${eur(feeNum)}</span>`;
+
+// Min order (Mindestbestellwert)
+const moRaw = (r.minOrder ?? (r.order && r.order.min) ?? null);
+const moNum = (moRaw==null ? null : Number(moRaw));
+const minOrderHtml = (moNum!=null && moNum>0)
+  ? `<span class="badge">MBW: ${eur(moNum)}</span>`
+  : ``;
+
+    const disc = getDisc(r);
+    const hasDisc = disc > 0;
+    const discStyle = hasDisc
+      ? (disc >= 20
+          ? 'background:#fee2e2;border:1px solid #fecaca;color:#b91c1c'
+          : 'background:#fff0d1;border:1px solid #ffd18a;color:#8a5a00')
+      : '';
+    const discHtml = hasDisc ? `<span class="badge sale" style="${discStyle}">-${Math.round(disc)}%</span>` : ``;
+
+    const rate = Number(r.rating);
+    const rateHtml = Number.isFinite(rate) && rate>0
+      ? `<span class="badge">⭐️ ${rate.toFixed(1)}</span>`
+      : `<span class="badge">Neu</span>`;
+
+    const card = document.createElement('div'); 
+card.className = 'tile';
+card.dataset.rid = r.id;   // ← مهم: نحتاجه لاكتشاف المطعم الوسطي
+
+    card.innerHTML = `
+      <div class="tile-media">
+  ${showCover ? `<img class="tile-cover" src="${coverUrl}" alt="" loading="lazy" decoding="async">` : ``}
+  ${showLogo  ? `<img class="tile-logo"  src="${logoUrl}"  alt="" loading="lazy" decoding="async">` : ``}
+  ${hasDisc ? `<div class="rest-disc">${discHtml}</div>` : ``}
+</div>
+
+      <div class="tile-body">
+        <div class="tile-name line-1">${esc(r.name||'(—)')}</div>
+        <div class="tile-sub line-1">${esc(addrText)}</div>
+        <div class="tile-meta">
+  
+    <span class="badge ${isOpenNow(r)?'open':'closed'}">${isOpenNow(r)?T('open'):T('closed')}</span>
+  </div>
+  <div class="tile-meta-right">
+    ${deliveryMinutes!=null ? `<span class="meta-time">🕒 <strong>${deliveryMinutes}</strong> min</span>` : ``}
+    ${deliveryHtml}
+    ${minOrderHtml}
+  </div>
+</div>
+<div class="tile-actions">
+  <button class="btn-cta" data-open="${r.id}">${T('viewMenu')}</button>
+</div>
+
+      </div>`;
+    card.querySelectorAll('[data-open]').forEach(b=> b.addEventListener('click', ()=> openMenu(r.id)));
+    return card;
+  };
+  const renderRail = (secId, contId, items)=>{
+    const sec  = document.getElementById(secId);
+    const cont = document.getElementById(contId);
+    if (!sec || !cont) return;
+    cont.innerHTML = '';
+    if (!items.length){ sec.classList.add('hidden'); return; }
+    const frag = document.createDocumentFragment();
+    items.forEach(r=>{
+  const el = createCard(r);
+  el.dataset.rid = r.id;              // ← مهم لتتبع البطاقة الوسطى
+  frag.appendChild(el);
+});
+cont.appendChild(frag);
+
+    sec.classList.remove('hidden');
+  };
+  
+
+  // 2) تقسيم المجموعات (بدون deals)
+  const seen = new Set();
+    const hot = rows
+    .filter(r => getDisc(r) > HOT)
+    .sort((a,b) => getDisc(b) - getDisc(a));
+
+  hot.forEach(r=> seen.add(r.id));
+
+  const top = rows
+    .filter(r => !seen.has(r.id))
+    .sort((a,b) => (b.rating||0) - (a.rating||0))
+    .slice(0, 12);
+  top.forEach(r=> seen.add(r.id));
+
+  const rest = rows.filter(r => !seen.has(r.id));
+
+  // 3) رسم السكّتين
+  renderRail('rail-hot-sec', 'railHot', hot);
+  renderRail('rail-top-sec', 'railTop', top);
+  // === Link products section to CENTER of Top Rated rail ===
+(() => {
+  const railTop = document.getElementById('railTop');
+  const already = railTop?.dataset?.linkedInit === '1';
+  if (!railTop || already) return;
+
+  railTop.dataset.linkedInit = '1';
+
+  // عندما يحطّ كارت مطعم في وسط السكة → اعرض منتجاته في القسم أسفل Top Rated
+  observeRailCenter(railTop, rid => {
+    showLinkedProductsByRid(rid, {
+      secId: 'top-rest-products',
+      contId: 'topRestProd',
+      titleId: 'topRestTitle'
+    });
+  });
+
+  // فعّل الأسهم (تظهر فقط على الديسكتوب)
+  initLinkedArrows('topRestProd', 'topprod');
+})();
+
+// فعّل تتبع مركز سكة HOT مرة واحدة بعد الرسم
+initHotCenterTracking();
+
+  // 4) الشبكة
+  grid.innerHTML = '';
+  rest.forEach(r => grid.appendChild(createCard(r)));
+
+  // 5) Prefetch للصور (بدون deals)
+  (function prefetchImages(){
+    const urls = [];
+    const pick = (arr)=> arr.slice(0,4).forEach(r=>{
+      if(r.coverUrl) urls.push(r.coverUrl);
+      else if(r.logoUrl) urls.push(r.logoUrl);
+    });
+    pick(hot); pick(top); pick(rest);
+    const head = document.head || document.getElementsByTagName('head')[0];
+    urls.slice(0,8).forEach(href=>{
+      try{
+        const l = document.createElement('link');
+        l.rel='prefetch'; l.as='image'; l.href=href;
+        head.appendChild(l);
+      }catch(_){}
+    });
+  })();
+}
+// يبني عنصر بطاقة صفقة منتج بنمط الشبكة (صورة يسار - نص وسط - زر يمين)
+function createProductDealGridItem(r, p){
+  const pic =
+    (Array.isArray(p.images) && p.images[0]) ? p.images[0] :
+    (typeof p.img === 'string' && p.img) ? p.img :
+    (typeof p.imageUrl === 'string' && p.imageUrl) ? p.imageUrl : '';
+
+  const hasOpts =
+    (Array.isArray(p.optionGroupIds) && p.optionGroupIds.length>0) ||
+    (Array.isArray(p.sizes) && p.sizes.length>0);
+
+ const { unit, unitOld, discPct } = computeDealUnit(r, p);
+const discHtml = (discPct > 0) ? `<span class="badge-disc">-${Math.round(discPct)}%</span>` : '';
+
+
+  const priceHtml = (unitOld > unit)
+    ? `<div class="pprice"><s>${eur(unitOld)}</s><strong>${eur(unit)}</strong></div>`
+    : `<div class="pprice"><strong>${eur(unit)}</strong></div>`;
+
+  const el = document.createElement('div');
+  el.className = 'pitem';
+  el.innerHTML = `
+   <div class="pitem-left-wrap">
+  <div class="pitem-left">
+    ${pic ? `<img src="${esc(pic)}" loading="lazy" decoding="async" alt="">`
+          : `<div style="font-size:13px;color:#999">—</div>`}
+  </div>
+  ${discHtml}
+</div>
+
+    <div class="pitem-mid">
+  <div class="pname">${esc(p.name || p.title || '(—)')}</div>
+  <div class="prest">${esc(r.name || '')}</div>
+  ${priceHtml}
+</div>
+
+
+    </div>
+    <div class="pitem-right">
+      ${hasOpts
+  ? `<button class="btn-sm" data-cfg="${r.id}::${p.id}" title="${T('choose')}">＋</button>`
+  : `<button class="btn-sm" data-add="${r.id}::${p.id}" title="${T('add')}">＋</button>`}
+
+    </div>
+  `;
+
+  // أزرار
+  const addBtn = el.querySelector('[data-add]');
+  if (addBtn){
+    addBtn.addEventListener('click', ()=>{
+      addToCart(r, p);
+    });
+  }
+  const cfgBtn = el.querySelector('[data-cfg]');
+  if (cfgBtn){
+    cfgBtn.addEventListener('click', async ()=>{
+      await openConfigurator(r, p);
+    });
+  }
+  return el;
+}
+
+// يرسم شبكة العروض في #prodDealsGrid
+function renderProductDealsGrid(list){
+  const sec  = document.getElementById('grid-prod-deals');
+  const cont = document.getElementById('prodDealsGrid');
+  if(!sec || !cont) return;
+  cont.innerHTML = '';
+  if(!list.length){ sec.classList.add('hidden'); return; }
+  const frag = document.createDocumentFragment();
+  list.forEach(({r,p})=> frag.appendChild(createProductDealGridItem(r,p)));
+  cont.appendChild(frag);
+  sec.classList.remove('hidden');
+}
+
+
+// تحميل منتجات عليها حسومات (عبر كل المطاعم المحمّلة)
+async function loadProductDeals(){
+  if(!Array.isArray(RESTAURANTS) || !RESTAURANTS.length){ renderProductDealsRail([]); return; }
+
+  const deals = [];
+
+  // اجلب من كل مطعم منتجاته، التقط المخفَّض فقط، ثم قصّ إلى عدد معقول
+  for (const r of RESTAURANTS){
+    try{
+      const snap = await fs.collection('restaurants').doc(r.id).collection('products').get();
+      snap.forEach(d=>{
+        const p = { id:d.id, ...d.data() };
+        // احسب الخصم الفعّال لهذا المنتج
+       const prodPct = getProductDiscount(p);
+const restPct = getRestaurantDiscount(r);
+
+        const eff = prodPct > 0 ? prodPct : restPct;
+        if (eff > 0){
+          deals.push({ r, p, eff });
+        }
+      });
+    }catch(_){}
+    // حد أعلى للحِمل
+    if (deals.length >= 48) break;
+  }
+
+  // رتب حسب أعلى خصم وخذ أفضل 24
+  deals.sort((a,b)=> b.eff - a.eff);
+renderProductDealsGrid(deals.slice(0,24));  // ← بدل renderProductDealsRail(...)
+
+// احذف/لا تضف أي منطق لأسهم التنقل - لم نعد بحاجة لها
+
+
+  // فعل أسهم التنقل لهذه السكة (مرة واحدة كفاية)
+  document.querySelectorAll('.rail-nav[data-nav="pdeal"]').forEach(btn=>{
+    if(btn.dataset.bound) return;
+    btn.dataset.bound = '1';
+    btn.addEventListener('click', ()=>{
+      const el = document.getElementById('railProdDeals');
+      if(!el) return;
+      const dir = btn.classList.contains('next') ? 1 : -1;
+      el.scrollBy({ left: dir * (el.clientWidth * 0.9), behavior:'smooth' });
+    });
+  });
+}
+
+// === Helper: جلب منتجات المطعم (مع كاش)
+async function getRestaurantProductsCached(rid){
+  if (PROD_CACHE.has(rid)) {
+    const { prods } = PROD_CACHE.get(rid);
+    return prods || [];
+  }
+  // في حال لم تُحمّل بعد: اجلبها وخزنها بالكاش البسيط
+  const proSnap = await fs.collection('restaurants').doc(rid).collection('products').get();
+  const prods = [];
+  proSnap.forEach(d => prods.push({ id:d.id, ...d.data() }));
+  const old = PROD_CACHE.get(rid) || {};
+// لا تمسّ cats أبداً هنا — خزّن المنتجات فقط
+PROD_CACHE.set(rid, { ...old, prods });
+
+  return prods;
+}
+
+// === Helper: بناء بطاقة منتج صغيرة لسكة المنتجات
+function buildHotProdSlide(r, p){
+  const img =
+    (Array.isArray(p.images) && p.images[0]) ? p.images[0] :
+    (typeof p.img === 'string' && p.img) ? p.img :
+    (typeof p.imageUrl === 'string' && p.imageUrl) ? p.imageUrl : '';
+
+  const { unit, unitOld, discPct } = computeUnitPrice(r, p, 0);
+
+  const hasOpts =
+    (Array.isArray(p.optionGroupIds) && p.optionGroupIds.length>0) ||
+    (Array.isArray(p.sizes) && p.sizes.length>0);
+
+  const el = document.createElement('div');
+  el.className = 'prod-slide';
+
+  el.innerHTML = `
+    <div class="thumb-wrap">
+      <div class="thumb">
+        ${img ? `<img src="${esc(img)}" loading="lazy" decoding="async" alt="">`
+              : `<div style="font-size:13px;color:#999">—</div>`}
+      </div>
+      ${discPct>0 ? `<span class="disc">-${Math.round(discPct)}%</span>` : ``}
+    </div>
+    <div class="mid">
+      <div class="name">${esc(p.name || p.title || '(—)')}</div>
+      <div class="price">
+        ${unitOld > unit
+          ? `<s>${eur(unitOld)}</s><strong>${eur(unit)}</strong>`
+          : `<strong>${eur(unit)}</strong>`}
+      </div>
+    </div>
+    <div class="act">
+      ${hasOpts
+        ? `<button class="btn-sm" data-cfg="${r.id}::${p.id}" title="${T('choose')}">＋</button>`
+        : `<button class="btn-sm" data-add="${r.id}::${p.id}" title="${T('add')}">＋</button>`}
+    </div>
+  `;
+
+  // أربط الأزرار
+  const addBtn = el.querySelector('[data-add]');
+  if (addBtn){
+    addBtn.addEventListener('click', ()=>{
+      addToCart(r, p);
+    });
+  }
+  const cfgBtn = el.querySelector('[data-cfg]');
+  if (cfgBtn){
+    cfgBtn.addEventListener('click', async ()=>{
+      await openConfigurator(r, p);
+    });
+  }
+  return el;
+}
+
+// === Render السكشن وفق مطعم محدّد
+async function showHotRestaurantProductsById(rid){
+  const sec  = document.getElementById('hot-rest-products');
+  const cont = document.getElementById('hotRestProd');
+  const title= document.getElementById('hotRestTitle');
+  if(!sec || !cont) return;
+
+  // ابحث عن المطعم من القائمة الحالية
+  const r = RESTAURANTS.find(x=> x.id === rid);
+  if(!r){ sec.classList.add('hidden'); return; }
+
+  title.textContent = `Produkte – ${r.name || ''}`;
+  cont.innerHTML = '';
+
+  // اجلب المنتجات (المتاحة فقط)
+  const all = await getRestaurantProductsCached(rid);
+  const prods = all.filter(p => p.isAvailable !== false);
+
+  // خذ 12 منتج كحد أقصى لخفّة الواجهة
+  const list = prods.slice(0, 12);
+
+  if(!list.length){
+    sec.classList.add('hidden');
+    return;
+  }
+
+  const frag = document.createDocumentFragment();
+  list.forEach(p => frag.appendChild(buildHotProdSlide(r, p)));
+  cont.appendChild(frag);
+  sec.classList.remove('hidden');
+  initHotProdArrows();
+
+}
+// === Arrows navigation for desktop (hot products rail)
+function initHotProdArrows(){
+  const rail = document.getElementById('hotRestProd');
+  if(!rail) return;
+  const btnPrev = document.querySelector('[data-nav="hotprod-prev"]');
+  const btnNext = document.querySelector('[data-nav="hotprod-next"]');
+  if(!btnPrev || !btnNext) return;
+
+  const scrollStep = 320; // px per click
+
+  btnPrev.addEventListener('click', ()=>{
+    rail.scrollBy({ left: -scrollStep, behavior: 'smooth' });
+  });
+  btnNext.addEventListener('click', ()=>{
+    rail.scrollBy({ left: scrollStep, behavior: 'smooth' });
+  });
+}
+
+// === احسب المطعم الواقع في منتصف سكة HOT
+function getCenteredHotRid(){
+  const rail = document.getElementById('railHot');
+  if(!rail) return null;
+  const railRect = rail.getBoundingClientRect();
+  const railCenter = railRect.left + railRect.width/2;
+
+  let best = { rid:null, dist:Infinity };
+  rail.querySelectorAll('.tile[data-rid]').forEach(el=>{
+    const r = el.getBoundingClientRect();
+    const center = r.left + r.width/2;
+    const d = Math.abs(center - railCenter);
+    if (d < best.dist){ best = { rid: el.dataset.rid, dist: d }; }
+  });
+  return best.rid;
+}
+
+// === استمع لتمرير سكة HOT وحدّث السكشن
+function initHotCenterTracking(){
+  const rail = document.getElementById('railHot');
+  if(!rail) return;
+
+  // حدّث dataset.rid على بطاقات HOT (يُستدعى بعد رسمها)
+  // (لو كانت محددة مسبقًا نتجاهل)
+  rail.querySelectorAll('.tile').forEach(el=>{
+    if(!el.dataset.rid){
+      // يُملأ في renderRail عند عدّ العناصر (سنضيفه هناك)
+    }
+  });
+
+  let raf = null;
+  const onScroll = ()=>{
+    if(raf) cancelAnimationFrame(raf);
+    raf = requestAnimationFrame(async ()=>{
+      const rid = getCenteredHotRid();
+      if (rid) await showHotRestaurantProductsById(rid);
+    });
+  };
+  rail.addEventListener('scroll', onScroll, { passive:true });
+
+  // تهيئة أوليّة
+  setTimeout(async ()=>{
+    const rid = getCenteredHotRid();
+    if (rid) await showHotRestaurantProductsById(rid);
+  }, 50);
+
+  // لو عندك أزرار prev/next لسكة HOT: حدّث بعد النقر (بعد اكتمال السحب السلس)
+  document.querySelectorAll('.rail-nav[data-nav="hot"]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      setTimeout(()=>{
+        const rid = getCenteredHotRid();
+        if (rid) showHotRestaurantProductsById(rid);
+      }, 420);
+    }, { passive:true });
+  });
+}
+
+
+
+/* ===== Menu & Products (مختصر ولا تكرار) ===== */
+async function openMenu(rid){
+  const dlg=$("#menuDialog"), body=$("#menuBody"), title=$("#menuTitle");
+  body.innerHTML = `<div style="padding:18px" class="small">…</div>`;
+  dlg.showModal();
+
+  const rDoc=await fs.collection('restaurants').doc(rid).get();
+  if(!rDoc.exists){ body.innerHTML=`<div class="small">—</div>`; return; }
+  const r={id:rid, ...rDoc.data()};
+  title.textContent = `${T('menu')} – ${r.name||''}`;
+
+  if (PROD_CACHE.has(rid)) {
+  const cached = PROD_CACHE.get(rid);
+  // إن كانت الفئات موجودة بالكاش، استخدمها مباشرة
+  if (Array.isArray(cached.cats) && cached.cats.length){
+    renderMenu(r, cached.cats, cached.prods || []);
+    return;
+  }
+  // غير ذلك: كمّل لتحميل الفئات من فايرستور
+}
+
+
+  const catsSnap=await fs.collection('restaurants').doc(rid).collection('categories').get();
+  const cats=[]; catsSnap.forEach(d=> cats.push({id:d.id, ...d.data()})); cats.sort((a,b)=>(a.sort??0)-(b.sort??0));
+  const proSnap=await fs.collection('restaurants').doc(rid).collection('products').get();
+  let prods=[]; proSnap.forEach(d=> prods.push({id:d.id, ...d.data()}));
+  prods = prods.filter(p=> p.isAvailable !== false);
+
+  const existing = PROD_CACHE.get(rid) || {};
+PROD_CACHE.set(rid, { ...existing, cats, prods });
+renderMenu(r, cats, prods);
+
+}
+// إعادة بناء عرض القائمة عند تغيير الحجم (لو الديالوج مفتوح)
+(function(){
+    let lastW = window.innerWidth;
   window.addEventListener('resize', ()=>{
     if (!dlg || !dlg.open || !ridOpen) return;
 
@@ -29,3 +1639,731 @@
       }catch(_){}
     }, 200);
   });
+
+})();
+
+function renderMenu(r, cats, prods){
+  const body = document.getElementById('menuBody');
+  const isMobile = window.matchMedia('(max-width: 900px)').matches;
+
+  // فهرسة المنتجات حسب الفئة
+  const byCat = new Map(); cats.forEach(c=>byCat.set(c.id,[])); byCat.set('_',[]);
+  for (const p of prods){
+    const cid = (p.categoryId && byCat.has(p.categoryId)) ? p.categoryId : '_';
+    byCat.get(cid).push(p);
+  }
+
+  // ===== MOBILE: سلايدر أفقي + قائمة كاملة =====
+  // ===== MOBILE: سلايدر أفقي + قائمة كاملة =====
+if (isMobile){
+    // استخدم آخر فئة نشطة محفوظة لهذا المطعم إن وُجدت وصالحة
+    let activeCid = (MENU_ACTIVE_CAT[r.id] && cats.some(c => c.id === MENU_ACTIVE_CAT[r.id]))
+      ? MENU_ACTIVE_CAT[r.id]
+      : (cats[0]?.id || '_');
+
+
+    const rail = document.createElement('div'); rail.className='menu-rail';
+    const list = document.createElement('div'); list.className='menu-list';
+
+    const makeChip = (c)=>{
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'menu-chip' + (activeCid===c.id?' active':'');
+      btn.textContent = c.name || c.title || '—';
+      btn.addEventListener('click', ()=>{
+  activeCid = c.id;
+  MENU_ACTIVE_CAT[r.id] = activeCid;     // ← حفظ الفئة
+  rail.querySelectorAll('.menu-chip').forEach(x=>x.classList.remove('active'));
+  btn.classList.add('active');
+  paint({ resetScroll:true });
+});
+
+      return btn;
+    };
+
+    rail.innerHTML = '';
+    cats.forEach(c => rail.appendChild(makeChip(c)));
+    if ((byCat.get('_')||[]).length){ rail.appendChild(makeChip({id:'_', name:'…'})); }
+
+    function paint(opts = {}){
+  const { resetScroll = false } = opts;
+  const keepScroll = list.scrollTop;   // احفظ الموضع الحالي
+  list.innerHTML = '';
+  const items = (byCat.get(activeCid) || []).sort((a,b)=>(a.sort??0)-(b.sort??0));
+      if (!items.length){ list.innerHTML = `<div class="small">—</div>`; return; }
+
+      for (const it of items){
+        const name  = it.name || it.title || '(—)';
+        const desc  = it.desc || '';
+        const price = (typeof it.price === 'number') ? it.price : Number(it.price||0);
+        const imgUrl =
+          (Array.isArray(it.images) && it.images[0]) ? it.images[0] :
+          (typeof it.img === 'string' && it.img) ? it.img :
+          (typeof it.imageUrl === 'string' && it.imageUrl) ? it.imageUrl : '';
+
+        const restDisc = getRestaurantDiscount(r);
+        const prodDisc = getProductDiscount(it);
+        const effDisc  = prodDisc > 0 ? prodDisc : restDisc;
+
+        const hasOpts =
+          (Array.isArray(it.optionGroupIds) && it.optionGroupIds.length>0) ||
+          (Array.isArray(it.sizes) && it.sizes.length>0);
+
+        const hasSizes = Array.isArray(it.sizes) && it.sizes.length > 0;
+        const priceBlock = priceHtml(price, effDisc, { prefixFrom: hasSizes });
+
+        const row = document.createElement('div'); row.className='item';
+        row.innerHTML = `
+          <div class="ph-wrap">
+            <div class="ph">
+              ${imgUrl
+                ? `<img class="im" src="${esc(imgUrl)}" loading="lazy" decoding="async" alt="">`
+                : `<div class="im" style="display:flex;align-items:center;justify-content:center;font-size:12px;color:#999">—</div>`}
+            </div>
+            ${effDisc>0 ? `<span class="badge-disc">-${Math.round(effDisc)}%</span>` : ``}
+          </div>
+
+          <div class="txt">
+            <div class="nm line-1">${esc(name)}</div>
+            <div class="pr">${priceBlock}</div>
+            ${desc ? `<div class="ds line-1">${esc(desc)}</div>` : ``}
+          </div>
+
+          <div class="act">
+            ${hasOpts
+              ? `<button class="btn-sm" data-cfg="${it.id}" title="${T('choose')}">＋</button>`
+              : `<button class="btn-sm" data-add="${it.id}" title="${T('add')}">＋</button>`}
+          </div>
+        `;
+        list.appendChild(row);
+      }
+
+      // Bind
+      list.querySelectorAll('[data-add]').forEach(b=>{
+        b.addEventListener('click',()=>{
+          const pid=b.getAttribute('data-add'); const it=prods.find(x=>x.id===pid);
+          addToCart(r,it);
+        });
+      });
+      list.querySelectorAll('[data-cfg]').forEach(b=>{
+        b.addEventListener('click', async ()=>{
+          const pid=b.getAttribute('data-cfg'); const it=prods.find(x=>x.id===pid);
+          await openConfigurator(r,it);
+        });
+      });
+    }
+
+    body.innerHTML=''; body.appendChild(rail); body.appendChild(list); paint();
+    return;
+  }
+
+  // ===== DESKTOP (كما كان): عمود فئات يسار + قائمة يمين =====
+  const side=document.createElement('div'); side.className='menu-side';
+  cats.forEach((c,i)=>{ const b=document.createElement('button'); b.className='menu-cat'+(i===0?' active':''); b.textContent=c.name||c.title||'—'; b.dataset.cid=c.id; side.appendChild(b); });
+  if((byCat.get('_')||[]).length){ const b=document.createElement('button'); b.className='menu-cat'; b.textContent='…'; b.dataset.cid='_'; side.appendChild(b); }
+
+  const list=document.createElement('div'); list.className='menu-list';
+
+  const paint=(cid)=>{
+    list.innerHTML=''; const items=(byCat.get(cid)||[]).sort((a,b)=>(a.sort??0)-(b.sort??0));
+    if(!items.length){ list.innerHTML=`<div class="small">—</div>`; return; }
+    for (const it of items) {
+      const name = it.name || it.title || '(—)';
+      const desc = it.desc || '';
+      const price = (typeof it.price === 'number') ? it.price : Number(it.price || 0);
+      const imgUrl =
+        (Array.isArray(it.images) && it.images[0]) ? it.images[0] :
+        (typeof it.img === 'string' && it.img) ? it.img :
+        (typeof it.imageUrl === 'string' && it.imageUrl) ? it.imageUrl : '';
+
+      const restDisc = getRestaurantDiscount(r);
+      const prodDisc = getProductDiscount(it);
+      const effDisc  = prodDisc > 0 ? prodDisc : restDisc;
+
+      const hasOpts =
+        (Array.isArray(it.optionGroupIds) && it.optionGroupIds.length>0) ||
+        (Array.isArray(it.sizes) && it.sizes.length>0);
+
+      const hasSizes = Array.isArray(it.sizes) && it.sizes.length > 0;
+      const priceBlock = priceHtml(price, effDisc, { prefixFrom: hasSizes });
+
+      const row = document.createElement('div'); row.className='item';
+      row.innerHTML = `
+        <div class="ph">
+          ${imgUrl
+            ? `<img class="im" src="${esc(imgUrl)}" loading="lazy" decoding="async" alt="">`
+            : `<div class="im" style="display:flex;align-items:center;justify-content:center;font-size:12px;color:#999">—</div>`}
+        </div>
+        <div class="txt">
+          <div class="nm line-1">${esc(name)}</div>
+          ${desc ? `<div class="ds line-1">${esc(desc)}</div>` : ``}
+        </div>
+        <div class="act" style="display:flex;gap:8px;align-items:center">
+          <div class="pr">${priceBlock}</div>
+          ${hasOpts
+            ? `<button class="btn-sm" data-cfg="${it.id}">${T('choose')}</button>`
+            : `<button class="btn-sm" data-add="${it.id}">${T('add')}</button>`}
+        </div>
+      `;
+      list.appendChild(row);
+    }
+
+    list.querySelectorAll('[data-add]').forEach(b=>{
+      b.addEventListener('click',()=>{
+        const pid=b.getAttribute('data-add'); const it=prods.find(x=>x.id===pid);
+        addToCart(r,it);
+      });
+    });
+    list.querySelectorAll('[data-cfg]').forEach(b=>{
+      b.addEventListener('click', async ()=>{
+        const pid=b.getAttribute('data-cfg'); const it=prods.find(x=>x.id===pid);
+        await openConfigurator(r,it);
+      });
+    });
+  };
+
+  paint(cats[0]?.id||'_');
+  side.querySelectorAll('.menu-cat').forEach(btn=>{
+    btn.addEventListener('click',()=>{
+      side.querySelectorAll('.menu-cat').forEach(x=>x.classList.remove('active'));
+      btn.classList.add('active'); paint(btn.dataset.cid);
+    });
+  });
+
+  body.innerHTML=''; body.appendChild(side); body.appendChild(list);
+}
+
+/* ===== Cart (مختصر) ===== */
+function addToCart(r,p){
+  const distinct = new Set(CART.map(x=>x.rid));
+  if (distinct.size && !distinct.has(r.id)){
+    const msg=(LANG==='de')?'Sie haben Artikel von einem anderen Restaurant im Warenkorb. Warenkorb leeren und fortfahren?'
+      :(LANG==='en')?'Your cart has items from another restaurant. Clear cart and continue?'
+      :(LANG==='tr')?'Sepette başka bir restorandan ürün var. Temizleyip devam edilsin mi?'
+      :'تحتوي السلة عناصر من مطعم آخر. هل تريد إفراغ السلة والمتابعة؟';
+    if(!confirm(msg)) return; CART=[];
+  }
+// حدّث معلومات السلة لهذا المطعم
+CART_INFO = {
+  rid: r.id,
+  rname: (r.name||''),
+  delivery: Number(r.flatDelivery ?? r.deliveryFlat ?? r.deliveryFee ?? 0) || 0,
+  minOrder: Number(r.minOrder ?? r.minOrderValue ?? 0) || 0
+};
+
+
+ 
+
+  // اختر أفضل مصدر للصورة: images[0] ثم img ثم imageUrl (إن وُجد)
+  const img =
+    (Array.isArray(p.images) && p.images[0]) ? p.images[0] :
+    (typeof p.img === 'string' && p.img) ? p.img :
+    (typeof p.imageUrl === 'string' && p.imageUrl) ? p.imageUrl : '';
+const { unit, unitOld, discPct } = computeUnitPrice(r, p, 0);
+
+  const key = `${r.id}::${p.id}`;
+  const row = CART.find(x=>x.key===key);
+
+  if (row){
+    row.qty += 1;
+  } else {
+    CART.push({
+      key, rid:r.id, rname:(r.name||''), pid:p.id,
+      title:(p.name||p.title||''), 
+      price: unit,            // سعر الوحدة بعد الخصم
+      unitOld: unitOld,       // السعر القديم (للعرض المشطوب إن لزم)
+      discPct: discPct,       // نسبة الخصم (للرجوع إن أردت)
+      qty:1, img
+    });
+  }
+
+  updateCartBadge();
+  toast(T('added'));
+}
+
+function updateCartBadge(){
+  const n = CART.reduce((s,x)=> s + x.qty, 0);
+  const badge = document.getElementById('cartCount');
+  if (badge) badge.textContent = String(n);
+}
+
+function openCart(){
+  const dlg=$("#cartDialog"), body=$("#cartBody"); body.innerHTML='';
+  if(!CART.length){ body.innerHTML=`<div class="small">${T('emptyCart')}</div>`; }
+  else{
+  const distinct=new Set(CART.map(x=>x.rid));
+  if(distinct.size>1)
+    body.insertAdjacentHTML('afterbegin',`<div class="small" style="color:#b45309;margin-bottom:8px">${T('multiWarn')}</div>`);
+
+  for(const row of CART){
+    const line = document.createElement('div'); line.className='cart-row';
+
+const imgHtml = row.img
+  ? `<img class="cart-thumb" src="${esc(row.img)}" alt="">`
+  : `<div class="cart-thumb" style="display:flex;align-items:center;justify-content:center;font-size:12px;color:#888">🍽️</div>`;
+
+const lineOldTotal = (row.unitOld!=null ? row.unitOld*row.qty : null);
+const lineNewTotal = row.price * row.qty;
+
+const priceBlock = (lineOldTotal!=null && lineOldTotal > lineNewTotal)
+  ? `<span style="text-decoration:line-through;opacity:.6;margin-inline-end:6px">${eur(lineOldTotal)}</span><strong>${eur(lineNewTotal)}</strong>`
+  : `<strong>${eur(lineNewTotal)}</strong>`;
+
+line.innerHTML = `
+  ${imgHtml}
+  <div>
+    <strong class="line-1">${esc(row.title)}</strong>
+    <div class="small line-1">${esc(row.rname)}</div>
+  </div>
+  <div class="cart-right">
+    <div>${priceBlock}</div>
+    <div class="q">
+      <button class="btn-sm" data-dec="${row.key}">−</button>
+      <span>${row.qty}</span>
+      <button class="btn-sm" data-inc="${row.key}">+</button>
+    </div>
+  </div>
+`;
+
+    body.appendChild(line);
+  }
+
+  body.querySelectorAll('[data-inc]').forEach(b=> b.addEventListener('click',()=> changeQty(b.dataset.inc,+1)));
+  body.querySelectorAll('[data-dec]').forEach(b=> b.addEventListener('click',()=> changeQty(b.dataset.dec,-1)));
+// === Min-Order notice + disable checkout (scoped) ===
+(()=>{
+  const cartSub     = CART.reduce((s,x)=> s + x.qty * x.price, 0);
+  const minRequired = Number(CART_INFO?.minOrder || 0);
+  const missingAmt  = Math.max(0, minRequired - cartSub);
+
+  // امسح التنبيه السابق إن وجد
+  const oldNotice = body.querySelector('#minOrderNotice');
+  if (oldNotice) oldNotice.remove();
+
+  // أنشئ تنبيه جديد إذا كان في حد أدنى
+  // أنشئ تنبيه جديد إذا كان في حد أدنى (ما لم يكن الالتقاط مفعّل)
+if (!PICKUP && minRequired > 0) {
+
+    const notice = document.createElement('div');
+    notice.id = 'minOrderNotice';
+    notice.className = 'small';
+    notice.style.cssText = 'margin-top:8px;padding:10px 12px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;display:flex;flex-direction:column;gap:6px';
+    notice.innerHTML = `
+      <div>${T('minOrder')}: <strong>${eur(minRequired)}</strong></div>
+      ${missingAmt > 0 ? `<div style="color:#b91c1c;font-weight:800">${T('needMore')(eur(missingAmt))}</div>` : ``}
+    `;
+    body.appendChild(notice);
+  }
+
+  // عطّل/فعّل زر الدفع
+  const payBtn = document.getElementById('checkout');
+  if (payBtn) {
+    const belowMin = (!PICKUP && minRequired > 0 && missingAmt > 0);
+
+    payBtn.disabled = belowMin;
+    payBtn.title = belowMin ? T('belowMinWarn') : '';
+  }
+})();
+
+  // --- ملخص الأسعار (أسفل عناصر السلة) ---
+  const sub = CART.reduce((s,x)=>s+x.qty*x.price,0);
+  const fee = (CART_INFO && Number(CART_INFO.delivery)) ? Number(CART_INFO.delivery) : 0;
+
+  const summary = document.createElement('div');
+  summary.className = 'small';
+  summary.style.cssText = 'margin-top:8px;padding:10px 12px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;display:flex;flex-direction:column;gap:6px';
+
+  const subLine = document.createElement('div');
+  subLine.textContent = T('subtotal')(eur(sub));
+  summary.appendChild(subLine);
+
+  const feeLine = document.createElement('div');
+feeLine.id = 'feeLine';
+
+if (PICKUP){
+  // عند الالتقاط: شطب الرسوم الأصلية وإظهار 0,00 €
+  const r = (typeof getCartRestaurant==='function') ? getCartRestaurant() : null;
+  const origFee = r ? (Number(r.flatDelivery ?? r.deliveryFlat ?? r.deliveryFee ?? 0) || 0) : fee;
+  feeLine.innerHTML = (origFee > 0)
+    ? `${T('delivery')}: <s>${eur(origFee)}</s> <strong>0,00 €</strong> <span style="margin-inline-start:6px;color:#16a34a;font-weight:800">(${T('pickup')})</span>`
+    : `<span style="color:#16a34a;font-weight:800">${T('freeDelivery')}</span>`;
+} else if (fee > 0){
+  feeLine.innerHTML = `${T('delivery')}: <strong>${eur(fee)}</strong>`;
+} else {
+  feeLine.innerHTML = `<span style="color:#16a34a;font-weight:800">${T('freeDelivery')}</span>`;
+}
+summary.appendChild(feeLine);
+
+
+  body.appendChild(summary);
+}
+// --- صف الالتقاط (Pickup / Abholung) ---
+const pickupRow = document.createElement('div');
+pickupRow.style.cssText = 'display:flex;align-items:center;gap:8px;padding:8px 0;border-top:1px solid #eee';
+pickupRow.innerHTML = `
+  <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+    <input id="pickupToggle" type="checkbox" ${PICKUP ? 'checked' : ''}>
+    <span>${T('pickup')}</span>
+  </label>
+`;
+body.appendChild(pickupRow);
+
+// ربط التغيير
+pickupRow.querySelector('#pickupToggle').addEventListener('change', (e)=>{
+  PICKUP = !!e.target.checked;
+
+  if (PICKUP){
+    // أزل تنبيه الحد الأدنى (إن وُجد) وفَعّل الدفع دائمًا
+    const minNotice = body.querySelector('#minOrderNotice');
+    if (minNotice) minNotice.remove();
+    const payBtn = document.getElementById('checkout');
+    if (payBtn){ payBtn.disabled = false; payBtn.title=''; }
+
+    // شطب رسوم التوصيل بصريًا وإظهار 0,00 €
+    const feeEl = document.getElementById('feeLine');
+    const r = (typeof getCartRestaurant==='function') ? getCartRestaurant() : null;
+    const origFee = r ? (Number(r.flatDelivery ?? r.deliveryFlat ?? r.deliveryFee ?? 0) || 0) : 0;
+    if (feeEl){
+      feeEl.innerHTML = (origFee > 0)
+        ? `${T('delivery')}: <s>${eur(origFee)}</s> <strong>0,00 €</strong> <span style="margin-inline-start:6px;color:#16a34a;font-weight:800">(${T('pickup')})</span>`
+        : `<span style="color:#16a34a;font-weight:800">${T('freeDelivery')}</span>`;
+    }
+
+    updateTotal();   // إجمالي بدون توصيل
+  } else {
+    // أبسط استرجاع: أعد بناء السلة لتعود قواعد الحد الأدنى/التوصيل كما كانت
+    openCart();
+    return; // لأن openCart() سيستدعي updateTotal() بنفسه
+  }
+});
+
+  updateTotal();
+  dlg.showModal();
+}
+
+function changeQty(key,d){
+  const row=CART.find(x=>x.key===key); if(!row) return;
+  row.qty+=d;
+  if(row.qty<=0) CART=CART.filter(x=>x.key!==key);
+  if(CART.length===0) CART_INFO = null; // صفّر معلومات السلة إن أصبحت فارغة
+  openCart();
+  updateCartBadge();
+}
+
+function updateTotal(){
+  const sub = CART.reduce((s,x)=>s+x.qty*x.price,0);
+  const fee = (CART_INFO && Number(CART_INFO.delivery)) ? Number(CART_INFO.delivery) : 0;
+  const total = sub + (PICKUP ? 0 : (fee>0 ? fee : 0));
+  document.getElementById('cartTotal').textContent = T('sum')(eur(total));
+}
+
+
+function checkout(){
+  if(!CART.length){ toast(T('emptyCart')); return; }
+  const payload={ createdAt:new Date().toISOString(), lang:LANG, items:CART.map(x=>({restaurantId:x.rid,productId:x.pid,title:x.title,qty:x.qty,price:x.price})), total:CART.reduce((s,x)=>s+x.qty*x.price,0) };
+  console.log('ORDER_DRAFT', payload); alert('Order draft prepared (Console). Connect backend to place the order.');
+}
+async function fetchOptionGroups(rid, ids){
+  if(!Array.isArray(ids) || !ids.length) return [];
+  const col = fs.collection('restaurants').doc(rid).collection('option_groups');
+  const groups = [];
+  // جلب كل مجموعة بالـ id
+  for(const gid of ids){
+    try{
+      const d = await col.doc(gid).get();
+      if(d.exists){
+        const x = d.data();
+        groups.push({
+          id: gid,
+          name: x.name || '',
+          type: (x.type==='multi'?'multi':'single'),
+          min: Number.isFinite(+x.min)? +x.min : 0,
+          max: (x.max==null ? null : (Number.isFinite(+x.max)? +x.max : null)),
+          items: Array.isArray(x.items)? x.items.map(it=>({
+            name: it.name || '',
+            price: Number(it.priceDelta||0)
+          })) : []
+        });
+      }
+    }catch(_){}
+  }
+  return groups;
+}
+
+// مهيّئ الخيارات
+async function openConfigurator(r, p){
+  const dlg = document.getElementById('cfgDialog');
+  const body = document.getElementById('cfgBody');
+  const title= document.getElementById('cfgTitle');
+  const totalEl=document.getElementById('cfgTotal');
+  const qtyEl  =document.getElementById('cfgQty');
+  const qMinus =document.getElementById('cfgQtyMinus');
+  const qPlus  =document.getElementById('cfgQtyPlus');
+  const doneBtn=document.getElementById('cfgDone');
+
+  title.textContent = `${(p.name||p.title||'')} – ${T('options')}`;
+  let qty = 1;
+
+  // قاعدة السعر
+  // الخصم الفعلي للمنتج (يغلب على خصم المطعم)
+const restDisc = getDiscountPercent(r);
+const prodDisc = getProductDiscountPercent(p, restDisc);
+
+// نطبّق الخصم على السعر الأساسي فقط (الإضافات تبقى كما هي)
+const __base = (typeof p.price==='number') ? p.price : Number(p.price||0);
+const basePrice = prodDisc > 0 ? Math.max(0, Math.round(__base * (100 - prodDisc)) / 100) : __base;
+
+
+  // جلب المجموعات
+  // 1) اجلب المجموعات “الحقيقية” من فايرستور
+const fetched = await fetchOptionGroups(
+  r.id,
+  Array.isArray(p.optionGroupIds) ? p.optionGroupIds : []
+);
+
+// 2) إذا كان عندنا sizes في وثيقة المنتج، ابنِ مجموعة حجم افتراضية
+const groups = [];
+let sizeDefault = -1;
+
+// تحاشي الازدواج لو كان هناك مجموعة اسمها Größe/Size أصلاً ضمن fetched
+const SIZE_NAMES = ['größe','grösse','size','الحجم','boyut'];
+const hasRealSizeGroup = fetched.some(g =>
+  g.type === 'single' && SIZE_NAMES.some(n => String(g.name||'').toLowerCase().includes(n))
+);
+
+if (!hasRealSizeGroup && Array.isArray(p.sizes) && p.sizes.length){
+  const items = p.sizes.map(s => ({
+    name: s.name || '',
+    // نتوقع أن الوثيقة تحفظ فرق السعر تحت priceDelta
+    // إن كانت تحفظها حقلاً آخر (price أو delta) غيّره هنا
+    price: Number(s.priceDelta || 0)
+  }));
+
+  // اختر افتراضيًا الأقل فرقًا (عادةً 0)
+  const minDelta = Math.min(...items.map(i => i.price));
+  sizeDefault = Math.max(0, items.findIndex(i => i.price === minDelta));
+
+  groups.push({
+    id: '__size__',
+    name: 'Größe',
+    type: 'single',
+    min: 1,
+    max: 1,
+    items
+  });
+}
+
+// 3) ألحِق المجموعات القادمة من فايرستور
+groups.push(...fetched);
+
+// 4) ابنِ الحالة الأولية مع وضع اختيار الحجم الافتراضي
+const state = groups.map(g => ({
+  g,
+  sel: (g.type === 'single'
+          ? (g.id === '__size__' ? sizeDefault : -1)
+          : g.items.map(()=>0))
+}));
+
+
+  function computeExtras(){
+    let extras = 0;
+    for(const s of state){
+      const {g, sel} = s;
+      if(g.type==='single'){
+        if(sel>=0){ extras += g.items[sel].price; }
+      }else{
+        s.sel.forEach((q,i)=>{ if(q>0) extras += q * g.items[i].price; });
+      }
+    }
+    return extras;
+  }
+  function isValid(){
+    // تحقق min/max على أساس عدد الخيارات المختارة (distinct)
+    for(const s of state){
+      const {g, sel} = s;
+      let chosen = 0;
+      if(g.type==='single'){ chosen = (sel>=0 ? 1 : 0); }
+      else{ chosen = sel.reduce((c,q)=> c + (q>0?1:0), 0); }
+      if(chosen < (g.min||0)) return false;
+      if(g.max!=null && chosen > g.max) return false;
+    }
+    return true;
+  }
+  function paint(){
+    body.innerHTML='';
+    // سطر السعر
+    totalEl.textContent = `${T('sum')(eur((basePrice + computeExtras()) * qty))}`;
+	qtyEl.textContent = String(qty);
+    doneBtn.disabled = !isValid();
+
+    // رسم المجموعات
+    for(const s of state){
+      const {g} = s;
+      const wrap = document.createElement('div'); wrap.className='cfg-row';
+      const hint = (g.type==='single'
+        ? (g.min===1 ? '(1 erforderlich)' : '(1 wählen)')
+        : `(min ${g.min}${g.max!=null?`, max ${g.max}`:''})`);
+      wrap.innerHTML = `
+        <div class="hdr">
+          <div>${esc(g.name||'—')}</div>
+          <div class="cfg-hint">${esc(hint)}</div>
+        </div>
+      `;
+      // قائمة الخيارات
+      g.items.forEach((it, i)=>{
+        const row = document.createElement('div'); row.className='opt';
+        if(g.type==='single'){
+          const checked = (s.sel===i) ? 'checked' : '';
+          row.innerHTML = `
+            <div class="opt-left">
+              <input type="radio" name="g_${g.id}" ${checked} data-g="${g.id}" data-i="${i}">
+              <div>
+                <div class="opt-name">${esc(it.name)}</div>
+                <div class="opt-price">${it.price>0?`+ ${eur(it.price)}`:eur(0).replace(/\d[\d.,\s]*€/,'0,00 €')}</div>
+              </div>
+            </div>
+            <div></div>
+          `;
+          row.querySelector('input').addEventListener('change',()=>{
+            s.sel = i; paint();
+          });
+        }else{
+          // multi: +/- كميات
+          const q = s.sel[i] || 0;
+          row.innerHTML = `
+            <div class="opt-left">
+              <div>
+                <div class="opt-name">${esc(it.name)}</div>
+                <div class="opt-price">${it.price>0?`+ ${eur(it.price)}`:eur(0).replace(/\d[\d.,\s]*€/,'0,00 €')}</div>
+              </div>
+            </div>
+            <div class="opt-qty">
+              <button class="btn-sm" data-dec="${i}">−</button>
+              <span>${q}</span>
+              <button class="btn-sm" data-inc="${i}">+</button>
+            </div>
+          `;
+          row.querySelector('[data-dec]').addEventListener('click', ()=>{
+            const idx = +row.querySelector('[data-dec]').dataset.dec;
+            s.sel[idx] = Math.max(0, (s.sel[idx]||0)-1);
+            paint();
+          });
+          row.querySelector('[data-inc]').addEventListener('click', ()=>{
+            const idx = +row.querySelector('[data-inc]').dataset.inc;
+            // ضبط max على أساس عدد الخيارات المميزة المختارة، ليس الكميات
+            const distinct = s.sel.reduce((c,q)=> c+(q>0?1:0),0) + (s.sel[idx]===0?1:0);
+            if(s.g.max!=null && distinct > s.g.max) return; // لا نتجاوز max
+            s.sel[idx] = (s.sel[idx]||0)+1;
+            paint();
+          });
+        }
+        wrap.appendChild(row);
+      });
+      body.appendChild(wrap);
+    }
+  }
+
+  qMinus.onclick = ()=>{ qty = Math.max(1, qty-1); paint(); };
+  qPlus.onclick  = ()=>{ qty = Math.min(99, qty+1); paint(); };
+  document.getElementById('cfgClose').onclick = ()=> dlg.close();
+
+  doneBtn.onclick = ()=>{
+    if(!isValid()){ toast(T('invalidSel')); return; }
+    // بناء وصف الخيارات المختارة + السعر الإضافي للوحدة
+    const picked = state.map(s=>{
+      const {g} = s;
+      if(g.type==='single'){
+        return (s.sel>=0) ? { group:g.name, items:[{ name:g.items[s.sel].name, qty:1, price:g.items[s.sel].price }]} : null;
+      }else{
+        const items = [];
+        s.sel.forEach((q,i)=>{ if(q>0) items.push({ name:g.items[i].name, qty:q, price:g.items[i].price }); });
+        return items.length ? { group:g.name, items } : null;
+      }
+    }).filter(Boolean);
+
+    const extraPerUnit = computeExtras();
+    addConfiguredToCart(r, p, { qty, picked, extraPerUnit });
+    dlg.close();
+  };
+
+  paint();
+  dlg.showModal();
+}
+
+// إضافة منتج مهيّأ إلى السلة
+function addConfiguredToCart(r, p, cfg){
+  const distinct = new Set(CART.map(x=>x.rid));
+  if (distinct.size && !distinct.has(r.id)){
+    const msg=(LANG==='de')?'Sie haben Artikel von einem anderen Restaurant im Warenkorb. Warenkorb leeren und fortfahren?'
+      :(LANG==='en')?'Your cart has items from another restaurant. Clear cart and continue?'
+      :(LANG==='tr')?'Sepette başka bir restorandan ürün var. Temizleyip devam edilsin mi?'
+      :'تحتوي السلة عناصر من مطعم آخر. هل تريد إفراغ السلة والمتابعة؟';
+    if(!confirm(msg)) return; CART=[];
+  }
+  // حدّث معلومات السلة لهذا المطعم
+CART_INFO = {
+  rid: r.id,
+  rname: (r.name||''),
+  delivery: Number(r.flatDelivery ?? r.deliveryFlat ?? r.deliveryFee ?? 0) || 0,
+  minOrder: Number(r.minOrder ?? r.minOrderValue ?? 0) || 0
+};
+
+
+    // حساب سعر الوحدة بعد/قبل الخصم مع الإضافات لكل وحدة
+  const extra = Number(cfg.extraPerUnit||0);
+  const { unit, unitOld, discPct } = computeUnitPrice(r, p, extra);
+
+  const img =
+    (Array.isArray(p.images) && p.images[0]) ? p.images[0] :
+    (typeof p.img === 'string' && p.img) ? p.img :
+    (typeof p.imageUrl === 'string' && p.imageUrl) ? p.imageUrl : '';
+
+  const sig = JSON.stringify(cfg.picked);
+  const key = `${r.id}::${p.id}::${btoa(unescape(encodeURIComponent(sig))).slice(0,16)}`;
+
+  const row = CART.find(x=>x.key===key);
+  if(row){ row.qty += cfg.qty; }
+  else{
+    CART.push({
+      key, rid:r.id, rname:(r.name||''), pid:p.id,
+      title:(p.name||p.title||''), 
+      price: unit,            // بعد الخصم + الإضافات للوحدة
+      unitOld: unitOld,       // قبل الخصم + الإضافات للوحدة (للعرض المشطوب)
+      discPct: discPct,
+      qty: cfg.qty,
+      img, opts: cfg.picked
+    });
+  }
+  updateCartBadge();
+  toast(T('added'));
+
+}
+
+/* ===== Bindings ===== */
+window.addEventListener('DOMContentLoaded', ()=>{
+  const sel=document.getElementById('lang'); sel.value=LANG; applyLang(); // Make cart button icon-only
+const vc = document.getElementById('viewCart');
+if (vc) vc.innerHTML = `<span class="cart-ico"></span><span id="cartCount" class="cart-badge">0</span>`;
+
+    sel.addEventListener('change',()=>{
+    LANG=sel.value; localStorage.setItem('taussil:lang',LANG);
+    applyLang(); buildCatRail(); renderCatalog();
+  });
+buildCatRail();
+  bindRailNav(); // ربط أسهم السكك مرة واحدة
+
+  document.querySelector('.chip[data-chip="open"]').addEventListener('click',e=>{ e.currentTarget.classList.toggle('active'); renderCatalog(); });
+  document.getElementById('sort').addEventListener('change',renderCatalog);
+  document.getElementById('city').addEventListener('change',renderCatalog);
+  document.getElementById('q').addEventListener('input',renderCatalog);
+
+  document.getElementById('menuClose').addEventListener('click',()=> document.getElementById('menuDialog').close());
+  document.getElementById('viewCart').addEventListener('click',openCart);
+  document.getElementById('cartClose').addEventListener('click',()=> document.getElementById('cartDialog').close());
+  document.getElementById('checkout').addEventListener('click',checkout);
+
+  loadRestaurants().catch(err=>{ document.getElementById('grid').innerHTML = `<div class="small" style="color:#b91c1c">${esc(err?.message||String(err))}</div>`; });
+});
+</script>
+</body>
+</html>
