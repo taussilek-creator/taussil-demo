@@ -1735,8 +1735,10 @@ if (isMobile){
               : `<button class="btn-sm" data-add="${it.id}" title="${T('add')}">＋</button>`}
           </div>
         `;
-        list.appendChild(row);
-      }
+        requestAnimationFrame(()=>{
+    list.scrollTop = resetScroll ? 0 : keepScroll;
+  });
+}
 
       // Bind
       list.querySelectorAll('[data-add]').forEach(b=>{
