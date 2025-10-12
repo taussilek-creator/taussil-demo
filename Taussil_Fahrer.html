@@ -749,6 +749,18 @@ html, body { width:100%; max-width:100%; overflow-x:hidden; }
   border:1px solid #0002;                /* نفس الحد */
   display:block;                         /* يمنع فجوات inline */
 }
+/* === Wider badges: status + serial, no wrapping === */
+.neo-driver .card-order .info .line .tag{
+  display: inline-flex;           /* يحافظ على العرض الطبيعي ويمنع الضغط */
+  align-items: center;
+  justify-content: center;
+  white-space: nowrap;            /* منع النزول لسطر جديد داخل الشارة */
+  padding: 6px 12px;              /* توسيع أفقي */
+  line-height: 1.1;               /* ارتفاع مريح للنص */
+  border-radius: 999px;           /* كبسولة */
+  font-weight: 800;
+  flex: 0 0 auto;                 /* لا تتمدد ولا تنضغط */
+}
 
 </style>
 </head>
