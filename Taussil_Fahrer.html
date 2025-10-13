@@ -775,6 +775,27 @@ html, body { width:100%; max-width:100%; overflow-x:hidden; }
   font-weight: 800;
   font-variant-numeric: tabular-nums;
 }
+/* [PATCH:MOBILE] إظهار زر تعديل السعر على الموبايل */
+@media (max-width: 640px){
+  #orderModal .sheet #md_price_edit{
+    display: inline-flex !important;
+    height: 36px !important;
+    min-width: 44px !important;
+    align-items: center;
+    justify-content: center;
+  }
+}
+
+/* [PATCH:COD] تمييز بطاقة الطلب الكاش بإطار أحمر ومبلغ أحمر */
+.neo-driver .card-order.cash{
+  border: 2px solid #ef4444 !important;
+  box-shadow: 0 0 0 2px rgba(239,68,68,.35) inset !important;
+}
+.neo-driver .card-order.cash .amount{
+  color: #ef4444 !important;
+  font-weight: 800;
+  white-space: nowrap;
+}
 
 </style>
 </head>
@@ -2509,6 +2530,14 @@ function renderOrders(items){
     const qty =Number(o.qty||0)||0;
     const plat=Array.isArray(o.platform)? o.platform.join(" / ") : (o.platform||"—");
     const lower=String(stRaw).toLowerCase();
+	/*** [PATCH:COD] كشف الكاش + تجهيز النص ***/
+const isCash = !!(o?.payment?.cod === true
+               || String(o?.payment?.method||'').toLowerCase()==='cash'
+               || o?.cash === true);
+const priceNum = Number(o.price||0) || 0;
+const cashHtml = isCash ? ` · <span class="amount">Bar: ${formatEUR(priceNum)}</span>` : '';
+/*** END PATCH ***/
+
 	// رقم تسلسلي داخل القائمة الحالية (يبدأ من 1)
 const serial = idx + 1;
 // أظهره لكل الحالات النشطة + Geliefert (اخفي فقط Abgebrochen)
@@ -2537,14 +2566,16 @@ else if (Number(o?.payment?.codSum || 0) > 0) {
 
     const navHref = addr ? makeNavUrl(addr) : '#';
     return `
-      <div class="card-order${isCOD ? ' cod' : ''}" data-id="${id}" data-addr="${encodeURIComponent(addr)}" data-status="${st}">
+      <div class="card-order ${isCash ? 'cash' : ''}" data-id="${id}" data-addr="${encodeURIComponent(addr)}" data-status="${st}">
+
 
 
         <div class="logo">${logoHTML}</div>
         <div class="info">
          <div class="line"><strong>${rest}</strong> <span class="tag">${st}</span> ${serialTag}</div>
 
-          <div class="small">${plat} · Qty ${qty}</div>
+          <div class="small">${plat} · Qty ${qty}${cashHtml}</div>
+
           <div class="small" style="opacity:.85;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${addr || '—'}</div>
 		  ${isCOD && codAmount > 0 ? `<div class="small cod-amount">Bar: ${formatEUR(codAmount)}</div>` : ``}
 
@@ -3142,9 +3173,24 @@ md_created.textContent = createdMs
 
   const priceEUR = Number(o.price||0) || 0;
 md_price_value.textContent = formatEUR(priceEUR);
-md_price_edit.disabled = !canEditPrice(o);
-md_price_edit.title = md_price_edit.disabled ? 'Keine Berechtigung / الحالة لا تسمح' : 'Preis bearbeiten';
-priceEditOrderId = id;
+// [PATCH:DETAIL-COD] لوّن السعر بالأحمر عند الكاش
+try{
+  const isCash = !!(o?.payment?.cod === true
+                 || String(o?.payment?.method||'').toLowerCase()==='cash'
+                 || o?.cash === true);
+  md_price_value.style.color = isCash ? '#ef4444' : '';
+  md_price_value.style.fontWeight = isCash ? '800' : '';
+}catch(_){}
+
+const _isDelivered = String(o?.status||'').trim().toLowerCase()==='geliefert';
+const _can = canEditPrice(o) && !_isDelivered && (currentTab === 'Neu');
+
+md_price_edit.style.display = _can ? '' : 'none';
+md_price_edit.disabled = !_can;
+md_price_edit.title = _can ? 'Preis bearbeiten' : 'Keine Berechtigung / الحالة لا تسمح';
+
+priceEditOrderId = _can ? id : null;
+
 md_price_edit.onclick = (e)=>{
   e.preventDefault();
   if(md_price_edit.disabled) return;
