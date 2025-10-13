@@ -810,6 +810,10 @@ html, body { width:100%; max-width:100%; overflow-x:hidden; }
   font-weight: 800;
   white-space: nowrap;
 }
+/* [HIDE-ACTIONS-WHEN-DELIVERED] */
+#orderModal[data-delivered="1"] #md_nav,
+#orderModal[data-delivered="1"] #md_start,
+#orderModal[data-delivered="1"] #md_done{ display:none !important; }
 
 
 </style>
