@@ -827,22 +827,29 @@ html, body { width:100%; max-width:100%; overflow-x:hidden; }
   white-space: nowrap;
 }
 
-/* ==== Single vs Multi — عرض البطاقة فقط ==== */
-/* Single (data-multi="0"): 
-   - إخفاء الحالة على البطاقة
-   - إخفاء التسلسلي ذو الهاش في سطر العنوان
-   - إظهار التسلسلي بدون هاش بجانب سطر المزوّد/الكمية
-   - إخفاء عنوان المطعم
+/* ==== توحيد منطق العرض على Single + Multi ==== */
+/* المطلوب: 
+   1) اسم المطعم وحده في الأعلى (نخفي شارة الحالة)
+   2) اسم المزوّد والكمية كما هي
+   3) إزالة عنوان المطعم من البطاقة
+   4) إزالة نص حالة الطلب من البطاقة
+   5) التسلسلي بدون # (نُظهر النسخة plain ونخفي النسخة hash)
 */
-.card-order[data-multi="0"] .tag-status { display: none !important; }
-.card-order[data-multi="0"] .serial-hash { display: none !important; }
-.card-order[data-multi="0"] .serial-plain { display: inline-flex !important; }
-.card-order[data-multi="0"] .addr-line { display: none !important; }
 
-/* Multi (data-multi="1"): السلوك القديم تمامًا */
-.card-order[data-multi="1"] .serial-hash { display: inline-flex !important; }
-.card-order[data-multi="1"] .serial-plain { display: none !important; }
-/* الحالة والعنوان يبقيان ظاهرين افتراضيًا في الـMulti */
+/* اخفِ شارة الحالة دائمًا على بطاقة الطلب (Single & Multi) */
+.card-order .tag-status { 
+  display: none !important; 
+}
+
+/* اخفِ سطر عنوان المطعم دائمًا (Single & Multi) */
+.card-order .addr-line { 
+  display: none !important; 
+}
+
+/* التسلسلي: أعرض النسخة بدون # وأخفِ النسخة بـ # على كل البطاقات */
+.card-order .serial-hash  { display: none !important; }
+.card-order .serial-plain { display: inline-flex !important; }
+
 
 </style>
 </head>
