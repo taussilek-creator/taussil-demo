@@ -330,6 +330,12 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
   color: #111 !important;                          /* نص أسود */
   border: 1px solid rgba(0,0,0,.12) !important;
 }
+/* [FIX:DETAIL-ACTIONS-DELIVERED] أخفِ أزرار التفاصيل عند Geliefert */
+#orderModal[data-delivered="1"] #md_nav,
+#orderModal[data-delivered="1"] #md_start,
+#orderModal[data-delivered="1"] #md_done{
+  display: none !important;
+}
 
 /* كل النصوص داخل الشيت سوداء… */
 .neo-driver #orderModal .sheet *{
@@ -3196,6 +3202,9 @@ try{
 }catch(_){}
 
 const _isDelivered = String(o?.status||'').trim().toLowerCase()==='geliefert';
+// علِّم المودال بحالة التسليم ليتحكم الـCSS بالأزرار
+md.setAttribute('data-delivered', _isDelivered ? '1' : '0');
+
 const _can = canEditPrice(o) && !_isDelivered && (currentTab === 'Neu');
 // هذا هو الذي يتحكم بالرؤية وفق الـCSS
 md.setAttribute('data-can-edit', _can ? '1' : '0');
