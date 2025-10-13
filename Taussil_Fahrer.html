@@ -54,6 +54,35 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
 /* Orders list */
 .list{display:flex;flex-direction:column;gap:10px}
 .card-order{display:grid;grid-template-columns:56px 1fr auto;gap:10px;align-items:center;border:1px solid rgba(255,255,255,.08);border-radius:14px;background:#0f1a30;padding:8px 10px;cursor:pointer}
+/* [PATCH:FIX-CARD-ORDER] إصلاح تمدد المحتوى داخل .card-order */
+.card-order {
+  min-height: 140px;
+}
+
+.card-order .info,
+.card-order .info .line,
+.card-order .info .small {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.card-order .info .line > * {
+  flex-shrink: 0;
+}
+
+.card-order .info strong {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: block;
+}
+
+.card-order .logo {
+  flex-shrink: 0;
+  align-self: flex-start;
+}
+
 .logo img{width:56px;height:56px;border-radius:12px;object-fit:cover;border:1px solid rgba(255,255,255,.08)}
 .logo .ph{width:56px;height:56px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-weight:800;background:#1a2742;border:1px solid rgba(255,255,255,.08)}
 .line{display:flex;align-items:center;gap:8px}
@@ -814,6 +843,17 @@ html, body { width:100%; max-width:100%; overflow-x:hidden; }
 #orderModal[data-delivered="1"] #md_nav,
 #orderModal[data-delivered="1"] #md_start,
 #orderModal[data-delivered="1"] #md_done{ display:none !important; }
+/* === Cash Stop (داخل الملتي) === */
+.neo-driver .card-order .multi-stops .stop-row.is-cod{
+  border: 2px solid #ef4444 !important;
+  box-shadow: 0 0 0 2px rgba(239,68,68,.14) inset !important;
+}
+.neo-driver .card-order .multi-stops .stop-row .stop-price{
+  color: #ef4444 !important;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
 
 
 </style>
@@ -2182,6 +2222,12 @@ function attachStopsForOrder(orderId, orderData, cardEl){
     }
     cont.style.display='block';
     if(doneGeneral) doneGeneral.style.display='none';          // Multi => نخفي الزر العام
+// هذا طلب ملتي: اخفِ سعر الكاش على البطاقة العامة وأزل كلاس cash من البطاقة
+try{
+  const card = cardEl;
+  card.querySelectorAll('[data-parent-cod]').forEach(el => el.remove());
+  card.classList.remove('cash');
+}catch(_){}
 
     // ترتيب: حسب nr ثم id
     docs.sort((a,b)=>{
@@ -2205,15 +2251,36 @@ const logoHTML = logoSrc
 
 const btn = del ? `<span class="btn-icon btn-done" title="Geliefert">✓</span>`
                 : `<button class="btn-icon btn-done" data-stop="${id}" title="Diesen Stop liefern">✓</button>`;
+// كشف كاش على مستوى الستوب فقط
+const stopIsCOD =
+  s?.payment?.cod === true ||
+  String(s?.payment?.method || '').toLowerCase() === 'cash' ||
+  s?.cod === true ||
+  Number(s?.cod_amount || 0) > 0 ||
+  Number(s?.cash || 0) > 0;
+
+// مبلغ الكاش للستوب (حسب ما يرسله المطعم)
+const stopCodAmount = (() => {
+  if (Number.isFinite(+s?.cod_amount)) return +s.cod_amount;
+  if (Number.isFinite(+s?.cash))       return +s.cash;
+  if (stopIsCOD && Number.isFinite(+s?.price)) return +s.price; // fallback: سعر الستوب
+  return 0;
+})();
 
 return `
-  <div class="stop-row" data-stop="${id}">
+  <div class="stop-row ${stopIsCOD ? 'is-cod' : ''}" data-stop="${id}">
     <div class="stop-logo">${logoHTML}</div>
     <div class="info">
-      <div class="line"><strong>${''}</strong>
-        <span class="tag">Item #${i+1} · ${st}</span></div>
+      <div class="line">
+        <strong></strong>
+        <span class="tag">Item #${i+1} · ${st}</span>
+      </div>
       <div class="small">${plat || '—'}</div>
-      <div class="small" style="opacity:.85;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${''}</div>
+      ${
+        (stopIsCOD && stopCodAmount > 0)
+          ? `<div class="small stop-price">Bar: ${formatEUR(stopCodAmount)}</div>`
+          : ``
+      }
     </div>
     <div class="act">${btn}</div>
   </div>`;
@@ -2597,7 +2664,8 @@ else if (Number(o?.payment?.codSum || 0) > 0) {
 
 
           <div class="small" style="opacity:.85;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${addr || '—'}</div>
-		  ${isCOD && codAmount > 0 ? `<div class="small cod-amount">Bar: ${formatEUR(codAmount)}</div>` : ``}
+		  ${isCOD && codAmount > 0 ? `<div class="small cod-amount" data-parent-cod>Bar: ${formatEUR(codAmount)}</div>` : ``}
+
 
 		  <div class="multi-stops" data-stops-of="${id}" style="grid-column:1 / -1; display:none"></div>
         </div>
