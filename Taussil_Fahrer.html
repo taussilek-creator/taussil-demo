@@ -796,19 +796,7 @@ html, body { width:100%; max-width:100%; overflow-x:hidden; }
   font-weight: 800;
   white-space: nowrap;
 }
-/* [PATCH:CARD-CASH-DESKTOP] أخفِ مبلغ الكاش داخل بطاقة الطلب على الديسكتوب */
-@media (min-width: 641px){
-  .neo-driver .card-order .amount{
-    display: none !important;
-  }
-}
 
-/* إبقِه ظاهرًا على الموبايل */
-@media (max-width: 640px){
-  .neo-driver .card-order .amount{
-    display: inline !important;
-  }
-}
 
 </style>
 </head>
@@ -2548,7 +2536,7 @@ const isCash = !!(o?.payment?.cod === true
                || String(o?.payment?.method||'').toLowerCase()==='cash'
                || o?.cash === true);
 const priceNum = Number(o.price||0) || 0;
-const cashHtml = isCash ? ` · <span class="amount">Bar: ${formatEUR(priceNum)}</span>` : '';
+
 /*** END PATCH ***/
 
 	// رقم تسلسلي داخل القائمة الحالية (يبدأ من 1)
@@ -2587,7 +2575,8 @@ else if (Number(o?.payment?.codSum || 0) > 0) {
         <div class="info">
          <div class="line"><strong>${rest}</strong> <span class="tag">${st}</span> ${serialTag}</div>
 
-          <div class="small">${plat} · Qty ${qty}${cashHtml}</div>
+          <div class="small">${plat} · Qty ${qty}</div>
+
 
           <div class="small" style="opacity:.85;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${addr || '—'}</div>
 		  ${isCOD && codAmount > 0 ? `<div class="small cod-amount">Bar: ${formatEUR(codAmount)}</div>` : ``}
