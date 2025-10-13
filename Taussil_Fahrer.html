@@ -849,6 +849,41 @@ html, body { width:100%; max-width:100%; overflow-x:hidden; }
 /* التسلسلي: أعرض النسخة بدون # وأخفِ النسخة بـ # على كل البطاقات */
 .card-order .serial-hash  { display: none !important; }
 .card-order .serial-plain { display: inline-flex !important; }
+/* === [HOTFIX-MOBILE-ORDER-CARD] Force card layout on mobile === */
+/* نرفع الخصوصية ونربط بالسياق .neo-driver + !important لتعطيل أي إعادة تعريف لاحقة */
+
+/* 1) اسم المطعم وحده (أخفي الحالة) */
+.neo-driver .card-order .tag-status{
+  display: none !important;
+}
+
+/* 2) أخفي عنوان المطعم تمامًا */
+.neo-driver .card-order .addr-line{
+  display: none !important;
+}
+
+/* 3) التسلسلي: أظهر النسخة بدون # وأخفِ نسخة الهاش */
+.neo-driver .card-order .serial-hash{
+  display: none !important;
+}
+.neo-driver .card-order .serial-plain{
+  display: inline-flex !important;
+}
+
+/* 4) تأكيد تنسيقات السطور على الشاشات الصغيرة */
+@media (max-width: 480px){
+  .neo-driver .card-order .title-line{
+    display: flex !important;
+    gap: 10px !important;
+    align-items: center !important;
+  }
+  .neo-driver .card-order .prov-line{
+    display: flex !important;
+    gap: 8px !important;
+    align-items: center !important;
+    flex-wrap: wrap !important;
+  }
+}
 
 
 </style>
