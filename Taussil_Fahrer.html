@@ -775,18 +775,21 @@ html, body { width:100%; max-width:100%; overflow-x:hidden; }
   font-weight: 800;
   font-variant-numeric: tabular-nums;
 }
-/* [PATCH:MOBILE] زر تعديل السعر على الموبايل — لا تُظهره إلا إذا كان مسموحًا */
+/* [FIX:MOBILE+DESKTOP] لا تُظهر زر تعديل السعر إلا إذا كانت النافذة موسومة data-can-edit="1" */
+#orderModal:not([data-can-edit="1"]) #md_price_edit{
+  display: none !important;      /* ينطبق على الموبايل والديسكتوب */
+}
+
 @media (max-width: 640px){
-  #orderModal .sheet #md_price_edit{
-    display: none;                /* افتراضيًا مخفي */
+  #orderModal #md_price_edit{
+    display: none !important;    /* اقتل أي قاعدة قديمة على الموبايل */
+  }
+  #orderModal[data-can-edit="1"] #md_price_edit{
+    display: inline-flex !important;   /* أظهره فقط عندما يسمح الـJS */
     height: 36px !important;
     min-width: 44px !important;
     align-items: center;
     justify-content: center;
-  }
-  /* أظهره فقط عندما يكون المنبثق موسومًا أنه قابل للتعديل */
-  #orderModal[data-can-edit="1"] #md_price_edit{
-    display: inline-flex !important;
   }
 }
 
@@ -3133,6 +3136,9 @@ price_save?.addEventListener('click', async ()=>{
 async function openDetail(id){
   const snap=await getDoc(doc(db,"orders", id)); if(!snap.exists()) return;
   const o=snap.data()||{};
+  // امنع الوميض: اعتبره غير قابل للتعديل افتراضيًا، للكل (موبايل + دسكتوب)
+md.setAttribute('data-can-edit', '0');
+
   md_id.textContent=id;
   md_status.textContent=mapStatusLabel(o.status||"—");
   md_platform.textContent=Array.isArray(o.platform)?o.platform.join(" / "):(o.platform||"—");
@@ -3191,6 +3197,8 @@ try{
 
 const _isDelivered = String(o?.status||'').trim().toLowerCase()==='geliefert';
 const _can = canEditPrice(o) && !_isDelivered && (currentTab === 'Neu');
+// هذا هو الذي يتحكم بالرؤية وفق الـCSS
+md.setAttribute('data-can-edit', _can ? '1' : '0');
 
 md_price_edit.style.display = _can ? '' : 'none';
 md_price_edit.disabled = !_can;
@@ -3203,28 +3211,7 @@ md_price_edit.onclick = (e)=>{
   if(md_price_edit.disabled) return;
   openPriceModal(priceEUR);
 };
-// إظهار زر "Preis bearbeiten" فقط في تبويب Neu ومع السماح بالتحرير
-try{
-  const onNeuTab  = (currentTab === 'Neu');
-  const delivered = String(o.status||'').trim().toLowerCase() === 'geliefert';
-  const canOnNeu  = onNeuTab && !delivered && canEditPrice(o);
-// وسم المنبثق بحالة السماح — هو المرجع الوحيد لـ CSS
-md.setAttribute('data-can-edit', canOnNeu ? '1' : '0');
-md.setAttribute('data-delivered', __isDelivered ? '1' : '0');
 
-  const editBtn = document.getElementById('md_price_edit'); // حماية لو تغيّر الريفرنس
-  if (editBtn){
-    editBtn.style.display = canOnNeu ? '' : 'none';
-    editBtn.disabled = !canOnNeu;
-    editBtn.setAttribute('aria-disabled', String(!canOnNeu));
-    if (canOnNeu){
-      editBtn.onclick = (e)=>{
-        e.preventDefault();
-        openPriceModal(priceEUR);
-      };
-    }
-  }
-}catch(_){}
 
   // === Upsert KV rows for ServiceFee & Distance ===
   function upsertKV(id, label){
@@ -3255,36 +3242,7 @@ const __isDelivered = String(o.status || '').trim().toLowerCase() === 'geliefert
 
 // ملاحظة مهمة: لا تستعمل replaceWith(...) حتى لا نخسر مراجع الأزرار
 
-if (__isDelivered) {
-  [md_nav, md_start, md_done].forEach(btn => {
-    if (!btn) return;
-    btn.style.display = 'none';
-    btn.disabled = true;
-    btn.setAttribute('aria-disabled', 'true');
-    // أوقف أي هاندلر سابق بدون استبدال العنصر
-    btn.onclick = null;
-  });
 
-  // أخفِ زر تعديل السعر فقط عندما يكون الطلب مُسلَّمًا
-  if (md_price_edit) {
-    md_price_edit.style.display = 'none';
-    md_price_edit.disabled = true;
-    md_price_edit.setAttribute('aria-disabled', 'true');
-    md_price_edit.onclick = null;
-  }
-
-} else {
-  // حالات غير Geliefert: أعد إظهار وتفعيل الأزرار + زر تعديل السعر
-  if (md_nav)   { md_nav.style.display   = ''; md_nav.disabled   = false; md_nav.setAttribute('aria-disabled','false'); }
-  if (md_start) { md_start.style.display = ''; md_start.disabled = false; md_start.setAttribute('aria-disabled','false'); }
-  if (md_done)  { md_done.style.display  = ''; md_done.disabled  = false; md_done.setAttribute('aria-disabled','false'); }
-
-  if (md_price_edit) {
-    md_price_edit.style.display = '';
-    md_price_edit.disabled = false;
-    md_price_edit.setAttribute('aria-disabled', 'false');
-  }
-}
 
 
 
