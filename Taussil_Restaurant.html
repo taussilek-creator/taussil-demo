@@ -185,13 +185,54 @@ input[type="number"]{-moz-appearance:textfield;text-align:center;font-variant-nu
 
 
 /* right */
-.stats{display:grid;grid-template-columns:1fr;gap:8px;margin-bottom:10px}
+.stats{
+  display:grid;
+  grid-template-columns:1fr 1fr 1fr; /* ثلاثة أعمدة */
+  gap:8px;
+  margin-bottom:10px
+}
+
 .stat{background:#fff;border:var(--border);border-radius:12px;padding:10px;display:flex;align-items:center;justify-content:space-between}
 .stat .k{font-weight:800}.stat .t{color:var(--muted);font-size:12px}
 .list{display:flex;flex-direction:column;gap:8px}
 .rowx{display:flex;gap:8px;align-items:center;justify-content:space-between;border:1px solid rgba(0,0,0,.06);border-radius:10px;padding:8px 10px;background:#fff;cursor:pointer}
 .rowx .id{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;opacity:.85}
 .rowx .tag{font-size:11px;padding:3px 8px;border-radius:999px;background:#f3f4f6;border:1px solid rgba(0,0,0,.05)}
+/* ===== Right list (Letzte Aufträge) — tidy layout ===== */
+.rowx{
+  display:grid;
+  grid-template-columns: auto 1fr auto;
+  gap:10px;
+  align-items:center;
+  padding:10px 12px;
+  border-radius:10px;
+}
+
+/* عمود اليسار: رقم الطلب + التاريخ */
+.r-left .id{
+  font-family: ui-monospace, Menlo, monospace;
+  font-size:12px;
+  opacity:.9;
+  white-space:nowrap;
+}
+.r-left .time{ font-size:11px; color:var(--muted); }
+
+/* عمود الوسط: المنصات + حالة مختصرة */
+.r-mid{ display:flex; flex-wrap:wrap; align-items:center; gap:6px 8px; }
+.chip{ display:inline-block; padding:4px 8px; border-radius:999px; background:#f3f4f6; border:1px solid rgba(0,0,0,.06); font-size:11px; }
+.badge{ display:inline-block; padding:4px 8px; border-radius:999px; font-size:11px; }
+.badge--cod{ background:#fee2e2; border:1px solid #ef4444; color:#b91c1c; }
+.badge--status{ background:#eef2ff; border:1px solid #e5e7eb; color:#334155; }
+.qty-pill{ font-size:11px; color:#6b7280; }
+
+/* عمود اليمين: الأسعار محاذاة يمين */
+.r-right{ text-align:right; }
+.price{ font-weight:800; }
+.price--cod{ color:#b91c1c; } /* أحمر عند كاش مفرد */
+.cod-inline{ font-size:11px; color:#b91c1c; margin-top:2px; }
+.fee{ font-size:12px; color:#4b5563; }
+
+/* نبض الطلب الجاري يبقى كما هو */
 
 *{-webkit-tap-highlight-color:transparent}
 @media (pointer:coarse){.input{font-size:16px}}
@@ -272,6 +313,23 @@ input[type="number"]{-moz-appearance:textfield;text-align:center;font-variant-nu
 .log-filter .input, .log-filter select, .log-filter button{
   height:38px; border-radius:10px; border:1px solid #e5e7eb; background:#fff;
 }
+/* === Log filters: vertical, unified look === */
+.log-filter{
+  display:grid;
+  grid-template-columns: 1fr 1fr auto; /* Bis | Plattform | Reset */
+  gap:8px;
+  align-items:end;
+}
+.log-filter .f{
+  display:flex; flex-direction:column; gap:4px;
+}
+.log-filter .f label{
+  font-size:12px; color:#6b7280; font-weight:700;
+}
+.log-filter .f .input,
+.log-filter .f select,
+.log-filter .btn-mini{ height:38px; }
+
 .log-scroll{ flex:1; min-height:0; overflow:auto; padding-top:8px; }
 .log-list{ display:flex; flex-direction:column; gap:6px; }
 .log-row{
@@ -320,6 +378,57 @@ input[type="number"]{-moz-appearance:textfield;text-align:center;font-variant-nu
   box-shadow: 0 0 0 0 rgba(34,197,94,.45);
   animation: taussil-pulse 1.6s ease-out infinite;
   will-change: box-shadow, opacity;
+}
+/* === Stronger Underway Pulse (Right list) === */
+#lastList .rowx.is-underway::after{
+  /* أقوى و أوضح */
+  inset: -3px;
+  border-radius: var(--pulse-radius);
+  pointer-events: none;
+  box-shadow: 0 0 0 0 rgba(34,197,94,.75);
+  animation: taussil-pulse-strong 1.2s ease-out infinite;
+}
+
+/* توهّج داخلي خفيف دائم لتمييز البطاقة حتى بين النبضات */
+#lastList .rowx.is-underway::before{
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: var(--pulse-radius);
+  pointer-events: none;
+  box-shadow:
+    0 0 0 2px rgba(34,197,94,.30) inset,   /* خط داخلي خفيف */
+    0 0 10px rgba(34,197,94,.25) inset;    /* توهج داخلي */
+}
+
+/* نبض أسرع وبانتشار أكبر */
+@keyframes taussil-pulse-strong{
+  0% {
+    box-shadow:
+      0 0 0 0 rgba(34,197,94,.75);
+    opacity: 1;
+    transform: scale(1);
+  }
+  60% {
+    box-shadow:
+      0 0 0 24px rgba(34,197,94,0);
+    opacity: .95;
+    transform: scale(1.01); /* تكبير طفيف يمنح إحساس حي */
+  }
+  100% {
+    box-shadow:
+      0 0 0 0 rgba(34,197,94,0);
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* احترام تقليل الحركة: نبض ثابت أقوى بدل الأنيميشن */
+@media (prefers-reduced-motion: reduce){
+  #lastList .rowx.is-underway::after{
+    animation: none;
+    box-shadow: 0 0 0 4px rgba(34,197,94,.55);
+  }
 }
 
 @keyframes taussil-pulse{
@@ -481,6 +590,56 @@ input[type="number"]{-moz-appearance:textfield;text-align:center;font-variant-nu
   padding-top: 8px;
   margin-top: 8px;
 }
+/* === COD (Bar) mini button + red money === */
+.cod-mini{
+  border:1px solid rgba(0,0,0,.15);
+  background:#fff;
+  border-radius:8px;
+  padding:4px 8px;
+  font-size:12px;
+  cursor:pointer;
+  font-weight:700;
+  user-select:none;
+}
+.cod-mini.active{
+  background:#fee2e2;
+  border-color:#ef4444;
+  color:#b91c1c;
+  box-shadow:0 0 0 2px rgba(239,68,68,.12) inset;
+}
+.money--cod{ color:#b91c1c; font-weight:800; }
+.rowx .cash-note{ color:#b91c1c; font-weight:800; margin-left:8px; }
+/* ===== Stats (3-in-row, label on top, value below) ===== */
+.stats3{
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 8px;
+}
+
+/* نلغي محاذاة الصف الأفقية الافتراضية للـ .stat القديمة */
+.stats3 .stat{
+  display: flex;
+  flex-direction: column;
+  align-items: flex-center;   /* أو center لو تحبها بالوسط */
+  justify-content: flex-start;
+  gap: 6px;
+}
+
+/* العنوان فوق بحجم أصغر ولون خافت */
+.stats3 .stat .t{
+  font-size: 12px;
+  color: var(--muted);
+  font-weight: 700;
+  margin: 0;
+}
+
+/* القيمة أكبر وتبويب أرقام جميل */
+.stats3 .stat .k{
+  font-weight: 800;
+  font-size: 20px;
+  line-height: 1.2;
+  font-variant-numeric: tabular-nums;
+}
 
 </style>
 </head>
@@ -525,6 +684,7 @@ input[type="number"]{-moz-appearance:textfield;text-align:center;font-variant-nu
 
       <span class="chip">Summe Preise: <b id="logSumPrice">0,00€</b></span>
       <span class="chip">Summe Liefergebühren: <b id="logSumFee">0,00€</b></span>
+	  <span class="chip">Bar: <b id="logSumBar">0,00€</b></span>
     </div>
     <div id="logScroll" class="log-scroll">
   <div id="logList" class="log-list"></div>
@@ -681,16 +841,30 @@ input[type="number"]{-moz-appearance:textfield;text-align:center;font-variant-nu
     <!-- right -->
     <section class="panel right">
 <div class="ph" id="overviewHeader">
-  <div class="t">Übersicht</div>
+  <div class="t">Übersicht :</div>
   <div class="s">Live</div>
   <button id="menuBtn" class="btn-mini" style="margin-left:auto">☰</button>
 </div>
 
       <div class="pb">
-        <div class="stats">
-          <div class="stat"><div class="t">Summe Preise (≠ Abgebrochen)</div><div class="k" id="sumPreis">0,00€</div></div>
-          <div class="stat"><div class="t">Summe Liefergebühren (≠ Abgebrochen)</div><div class="k" id="sumLiefer">0,00€</div></div>
-        </div>
+        <div class="stats stats3">
+  <div class="stat">
+    <div class="t">Summe Preise</div>
+    <div class="k" id="sumPreis">0,00€</div>
+  </div>
+
+  <div class="stat">
+    <div class="t">Bar</div>
+    <div class="k money--cod" id="sumBar">0,00€</div>
+  </div>
+
+  <div class="stat">
+    <div class="t">Liefergebühren</div>
+    <div class="k" id="sumLiefer">0,00€</div>
+  </div>
+</div>
+
+
         <h4 style="margin:10px 2px">Letzte Aufträge</h4>
         <div id="lastList" class="list"></div>
       </div>
@@ -718,17 +892,22 @@ const firebaseConfig = {
 
 import { initializeApp, getApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import {
-  getFirestore, collection, doc, setDoc, getDoc, serverTimestamp,
+  initializeFirestore, collection, doc, setDoc, getDoc, serverTimestamp,
   onSnapshot, query, where, orderBy, limit, getDocs, startAfter,
   getCountFromServer
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
 
 
 import { getDatabase, ref as rRef, get as rGet, onValue as rOn, off as rOff } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, setPersistence, browserLocalPersistence } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
 let app; try{ app=getApp(); }catch{ app=initializeApp(firebaseConfig); }
-const db   = getFirestore(app);
+const db = initializeFirestore(app, {
+  experimentalAutoDetectLongPolling: true,
+  useFetchStreams: false
+});
+
 const rtdb = getDatabase(app);
 const auth = getAuth(app);
 setPersistence(auth, browserLocalPersistence).catch(()=>{});
@@ -737,6 +916,8 @@ setPersistence(auth, browserLocalPersistence).catch(()=>{});
 const $ = (s)=>document.querySelector(s);
 const money = n=> (Number(n||0)).toLocaleString("de-DE",{minimumFractionDigits:2,maximumFractionDigits:2})+"€";
 const parsePrice = s => { if(s==null) return 0; const n = parseFloat(String(s).replace(/[^\d.,-]/g,"").replace(",",".")); return Number.isFinite(n)?n:0; };
+
+
 /* === TAUSSIL-COST: إعدادات توفير التكلفة === */
 const COST_SAVE = {
   GEOFENCE_M: 280,          // 200–300m لإيقاف التتبّع والـDirections
@@ -773,6 +954,8 @@ const banner  = $("#banner");
 const lastList = $("#lastList");
 const sumPreis = $("#sumPreis");
 const sumLiefer= $("#sumLiefer");
+const sumBar   = $("#sumBar");
+
 const nrBox    = $("#nrBox");
 const qtyMinus = $("#qtyMinus");
 const qtyPlus  = $("#qtyPlus");
@@ -828,6 +1011,29 @@ function refreshQtyAndSendState(){
 }
 /* === MULTI-ORDERS: per-provider per-item prices + stepper in-row (no overlay) === */
 const providerPrices = new Map();   // key => number[] (سعر لكل عنصر لنفس المزوّد)
+/* === COD flags per-item (Bar) parallel to prices === */
+const providerCOD = new Map(); // key => boolean[] (Bar per item)
+
+/* حافظ على تساوي طول الأسعار و COD مع الكمية */
+function ensureArrays(key){
+  const q = Math.max(1, Math.min(3, Number(providerQty.get(key)||1)));
+  providerQty.set(key, q);
+
+  // prices
+  let prices = Array.isArray(providerPrices.get(key)) ? providerPrices.get(key) : [];
+  if (prices.length < q) prices = prices.concat(new Array(q - prices.length).fill(0));
+  if (prices.length > q) prices = prices.slice(0, q);
+  providerPrices.set(key, prices);
+
+  // CODs
+  let cods = Array.isArray(providerCOD.get(key)) ? providerCOD.get(key) : [];
+  if (cods.length < q) cods = cods.concat(new Array(q - cods.length).fill(false));
+  if (cods.length > q) cods = cods.slice(0, q);
+  providerCOD.set(key, cods);
+
+  return { prices, cods, q };
+}
+
 const multiRows = document.getElementById('multiRows');
 
 function slugKey(k){ return String(k||'').toLowerCase().replace(/\s+/g,'_').replace(/[^a-z0-9_]/g,''); }
@@ -880,17 +1086,21 @@ function renderMultiRows(){
   const rows = [...selectedProviders].map(k=>{
     const q   = Math.max(1, Math.min(3, Number(providerQty.get(k)||1)));
     providerQty.set(k, q);
-    const arr = ensurePricesArray(k);
+    // تزامُن الأسعار و COD
+const { prices: arr, cods } = ensureArrays(k);
 
-    // الحقول السعرية لكل عنصر (#1..#q)
-    const pricesInputs = Array.from({length:q}, (_,i)=>{
-      const val = arr[i] ? String(arr[i]).replace('.',',') : '';
-      return `
-        <div class="price-chip" data-idx="${i}" style="display:flex;align-items:center;gap:6px;margin:4px 0;">
-          <span class="small" style="width:22px;text-align:center">#${i+1}</span>
-          <input class="input per-price" type="text" inputmode="decimal" placeholder="0,00€" value="${val}">
-        </div>`;
-    }).join('');
+// الحقول السعرية + زر Bar
+const pricesInputs = Array.from({length:q}, (_,i)=>{
+  const val   = arr[i] ? String(arr[i]).replace('.',',') : '';
+  const isCOD = !!cods[i];
+  return `
+    <div class="price-chip" data-idx="${i}" style="display:flex;align-items:center;gap:6px;margin:4px 0;">
+      <span class="small" style="width:22px;text-align:center">#${i+1}</span>
+      <input class="input per-price" type="text" inputmode="decimal" placeholder="0,00€" value="${val}">
+      <button type="button" class="cod-mini${isCOD ? ' active':''}" aria-pressed="${isCOD?'true':'false'}">Bar</button>
+    </div>`;
+}).join('');
+
 
     return `
       <div class="multi-row" data-key="${k}">
@@ -932,6 +1142,22 @@ multiRows?.addEventListener('blur', (e)=>{
   const arr = ensurePricesArray(key);
   const p = Number(arr[idx]||0);
   e.target.value = p ? money(p) : '';
+}, true);
+/* Toggle COD per item (Bar) */
+multiRows?.addEventListener('click', (e)=>{
+  const btn = e.target.closest('.cod-mini'); if(!btn) return;
+  const chip = btn.closest('.price-chip');   if(!chip) return;
+  const row  = btn.closest('.multi-row');    if(!row)  return;
+
+  const key = row.getAttribute('data-key');
+  const idx = Number(chip.getAttribute('data-idx')||0);
+
+  const { cods } = ensureArrays(key);
+  cods[idx] = !cods[idx];
+  providerCOD.set(key, cods);
+
+  btn.classList.toggle('active', cods[idx]);
+  btn.setAttribute('aria-pressed', cods[idx] ? 'true' : 'false');
 }, true);
 
 /* عدّاد +/− داخل الصف */
@@ -1235,11 +1461,58 @@ sendBtn?.addEventListener('click', async ()=>{
     }
 
     // الطلب الأم
+	// === COD summary (per form) + codSum (مجموع الكاش) ===
+let codCount = 0, firstItemCOD = false, seenFirst = false;
+let codSumTotal = 0;
+
+selectedProviders.forEach(k=>{
+  const { prices, cods } = ensureArrays(k);
+  prices.forEach((p, i)=>{
+    const isCOD = !!cods[i];
+    if (isCOD) {
+      codCount++;
+      const v = Number(p || 0);
+      if (Number.isFinite(v)) codSumTotal += v;
+    }
+    if (!seenFirst){ firstItemCOD = isCOD; seenFirst = true; }
+  });
+});
+
+codSumTotal = Math.round(codSumTotal * 100) / 100;
+const codAny   = codCount > 0;
+const totalQty = qty;
+const isSingle = totalQty <= 1;
+
+// مجموع المبالغ المعلَّمة COD
+let codAmount = 0;
+selectedProviders.forEach(plat=>{
+  const prices = providerPrices.get(plat) || [];
+  const cods   = providerCOD.get(plat)    || [];
+  const len = Math.min(prices.length, cods.length);
+  for (let i=0; i<len; i++){
+    if (cods[i] && Number(prices[i])>0){
+      codAmount += Number(prices[i]);
+    }
+  }
+});
+codAmount = Math.round(codAmount * 100) / 100;
+
     await setDoc(ref, {
   nr,
   status: 'Bearbeitung',
   platform: platforms,
   qty,
+payment: {
+  cod: isSingle ? !!firstItemCOD : false,
+  codAny,
+  codCount,
+  codSum: isSingle ? (firstItemCOD ? Math.round(Number(preis||0)*100)/100 : 0) : codSumTotal,
+  method: isSingle
+    ? (firstItemCOD ? 'cash' : 'online')
+    : (codAny ? 'mixed' : 'online')
+},
+
+
 
   // ⬇️ الجديد
   stops_total: qty,
@@ -1267,8 +1540,9 @@ if (qty > 1 && Array.isArray(platforms) && platforms.length) {
     let stopIdx = 0;
 
     for (const plat of platforms) {
-      const arr = providerPrices.get(plat) || [];
-      for (let i = 0; i < arr.length; i++) {
+      const { prices, cods } = ensureArrays(plat); // ← جلب الأسعار والكاش لهذا المزوّد
+
+      for (let i = 0; i < prices.length; i++) {
         stopIdx++;
         const stopId = `${plat}_${i+1}`;
         const stopRef = doc(stopCol, stopId);
@@ -1276,11 +1550,13 @@ if (qty > 1 && Array.isArray(platforms) && platforms.length) {
         await setDoc(stopRef, {
           nr,
           platform: plat,
-          price: Math.round(Number(arr[i] || 0) * 100) / 100,
+          price: Math.round(Number(prices[i] || 0) * 100) / 100,
           qty: 1,
           deliveryFee: 0,
           status: "Bearbeitung",
-          address_text: addr, // ✅ استخدام نفس المتغير addr
+          address_text: addr,
+          payment: { cod: !!(cods && cods[i]) },
+
           name: hiddenDefaults?.Restaurant_Name ?? null,
           phone: hiddenDefaults?.Telefon ?? null,
           fullName: null,
@@ -1293,6 +1569,8 @@ if (qty > 1 && Array.isArray(platforms) && platforms.length) {
     console.error("stops creation failed", e);
   }
 }
+
+
 // === END PATCH ===
 
 
@@ -1306,6 +1584,8 @@ if (qty > 1 && Array.isArray(platforms) && platforms.length) {
 
     providerQty.clear(); 
     selectedProviders.clear();
+	providerCOD.clear();
+
     providerEls.forEach(el=>el.classList.remove('is-selected'));
     if(qtyEl){ qtyEl.value='0'; qtyEl.readOnly=true; }
     if(priceEl) priceEl.value='0,00€';
@@ -1328,91 +1608,227 @@ function feeForView(o){
   const d = Number(o?.deliveryFee);
   return Number.isFinite(d) ? d : 0;
 }
+// === COD cache (global, single instance) ===
+const COD_CACHE   = (window.COD_CACHE   ||= new Map()); // orderId -> number
+const COD_PENDING = (window.COD_PENDING ||= new Set()); // orderIds being fetched
+
+let CURRENT_ORDERS = new Map();    // orderId -> orderData (آخر Snapshot مستعمل لواجهة اليمين)
+
+function euro(n){ return (Number(n||0)).toLocaleString('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2})+'€'; }
+
+async function fetchOrderCodSum(oid){
+  if(COD_CACHE.has(oid) || COD_PENDING.has(oid)) return;
+  try{
+    COD_PENDING.add(oid);
+    const snap = await getDocs(collection(db,'orders', oid, 'stops'));
+    let s = 0;
+    snap.forEach(st=>{
+      const it = st.data()||{};
+      if (it?.payment?.cod) s += Number(it.price||0) || 0;
+    });
+    COD_CACHE.set(oid, Math.round(s*100)/100);
+  }catch(_){ /* ignore */ }
+  finally{
+    COD_PENDING.delete(oid);
+    updateRightTotalsUI();
+  }
+}
+
+function updateRightTotalsUI(){
+  let sumP=0, sumL=0, sumB=0;
+
+  CURRENT_ORDERS.forEach((o, id)=>{
+    if(String(o.status||'')==='Abgebrochen') return;
+
+    const price = Number(o.price||0);
+    const fee   = Number(feeForView(o) || 0);
+    if (Number.isFinite(price)) sumP += price;
+    if (Number.isFinite(fee))   sumL += fee;
+
+    const qty = Number(o.qty||o.stops_total||0) || 0;
+    const isSingle = qty <= 1;
+    const codSingle = !!(o?.payment?.cod);
+
+    if (isSingle){
+      if (codSingle) sumB += price;
+    } else {
+      const codCount = Number(o?.payment?.codCount || 0);
+      if (codCount > 0){
+        // أولًا: خُذ codSum من الدوك (جاهز)، ثانيًا: من الكاش، وأخيرًا: اجلب من stops
+        const codSumDoc = Number(o?.payment?.codSum || 0);
+        if (codSumDoc > 0){
+          // بذر الكاش حتى لا يضيع لاحقًا
+          if (!COD_CACHE.has(id)) COD_CACHE.set(id, Math.round(codSumDoc*100)/100);
+          sumB += codSumDoc;
+        } else if (COD_CACHE.has(id)){
+          sumB += Number(COD_CACHE.get(id) || 0);
+        } else {
+          fetchOrderCodSum(id);
+        }
+      }
+    }
+  });
+
+  if(sumPreis)  sumPreis.textContent  = euro(sumP);
+  if(sumLiefer) sumLiefer.textContent = euro(sumL);
+  if(sumBar)    sumBar.textContent    = euro(Math.round(sumB*100)/100);
+}
+
 
 function attachMyTotalsAndLast(){
   if(ORDERS_UNSUB){ ORDERS_UNSUB(); ORDERS_UNSUB=null; }
   if(!RESTAURANT_ID) return;
   onSnapshot(query(collection(db,'orders'), where('restaurant.id','==', RESTAURANT_ID)), (snap)=>{
-    let sumP=0, sumL=0;
-snap.forEach(d=>{
-  const o=d.data()||{};
-  if(String(o.status||'')==='Abgebrochen') return;
+  CURRENT_ORDERS = new Map();
+  snap.forEach(d => {
+    const o = d.data()||{};
+    CURRENT_ORDERS.set(d.id, o);
 
-  const p = Number(o.price || 0);
-const l = Number(feeForView(o) || 0);
+    // بذر كاش الملتي من codSum إن موجود
+    const codSumDoc = Number(o?.payment?.codSum || 0);
+    const qty = Number(o.stops_total ?? o.qty ?? 0) || 0;
+    const codCount = Number(o?.payment?.codCount || 0);
+    if (qty > 1 && codCount > 0 && codSumDoc > 0 && !COD_CACHE.has(d.id)){
+      COD_CACHE.set(d.id, Math.round(codSumDoc*100)/100);
+    }
+  });
 
-
-  if (Number.isFinite(p)) sumP += p;
-  if (Number.isFinite(l)) sumL += l;
+  updateRightTotalsUI();
 });
 
-    if(sumPreis) sumPreis.textContent=money(sumP);
-    if(sumLiefer) sumLiefer.textContent=money(sumL);
-  });
-  ORDERS_UNSUB = onSnapshot(
-    query(collection(db,'orders'),
-      where('restaurant.id','==', RESTAURANT_ID),
-      orderBy('updatedAt','desc'),
-      limit(8)),
-    (snap)=>{
-      if(!lastList) return;
-      if(snap.empty){
-        lastList.innerHTML = `<div class="rowx"><span>— Keine Daten —</span></div>`;
-        return;
-      }
-      lastList.innerHTML = snap.docs.map(d=>{
-  const o=d.data()||{};
-  const plat = Array.isArray(o.platform)? o.platform.join(' / ') : (o.platform||'—');
-  const preis= money(Number(o.price||0));
-  const name = o.restaurant?.name || '—';
-  const qty  = Number(o.qty||0);
-  const nr   = (o.nr!=null ? `#${o.nr}` : '');
-  /* ⬅️ أضفنا data-status */
-  return `<div class="rowx" data-oid="${d.id}" data-status="${o.status||''}">
-    <div class="id">${d.id} ${nr}</div>
-    <div class="tag">${plat}</div>
-    <div style="flex:1"></div>
-    <div>${name}</div>
-    <div>${qty>0? qty : ''}</div>
-    <div>${preis}</div>
-  </div>`;
-}).join('');
-/* ⬅️ بعد الرندر مباشرة */
-markUnterwegsRows();
 
-      snap.docChanges().forEach(ch=>{
-        const id = ch.doc.id; const o = ch.doc.data()||{};
-        const prev = ORDER_CACHE.get(id)?.status;
-        ORDER_CACHE.set(id, {status:o.status});
-        if(prev !== undefined && prev !== o.status){
-          if(o.status === 'Unterwegs'){
-            playSnd('unterwegs', id);
-            if(!SELECTED_ORDER_ID){ showTripCard(id, o); }
-          }
-          if(o.status === 'Geliefert'){
-            playSnd('delivered', id);
-            if(SELECTED_ORDER_ID===id){
-              stopDriverTracking();
-              clearMapArtifacts();
-              resetTripTimesUI();
-            }
+ORDERS_UNSUB = onSnapshot(
+  query(collection(db,'orders'),
+    where('restaurant.id','==', RESTAURANT_ID),
+    orderBy('updatedAt','desc'),
+    limit(8)),
+  (snap)=>{
+    if(!lastList) return;
+    if(snap.empty){
+      lastList.innerHTML = `<div class="rowx"><span>— Keine Daten —</span></div>`;
+      return;
+    }
+
+    // ابْنِ الصفوف (نستخدم codSum مباشرة و نزرع الكاش)
+    const rowsHtml = snap.docs.map(d=>{
+      const o = d.data()||{};
+      const plat = Array.isArray(o.platform)? o.platform.join(' / ') : (o.platform||'—');
+      const qty  = Number(o.qty||o.stops_total||0) || 0;
+      const nr   = (o.nr!=null ? `#${o.nr}` : '');
+      const preisNum = Number(o.price||0);
+
+      const isSingle  = qty <= 1;
+      const codSingle = !!(o?.payment?.cod);
+      const codCount  = Number(o?.payment?.codCount || 0);
+      const codAny    = codSingle || codCount > 0;
+
+      // مصدر موحّد: codSum في الدوك، وإلا من الكاش، وإلا لاحقًا via fetch
+      let codMulti = 0;
+      const codSumDoc = Number(o?.payment?.codSum || 0);
+      if (!isSingle && codAny){
+        if (codSumDoc > 0){
+          codMulti = codSumDoc;
+          if (!COD_CACHE.has(d.id)) COD_CACHE.set(d.id, Math.round(codSumDoc*100)/100);
+        } else if (COD_CACHE.has(d.id)){
+          codMulti = Number(COD_CACHE.get(d.id) || 0);
+        } else {
+          fetchOrderCodSum(d.id);
+        }
+      }
+
+      const cashTag = (codMulti > 0)
+        ? ` <span class="cash-note">(Bar: ${money(codMulti)})</span>`
+        : '';
+
+      const preisHtml = `<span class="${(isSingle && codSingle) ? 'money--cod' : ''}">${money(preisNum)}</span>${cashTag}`;
+
+      const codBadge  = (!isSingle && codAny)
+        ? `<div class="tag" style="background:#fee2e2;border-color:#ef4444;color:#b91c1c">Bar x${codCount}</div>`
+        : (isSingle && codSingle)
+          ? `<div class="tag" style="background:#fee2e2;border-color:#ef4444;color:#b91c1c">Bar</div>`
+          : '';
+const statusTxt = (o.status || '—');
+
+      return `<div class="rowx" data-oid="${d.id}" data-status="${o.status||''}">
+        <div class="id">${d.id} ${nr}</div>
+        <div class="tag">${plat} <span class="badge badge--status">${statusTxt}</span></div>
+        ${codBadge}
+        <div style="flex:1"></div>
+        <div>${qty>0? qty : ''}</div>
+        <div id="codslot-${d.id}">${preisHtml}</div>
+      </div>`;
+    }).join('');
+
+    lastList.innerHTML = rowsHtml;
+// ارفع كل الطلبات "Unterwegs" للأعلى مباشرة بعد الرندر (مع الحفاظ على ترتيبها النسبي)
+(() => {
+  const rows = Array.from(lastList.querySelectorAll('.rowx'));
+  const underway = rows.filter(r => (r.dataset.status || '').trim() === 'Unterwegs');
+  underway.reverse().forEach(r => lastList.prepend(r)); // reverse للحفاظ على نفس ترتيب السنبشوت
+})();
+
+    // بعد الرندر: لو فيه طلبات ما زال كاشها يُجلب من stops، حدّث الخلايا عند توفر الكاش
+    snap.docs.forEach(d=>{
+      const o = d.data()||{};
+      const qty = Number(o.stops_total ?? o.qty ?? 0) || 0;
+      const codCount = Number(o?.payment?.codCount || 0);
+      if (qty <= 1 || codCount <= 0) return;
+
+      const slot = document.getElementById(`codslot-${d.id}`);
+      if (!slot) return;
+
+      const codSumDoc = Number(o?.payment?.codSum || 0);
+      const val = COD_CACHE.has(d.id) ? Number(COD_CACHE.get(d.id)||0) : (codSumDoc>0 ? codSumDoc : 0);
+      if (val > 0 && !slot.innerHTML.includes('(Bar:')){
+        slot.innerHTML += ` <span class="cash-note">(Bar: ${money(val)})</span>`;
+      }
+    });
+
+    // إبقاء نبض الطلب الجاري
+    markUnterwegsRows();
+
+    // (الباقي من منطق الأصوات/التحديد كما هو عندك)
+    snap.docChanges().forEach(ch=>{
+      const id = ch.doc.id; const o = ch.doc.data()||{};
+      const prev = ORDER_CACHE.get(id)?.status;
+      ORDER_CACHE.set(id, {status:o.status});
+      if(prev !== undefined && prev !== o.status){
+        if(o.status === 'Unterwegs'){
+          playSnd('unterwegs', id);
+          if(!SELECTED_ORDER_ID){ showTripCard(id, o); }
+        }
+		// عند انتقال الطلب إلى "Unterwegs" ارفعه فورًا للأعلى بدون انتظار إعادة بناء القائمة
+{
+  const row = lastList.querySelector(`.rowx[data-oid="${id}"]`);
+  if (row) lastList.prepend(row);
+}
+
+        if(o.status === 'Geliefert'){
+          playSnd('delivered', id);
+          if(SELECTED_ORDER_ID===id){
+            stopDriverTracking();
+            clearMapArtifacts();
+            resetTripTimesUI();
           }
         }
-        if(SELECTED_ORDER_ID===id){ showTripCard(id, o); }
-      });
-      if(!lastList.__bound){
-        lastList.__bound = true;
-        lastList.addEventListener('click', async (e)=>{
-          const row = e.target.closest('.rowx'); if(!row) return;
-          const oid = row.getAttribute('data-oid'); if(!oid) return;
-          try{
-            const ds = await getDoc(doc(db,'orders', oid));
-            if(ds.exists()) showTripCard(oid, ds.data());
-          }catch(_){}
-        });
       }
+      if(SELECTED_ORDER_ID===id){ showTripCard(id, o); }
+    });
+
+    if(!lastList.__bound){
+      lastList.__bound = true;
+      lastList.addEventListener('click', async (e)=>{
+        const row = e.target.closest('.rowx'); if(!row) return;
+        const oid = row.getAttribute('data-oid'); if(!oid) return;
+        try{
+          const ds = await getDoc(doc(db,'orders', oid));
+          if(ds.exists()) showTripCard(oid, ds.data());
+        }catch(_){}
+      });
     }
-  );
+  }
+);
+
 }
 /* ===== Driver name resolver (Vorname فقط من users) ===== */
 const firstWord = (s)=> {
@@ -1976,6 +2392,7 @@ showAuthSafe();
   const logList  = document.getElementById('logList');
   const logSumPrice = document.getElementById('logSumPrice');
   const logSumFee   = document.getElementById('logSumFee');
+  const logSumBar   = document.getElementById('logSumBar');  // NEW
   const navLog      = document.getElementById('navLog');
   const logFrom = document.getElementById('logFrom');
   const logTo   = document.getElementById('logTo');
@@ -1997,6 +2414,38 @@ showAuthSafe();
     e.preventDefault();
     await openLog();
   });
+  /* === Arrange log filters vertically with labels (non-destructive) === */
+(() => {
+  const wrap = document.querySelector('.log-filter');
+  if (!wrap || wrap.__styled) return;
+
+  // عناصرك الحالية
+  const toEl   = document.getElementById('logTo');
+  const provEl = document.getElementById('logProvider');
+  const rstBtn = document.getElementById('logReset');
+
+  if (!toEl || !provEl || !rstBtn) return;
+
+  // منشئ حاوية بعنوان
+  const makeField = (el, labelText) => {
+    const f   = document.createElement('div'); f.className = 'f';
+    const lab = document.createElement('label'); lab.textContent = labelText;
+    f.append(lab, el);
+    return f;
+  };
+
+  // نبني النسق: Bis (Datum) | Plattform | Reset
+  const fTo   = toEl.closest('.f')   || makeField(toEl,   'Bis (Datum)');
+  const fProv = provEl.closest('.f') || makeField(provEl, 'Plattform');
+  const fBtn  = rstBtn.closest('.f') || (() => { const d=document.createElement('div'); d.className='f'; d.append(rstBtn); return d; })();
+
+  // نرتّب داخل نفس الـwrap بدون نسخ—ننقل العناصر الأصلية
+  wrap.innerHTML = '';
+  wrap.append(fTo, fProv, fBtn);
+
+  wrap.__styled = true;
+})();
+
   async function openLog(){
     RID = getRID();
     if(!RID){ alert('Bitte zuerst anmelden.'); return; }
@@ -2011,23 +2460,39 @@ showAuthSafe();
   }
     logModal?.classList.add('show');
     try{
-      const qs = await getDocs(query(collection(db,'orders'), where('restaurant.id','==', RID)));
-      let sumP=0, sumL=0;
-qs.forEach(d=>{
-  const o=d.data()||{}; 
-  if(String(o.status||'')==='Abgebrochen') return;
+  const qs = await getDocs(query(collection(db,'orders'), where('restaurant.id','==', RID)));
+  let sumP=0, sumL=0, sumB=0; // NEW: إجمالي الكاش
 
-  const p = Number(o.price || 0);
-const l = Number(feeForView(o) || 0);
+  qs.forEach(d=>{
+    const o = d.data() || {};
+    if (String(o.status||'') === 'Abgebrochen') return;
 
+    const p   = Number(o.price || 0);
+    const l   = Number(feeForView(o) || 0);
+    const qty = Number(o.stops_total ?? o.qty ?? 0) || 0;
 
-  if (Number.isFinite(p)) sumP += p; 
-  if (Number.isFinite(l)) sumL += l;
-});
+    if (Number.isFinite(p)) sumP += p;
+    if (Number.isFinite(l)) sumL += l;
 
-      if(logSumPrice) logSumPrice.textContent = money(sumP);
-      if(logSumFee)   logSumFee.textContent   = money(sumL);
-    }catch(e){ /* ignore */ }
+    // Bar sum:
+    // - طلب أحادي: إن كان الدفع كاش payment.cod == true نضيف كامل السعر
+    // - طلب متعدد: نستخدم payment.codSum إن كان > 0
+    const isSingle  = qty <= 1;
+    const codSingle = !!(o?.payment?.cod);
+    const codSumDoc = Number(o?.payment?.codSum || 0);
+
+    if (isSingle) {
+      if (codSingle) sumB += p;
+    } else {
+      if (codSumDoc > 0) sumB += codSumDoc;
+    }
+  });
+
+  if (logSumPrice) logSumPrice.textContent = money(sumP);
+  if (logSumFee)   logSumFee.textContent   = money(sumL);
+  if (logSumBar)   logSumBar.textContent   = money(sumB); // NEW
+}catch(e){ /* ignore */ }
+
     await loadMore();
     bindScroll();
   }
@@ -2170,6 +2635,15 @@ function buildOrderDL(oid, o){
   const feeService = num(o?.serviceFee);
   const feeDeliv   = num(o?.deliveryFee);
   const feeDist    = num(o?.distanceFee);
+  // ==== Cash (Bar) amount ====
+  const preisN    = num(o?.price);
+  const isSingle  = ((o?.stops_total ?? o?.qty ?? 1) <= 1);
+  let  codSumN    = Number(o?.payment?.codSum || 0);
+
+  // للأوردر الأحادي: إن كان الدفع كاش ولم يُخزن codSum، اعتبره كامل السعر
+  if (isSingle && o?.payment?.cod && !(codSumN > 0)) {
+    codSumN = preisN;
+  }
 
   return `
   <dl class="od-dl">
@@ -2178,7 +2652,12 @@ function buildOrderDL(oid, o){
     ${dtdd('Status', o?.status ?? '—')}
     ${dtdd('Plattform(en)', arrJoin(o?.platform))}
     ${dtdd('Qty', num(o?.qty))}
-    ${dtdd('Preis', moneyDE(num(o?.price)))}
+${dtdd('Preis', `<div style="display:flex;justify-content:space-between;gap:8px;align-items:baseline">
+  <span>${moneyDE(num(o?.price))}</span>
+  ${codSumN > 0 ? `<span class="money--cod" style="font-weight:800">Bar Betrag: ${moneyDE(codSumN)}</span>` : ''}
+</div>`)}
+
+    
 
     ${dtdd('Service Fee',   moneyDE(feeService))}
     ${dtdd('Liefergebühr',  moneyDE(feeDeliv))}
@@ -2390,22 +2869,84 @@ const fee     = money(feeNum);
       const st    = o.status || '—';
       const dt    = (o.updatedAt?.toDate?.() || o.createdAt?.toDate?.() || null);
       const dtStr = dateISO(dt);
+	  // === COD decorations (safe insert) ===
+const preisNum = Number(o.price || 0);
+const isSingle  = ((o.stops_total ?? o.qty ?? 1) <= 1);
+const codSingle = !!(o?.payment?.cod);
+const codCount  = Number(o?.payment?.codCount || 0);
+const codAny    = codSingle || codCount > 0;
+
+// codSum محفوظ في الطلب من الإرسال (بدون قراءات stops)
+const codSum = Number(o?.payment?.codSum || 0);
+
+const priceMainHtml = (isSingle && codSingle)
+  ? `<span class="money--cod">${money(preisNum)}</span>`
+  : `${money(preisNum)}`;
+
+// إن كان ملتي-أوردر ويوجد كاش، نضيف (Bar: …) أحمر بعد السعر
+const codSumHtml = (!isSingle && codAny && codSum > 0)
+  ? ` <span class="money--cod" style="margin-left:6px">(Bar: ${money(codSum)})</span>`
+  : '';
+
+const priceHtml = `${priceMainHtml}${codSumHtml}`;
+
+const codBadge  = (!isSingle && codAny)
+  ? `<span class="log-tag" style="background:#fee2e2;border-color:#ef4444;color:#b91c1c">Bar x${codCount}</span>`
+  : (isSingle && codSingle)
+    ? `<span class="log-tag" style="background:#fee2e2;border-color:#ef4444;color:#b91c1c">Bar</span>`
+    : '';
+
+
       return `
   <div class="log-row">
-    <div class="log-id">${id} ${nr}</div>
-    <div>
-      ${rest} · ${plat}
-      <div class="small" style="opacity:.8">${dtStr}</div>
+    <div style="display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:center;width:100%">
+      <!-- يسار: المعرّف + التاريخ -->
+      <div class="r-left" style="min-width:190px">
+        <div class="log-id">${id} ${nr}</div>
+        <div class="small" style="opacity:.8">${dtStr}</div>
+      </div>
+
+      <!-- وسط: المطعم + المنصات + الحالة + الكمية + شارة الكاش -->
+      <div class="r-mid" style="display:flex;flex-direction:column;gap:4px">
+        <div><b></b>${plat}</div>
+        <div class="small" style="display:flex;flex-wrap:wrap;gap:6px;align-items:center">
+          <span class="log-tag">${st}</span>
+          <span class="chip">Qty ${qty}</span>
+          ${
+            (!isSingle && codAny)
+              ? `<span class="log-tag" style="background:#fee2e2;border-color:#ef4444;color:#b91c1c">Bar x${codCount}</span>`
+              : (isSingle && codSingle
+                  ? `<span class="log-tag" style="background:#fee2e2;border-color:#ef4444;color:#b91c1c">Bar</span>`
+                  : ``)
+          }
+        </div>
+      </div>
+
+      <!-- يمين: السعر + (Bar: …) + رسوم التوصيل -->
+      <div class="r-right" style="text-align:right;min-width:190px">
+        <div>
+          ${
+            (isSingle && codSingle)
+              ? `<span class="money--cod">${money(preisNum)}</span>`
+              : `${money(preisNum)}`
+          }
+          ${
+            (!isSingle && codAny && Number(codSum) > 0)
+              ? ` <span class="money--cod" style="margin-left:6px">(Bar: ${money(codSum)})</span>`
+              : ``
+          }
+        </div>
+        <div class="small" style="color:#4b5563">${fee}</div>
+      </div>
     </div>
-    <div class="log-tag">${st}</div>
-    <div>Qty ${qty}</div>
-    <div>${price}</div>
-    <div>${fee}</div>
-    <div style="text-align:right">
+
+    <!-- زر التفاصيل بمحاذاة يمين أسفل البطاقة -->
+    <div style="text-align:right;margin-top:6px">
       <button class="btn-mini log-details" data-oid="${id}" type="button">Details</button>
     </div>
   </div>
 `;
+
 
     }).join('');
   }
