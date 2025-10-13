@@ -640,6 +640,41 @@ input[type="number"]{-moz-appearance:textfield;text-align:center;font-variant-nu
   line-height: 1.2;
   font-variant-numeric: tabular-nums;
 }
+/* === UX: توسيع حقل السعر + تكبير زر Bar (Tablet-friendly) === */
+
+/* داخل صف الملتي: كبّر عرض خانة السعر واجعل الأرقام واضحة */
+.multi-row .price-chip { gap: 8px; }
+.multi-row .price-chip .per-price{
+  flex: 1 1 140px;      /* عرض ابتدائي أوضح */
+  min-width: 130px;     /* لا ينكمش أكثر من هذا */
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+.multi-row .price-chip .per-price::placeholder{ opacity:.5; }
+
+/* زر Bar أكبر وأسهل للمس */
+.multi-row .cod-mini{
+  min-width: 56px;
+  height: 36px;
+  padding: 6px 12px;
+  font-size: 13px;
+  border-radius: 10px;
+}
+
+/* على الأجهزة اللمسية (تابلت/موبايل): زيادة إضافية للحجم */
+@media (pointer:coarse){
+  .multi-row .price-chip .per-price{
+    flex-basis: 170px;
+    min-width: 150px;
+    height: 42px;       /* ارتفاع مريح للمس */
+  }
+  .multi-row .cod-mini{
+    min-width: 64px;
+    height: 40px;
+    padding: 8px 14px;
+    font-size: 14px;
+  }
+}
 
 </style>
 </head>
