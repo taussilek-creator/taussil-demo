@@ -827,6 +827,22 @@ html, body { width:100%; max-width:100%; overflow-x:hidden; }
   white-space: nowrap;
 }
 
+/* ==== Single vs Multi — عرض البطاقة فقط ==== */
+/* Single (data-multi="0"): 
+   - إخفاء الحالة على البطاقة
+   - إخفاء التسلسلي ذو الهاش في سطر العنوان
+   - إظهار التسلسلي بدون هاش بجانب سطر المزوّد/الكمية
+   - إخفاء عنوان المطعم
+*/
+.card-order[data-multi="0"] .tag-status { display: none !important; }
+.card-order[data-multi="0"] .serial-hash { display: none !important; }
+.card-order[data-multi="0"] .serial-plain { display: inline-flex !important; }
+.card-order[data-multi="0"] .addr-line { display: none !important; }
+
+/* Multi (data-multi="1"): السلوك القديم تمامًا */
+.card-order[data-multi="1"] .serial-hash { display: inline-flex !important; }
+.card-order[data-multi="1"] .serial-plain { display: none !important; }
+/* الحالة والعنوان يبقيان ظاهرين افتراضيًا في الـMulti */
 
 </style>
 </head>
@@ -2188,18 +2204,17 @@ function attachStopsForOrder(orderId, orderData, cardEl){
   const unsub = onSnapshot(subCol, (snap)=>{
     const docs = snap.docs.map(d=>({ id:d.id, s:d.data()||{} }));
     if(docs.length===0){
-      cont.style.display='none';
-      if(doneGeneral) doneGeneral.style.display='inline-flex'; // طلب منفرد => يرجع الزر العام
-      return;
-    }
-    cont.style.display='block';
-    if(doneGeneral) doneGeneral.style.display='none';          // Multi => نخفي الزر العام
-// هذا طلب ملتي: اخفِ سعر الكاش على البطاقة العامة وأزل كلاس cash من البطاقة
-try{
-  const card = cardEl;
-  card.querySelectorAll('[data-parent-cod]').forEach(el => el.remove());
-  card.classList.remove('cash');
-}catch(_){}
+  cont.style.display='none';
+  if(doneGeneral) doneGeneral.style.display='inline-flex'; // طلب منفرد => يرجع الزر العام
+  // ⇩ وسم البطاقة كـ Single
+  try{ cardEl.classList.remove('has-stops'); cardEl.setAttribute('data-multi','0'); }catch(_){}
+  return;
+}
+cont.style.display='block';
+if(doneGeneral) doneGeneral.style.display='none';          // Multi => نخفي الزر العام
+// ⇩ وسم البطاقة كـ Multi
+try{ cardEl.classList.add('has-stops'); cardEl.setAttribute('data-multi','1'); }catch(_){}
+
 
     // ترتيب: حسب nr ثم id
     docs.sort((a,b)=>{
@@ -2598,9 +2613,12 @@ const priceNum = Number(o.price||0) || 0;
 
 	// رقم تسلسلي داخل القائمة الحالية (يبدأ من 1)
 const serial = idx + 1;
-// أظهره لكل الحالات النشطة + Geliefert (اخفي فقط Abgebrochen)
 const showSerial = (lower !== 'abgebrochen');
-const serialTag = showSerial ? `<span class="tag">#${serial}</span>` : '';
+// Multi (هاش) — يظهر فقط عندما data-multi="1"
+const serialTagHash  = showSerial ? `<span class="tag tag-serial serial-hash">#${serial}</span>` : '';
+// Single (بدون هاش) — يظهر فقط عندما data-multi="0"
+const serialTagPlain = showSerial ? `<span class="tag tag-serial serial-plain">${serial}</span>` : '';
+
 
     const showStart = (lower==="angenommen" || lower==="zugewiesen" || lower==="assigned" || lower==="bearbeitung");
     const showDone  = (lower==="unterwegs");
@@ -2624,18 +2642,26 @@ else if (Number(o?.payment?.codSum || 0) > 0) {
 
     const navHref = addr ? makeNavUrl(addr) : '#';
     return `
-      <div class="card-order ${isCash ? 'cash' : ''}" data-id="${id}" data-addr="${encodeURIComponent(addr)}" data-status="${st}">
+     <div class="card-order ${isCash ? 'cash' : ''}" data-id="${id}" data-addr="${encodeURIComponent(addr)}" data-status="${st}" data-multi="0">
+
 
 
 
         <div class="logo">${logoHTML}</div>
         <div class="info">
-         <div class="line"><strong>${rest}</strong> <span class="tag">${st}</span> ${serialTag}</div>
+         <div class="line title-line">
+  <strong>${rest}</strong>
+  <span class="tag tag-status">${st}</span>
+  ${serialTagHash}
+</div>
 
-          <div class="small">${plat} · Qty ${qty}</div>
+
+          <div class="small prov-line">${plat} · Qty ${qty} ${serialTagPlain}</div>
 
 
-          <div class="small" style="opacity:.85;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${addr || '—'}</div>
+
+          <div class="small addr-line" style="opacity:.85;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${addr || '—'}</div>
+
 		  ${isCOD && codAmount > 0 ? `<div class="small cod-amount" data-parent-cod>Bar: ${formatEUR(codAmount)}</div>` : ``}
 
 
