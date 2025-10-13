@@ -775,16 +775,21 @@ html, body { width:100%; max-width:100%; overflow-x:hidden; }
   font-weight: 800;
   font-variant-numeric: tabular-nums;
 }
-/* [PATCH:MOBILE] إظهار زر تعديل السعر على الموبايل */
+/* [PATCH:MOBILE] زر تعديل السعر على الموبايل — لا تُظهره إلا إذا كان مسموحًا */
 @media (max-width: 640px){
   #orderModal .sheet #md_price_edit{
-    display: inline-flex !important;
+    display: none;                /* افتراضيًا مخفي */
     height: 36px !important;
     min-width: 44px !important;
     align-items: center;
     justify-content: center;
   }
+  /* أظهره فقط عندما يكون المنبثق موسومًا أنه قابل للتعديل */
+  #orderModal[data-can-edit="1"] #md_price_edit{
+    display: inline-flex !important;
+  }
 }
+
 
 /* [PATCH:COD] تمييز بطاقة الطلب الكاش بإطار أحمر ومبلغ أحمر */
 .neo-driver .card-order.cash{
@@ -3203,6 +3208,9 @@ try{
   const onNeuTab  = (currentTab === 'Neu');
   const delivered = String(o.status||'').trim().toLowerCase() === 'geliefert';
   const canOnNeu  = onNeuTab && !delivered && canEditPrice(o);
+// وسم المنبثق بحالة السماح — هو المرجع الوحيد لـ CSS
+md.setAttribute('data-can-edit', canOnNeu ? '1' : '0');
+md.setAttribute('data-delivered', __isDelivered ? '1' : '0');
 
   const editBtn = document.getElementById('md_price_edit'); // حماية لو تغيّر الريفرنس
   if (editBtn){
