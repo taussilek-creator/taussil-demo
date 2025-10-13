@@ -926,6 +926,55 @@ html, body { width:100%; max-width:100%; overflow-x:hidden; }
     flex-wrap: wrap !important;
   }
 }
+/* === [PIN-SERIAL-TOP-RIGHT — MOBILE HOTFIX v2] === */
+/* نرفع الخصوصية إلى أقصى حد: سياق neo-driver + اسم البطاقة + الطبقة الداخلية */
+.neo-driver .card-order{
+  position: relative !important;
+  overflow: visible !important; /* تأكد أنها لا تقص العنصر المطلق */
+}
+
+/* ثبّت الشارة (plain/hash) أعلى يمين البطاقة — ينطبق على سنكل وملتي */
+.neo-driver .card-order .tag-serial,
+.neo-driver .card-order .info .tag-serial{
+  position: absolute !important;
+  top: 8px !important;
+  right: 10px !important;
+  z-index: 9 !important;
+  pointer-events: none !important;
+  line-height: 1.1 !important;
+  padding: 6px 12px !important;
+  border-radius: 999px !important;
+  white-space: nowrap !important;
+}
+
+/* اعرض النسخة بدون #، وأخفِ نسخة الهاش — موحّد على الموبايل */
+.neo-driver .card-order .serial-hash{  display: none !important; }
+.neo-driver .card-order .serial-plain{ display: inline-flex !important; }
+
+/* دعم إضافي لمتصفحات WebKit على الموبايل (iOS/Android) */
+@supports (-webkit-touch-callout: none) {
+  .neo-driver .card-order .tag-serial,
+  .neo-driver .card-order .info .tag-serial{
+    position: absolute !important;
+    top: 8px !important;
+    right: 10px !important;
+  }
+}
+
+/* تأكيد تخطيط الأسطر على الشاشات الصغيرة */
+@media (max-width: 480px){
+  .neo-driver .card-order .title-line{
+    display: flex !important;
+    gap: 10px !important;
+    align-items: center !important;
+  }
+  .neo-driver .card-order .prov-line{
+    display: flex !important;
+    gap: 8px !important;
+    align-items: center !important;
+    flex-wrap: wrap !important;
+  }
+}
 
 
 </style>
