@@ -2345,6 +2345,15 @@ function attachStopsForOrder(orderId, orderData, cardEl){
 }
 cont.style.display='block';
 if(doneGeneral) doneGeneral.style.display='none';          // Multi => نخفي الزر العام
+  // [PATCH: MULTI-COD → remove parent COD pill & red frame on the main card]
+  try{
+    // 1) احذف أي مبلغ كاش موروث من البطاقة الأم (تم وضعه بـ data-parent-cod)
+    cardEl.querySelectorAll('[data-parent-cod]').forEach(el => el.remove());
+
+    // 2) أزل إطار الكاش الأحمر عن البطاقة الأم (الملتي تُظهر الكاش على مستوى الستوب فقط)
+    cardEl.classList.remove('cash');
+  }catch(_){}
+
 // ⇩ وسم البطاقة كـ Multi
 try{ cardEl.classList.add('has-stops'); cardEl.setAttribute('data-multi','1'); }catch(_){}
 
