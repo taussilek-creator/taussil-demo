@@ -1458,6 +1458,33 @@ function headingDeg(fromLL, toLL){
 
 const ORDER_CACHE=new Map();
 /* ===== Send Order ===== */
+// === Helper: استرجاع أسعار/ COD لكل مزوّد بحسب كميته الفعلية ===
+function arraysForProvider(plat){
+  // مصدركم في الملف الأول:
+  // - providerQty      : Map(provider -> qty)
+  // - providerPrices   : Map(provider -> number[] لكل عنصر)
+  // - providerCOD      : Map(provider -> boolean[] لكل عنصر)  ← موجود لأنك تمسحه بعد الإرسال
+  const qty = Math.max(0, Number(providerQty.get(plat) || 0));
+
+  // الأسعار
+  let prices = Array.isArray(providerPrices?.get?.(plat))
+    ? [...providerPrices.get(plat)]
+    : [];
+
+  // قص/تمدبد لطول الكمية
+  if (prices.length > qty) prices = prices.slice(0, qty);
+  while (prices.length < qty) prices.push(0);
+
+  // COD per item (إن وُجد، وإلا نملأ false)
+  let cods = Array.isArray(providerCOD?.get?.(plat))
+    ? [...providerCOD.get(plat)]
+    : [];
+  if (cods.length > qty) cods = cods.slice(0, qty);
+  while (cods.length < qty) cods.push(false);
+
+  return { prices, cods, qty };
+}
+
 async function computeFormQty(){
   let sum = 0;
   selectedProviders.forEach(k=>{ sum += Math.max(0, Number(providerQty.get(k)||0)); });
@@ -1568,33 +1595,35 @@ payment: {
 });
 
 
-    // === TAUSSIL-PATCH: إنشاء stops إذا الطلب متعدد ===
+    // === RESTORE: إنشاء stops كما في الملف القديم (سكيما قديمة 100%) ===
 if (qty > 1 && Array.isArray(platforms) && platforms.length) {
   try {
-    const stopCol = collection(ref, 'stops');
-    let stopIdx = 0;
+    // تأكيد المسار الصريح للسب-كوليكشن
+    const stopCol = collection(db, 'orders', id, 'stops');
 
     for (const plat of platforms) {
-      const { prices, cods } = ensureArrays(plat); // ← جلب الأسعار والكاش لهذا المزوّد
+      // بالضبط كما في الملف القديم: نعتمد providerPrices لكل مزوّد
+      const arr = providerPrices.get(plat) || [];
 
-      for (let i = 0; i < prices.length; i++) {
-        stopIdx++;
-        const stopId = `${plat}_${i+1}`;
+      for (let i = 0; i < arr.length; i++) {
+        const stopId  = `${plat}_${i+1}`;
         const stopRef = doc(stopCol, stopId);
 
         await setDoc(stopRef, {
           nr,
           platform: plat,
-          price: Math.round(Number(prices[i] || 0) * 100) / 100,
+          // نفس تقريب السعر القديم
+          price: Math.round(Number(arr[i] || 0) * 100) / 100,
           qty: 1,
           deliveryFee: 0,
           status: "Bearbeitung",
           address_text: addr,
-          payment: { cod: !!(cods && cods[i]) },
 
-          name: hiddenDefaults?.Restaurant_Name ?? null,
-          phone: hiddenDefaults?.Telefon ?? null,
+          // نفس الحقول كما كانت (بدون payment/restaurant/…)
+          name:  hiddenDefaults?.Restaurant_Name  ?? null,
+          phone: hiddenDefaults?.Telefon          ?? null,
           fullName: null,
+
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp()
         });
@@ -1604,9 +1633,10 @@ if (qty > 1 && Array.isArray(platforms) && platforms.length) {
     console.error("stops creation failed", e);
   }
 }
+// === END RESTORE ===
 
 
-// === END PATCH ===
+
 
 
     playSnd('send', id);
