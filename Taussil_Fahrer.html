@@ -765,6 +765,16 @@ html, body { width:100%; max-width:100%; overflow-x:hidden; }
   font-weight: 800;
   flex: 0 0 auto;                 /* لا تتمدد ولا تنضغط */
 }
+/* === COD (driver) — red frame + red amount === */
+.card-order.cod{
+  border: 2px solid var(--err) !important;        /* أحمر */
+  box-shadow: 0 0 0 3px rgba(239,68,68,.12) !important;
+}
+.cod-amount{
+  color: #b91c1c !important;                      /* نص أحمر واضح */
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
 
 </style>
 </head>
@@ -2509,10 +2519,26 @@ const serialTag = showSerial ? `<span class="tag">#${serial}</span>` : '';
     const showDone  = (lower==="unterwegs");
         const initials = (rest || "—").slice(0,2).toUpperCase();
     const logoHTML = `<div class="ph">${initials}</div>`; // placeholder أولي
+	// === COD detection for driver card ===
+const isCOD = !!(o?.payment?.cod) || Number(o?.payment?.codCount || 0) > 0;
+
+let codAmount = 0;
+// طلب مفرد: لو payment.cod=true نعتبر كامل سعر الطلب كاش
+if (o?.payment?.cod) {
+  codAmount = Number(
+    o?.items_total_eur ?? o?.price ?? 0
+  ) || 0;
+}
+// ملتي أوردر: استخدم codSum إن كان محفوظًا
+else if (Number(o?.payment?.codSum || 0) > 0) {
+  codAmount = Number(o.payment.codSum) || 0;
+}
+
 
     const navHref = addr ? makeNavUrl(addr) : '#';
     return `
-      <div class="card-order" data-id="${id}" data-addr="${encodeURIComponent(addr)}" data-status="${st}">
+      <div class="card-order${isCOD ? ' cod' : ''}" data-id="${id}" data-addr="${encodeURIComponent(addr)}" data-status="${st}">
+
 
         <div class="logo">${logoHTML}</div>
         <div class="info">
@@ -2520,6 +2546,8 @@ const serialTag = showSerial ? `<span class="tag">#${serial}</span>` : '';
 
           <div class="small">${plat} · Qty ${qty}</div>
           <div class="small" style="opacity:.85;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${addr || '—'}</div>
+		  ${isCOD && codAmount > 0 ? `<div class="small cod-amount">Bar: ${formatEUR(codAmount)}</div>` : ``}
+
 		  <div class="multi-stops" data-stops-of="${id}" style="grid-column:1 / -1; display:none"></div>
         </div>
         <div class="act">
@@ -3122,6 +3150,26 @@ md_price_edit.onclick = (e)=>{
   if(md_price_edit.disabled) return;
   openPriceModal(priceEUR);
 };
+// إظهار زر "Preis bearbeiten" فقط في تبويب Neu ومع السماح بالتحرير
+try{
+  const onNeuTab  = (currentTab === 'Neu');
+  const delivered = String(o.status||'').trim().toLowerCase() === 'geliefert';
+  const canOnNeu  = onNeuTab && !delivered && canEditPrice(o);
+
+  const editBtn = document.getElementById('md_price_edit'); // حماية لو تغيّر الريفرنس
+  if (editBtn){
+    editBtn.style.display = canOnNeu ? '' : 'none';
+    editBtn.disabled = !canOnNeu;
+    editBtn.setAttribute('aria-disabled', String(!canOnNeu));
+    if (canOnNeu){
+      editBtn.onclick = (e)=>{
+        e.preventDefault();
+        openPriceModal(priceEUR);
+      };
+    }
+  }
+}catch(_){}
+
   // === Upsert KV rows for ServiceFee & Distance ===
   function upsertKV(id, label){
     let el = document.getElementById(id);
@@ -3167,13 +3215,13 @@ md_price_edit.onclick = (e)=>{
     if (md_start) { md_start.style.display = ''; md_start.disabled = false; md_start.setAttribute('aria-disabled','false'); }
     if (md_done)  { md_done.style.display  = ''; md_done.disabled  = false; md_done.setAttribute('aria-disabled','false'); }
   }
-  // ضمن if (__isDelivered) {...}
-  if (md_price_edit) {
-    md_price_edit.style.display = 'none';
-    md_price_edit.disabled = true;
-    md_price_edit.setAttribute('aria-disabled','true');
-    md_price_edit.replaceWith(md_price_edit.cloneNode(true)); // قتل أي Listeners قديمة
-  }
+  // أخفِ زر التعديل فقط إذا كان الطلب مُسلّم
+if (__isDelivered && md_price_edit) {
+  md_price_edit.style.display = 'none';
+  md_price_edit.disabled = true;
+  md_price_edit.setAttribute('aria-disabled','true');
+}
+
 
   md.classList.add("show");
   md_start.onclick=async (e)=>{
