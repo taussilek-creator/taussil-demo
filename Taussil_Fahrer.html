@@ -975,6 +975,25 @@ html, body { width:100%; max-width:100%; overflow-x:hidden; }
     flex-wrap: wrap !important;
   }
 }
+/* === [MULTI-CASH: STOP FRAME + RED PRICE] === */
+.neo-driver .card-order .multi-stops .stop-row.is-cod{
+  border: 2px solid #ef4444 !important;
+  box-shadow: 0 0 0 2px rgba(239,68,68,.14) inset !important;
+  border-radius: 14px !important;
+}
+.neo-driver .card-order .multi-stops .stop-row.is-cod .stop-price{
+  color: #ef4444 !important;
+  font-weight: 800 !important;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* لإجبار السلوك على الجوال كذلك */
+@media (max-width: 480px){
+  .neo-driver .card-order .multi-stops .stop-row.is-cod{
+    border-width: 2px !important;
+  }
+}
 
 
 </style>
@@ -2345,13 +2364,29 @@ function attachStopsForOrder(orderId, orderData, cardEl){
 }
 cont.style.display='block';
 if(doneGeneral) doneGeneral.style.display='none';          // Multi => نخفي الزر العام
-  // [PATCH: MULTI-COD → remove parent COD pill & red frame on the main card]
+  // [MULTI-CASH:PARENT→STOP] انقل السعر الكاش من البطاقة الأم إلى الستوب الكاش ثم احذف نسخة الأم
   try{
-    // 1) احذف أي مبلغ كاش موروث من البطاقة الأم (تم وضعه بـ data-parent-cod)
-    cardEl.querySelectorAll('[data-parent-cod]').forEach(el => el.remove());
+    // 1) التقط العنصر الذي يطبع السعر على البطاقة الأم (إن وُجد)
+    const parentAmtEl = cardEl.querySelector('.cod-amount[data-parent-cod]');
+    const parentText  = parentAmtEl ? parentAmtEl.textContent.trim() : '';
 
-    // 2) أزل إطار الكاش الأحمر عن البطاقة الأم (الملتي تُظهر الكاش على مستوى الستوب فقط)
-    cardEl.classList.remove('cash');
+    // 2) إن وُجد نص سعر على الأم — أضِفه إلى كل stop "is-cod" يفتقد .stop-price
+    if (parentText) {
+      cont.querySelectorAll('.stop-row.is-cod').forEach(row=>{
+        if (!row.querySelector('.stop-price')) {
+          const info = row.querySelector('.info');
+          if (info) {
+            const div = document.createElement('div');
+            div.className = 'small stop-price';
+            div.textContent = parentText;  // مثال: "Bar: 12,00 €"
+            info.appendChild(div);
+          }
+        }
+      });
+    }
+
+    // 3) احذف عنصر السعر من البطاقة الأم حتى لا يتكرر
+    if (parentAmtEl) parentAmtEl.remove();
   }catch(_){}
 
 // ⇩ وسم البطاقة كـ Multi
