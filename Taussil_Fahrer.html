@@ -788,13 +788,26 @@ html, body { width:100%; max-width:100%; overflow-x:hidden; }
 
 /* [PATCH:COD] تمييز بطاقة الطلب الكاش بإطار أحمر ومبلغ أحمر */
 .neo-driver .card-order.cash{
-  border: 2px solid #ef4444 !important;
+  border: 3px solid #ef4444 !important;
   box-shadow: 0 0 0 2px rgba(239,68,68,.35) inset !important;
 }
 .neo-driver .card-order.cash .amount{
   color: #ef4444 !important;
   font-weight: 800;
   white-space: nowrap;
+}
+/* [PATCH:CARD-CASH-DESKTOP] أخفِ مبلغ الكاش داخل بطاقة الطلب على الديسكتوب */
+@media (min-width: 641px){
+  .neo-driver .card-order .amount{
+    display: none !important;
+  }
+}
+
+/* إبقِه ظاهرًا على الموبايل */
+@media (max-width: 640px){
+  .neo-driver .card-order .amount{
+    display: inline !important;
+  }
 }
 
 </style>
@@ -3241,32 +3254,41 @@ try{
     .textContent = (__dist!=null) ? (Math.round(__dist*100)/100).toFixed(2) + ' km' : '—';
 
   // === Disable action buttons for delivered orders ===
-  const __isDelivered = String(o.status || '').trim().toLowerCase() === 'geliefert';
+const __isDelivered = String(o.status || '').trim().toLowerCase() === 'geliefert';
 
-  if (__isDelivered) {
-    // أخفِ الأزرار الثلاثة + عطّل أي Handlers
-    [md_nav, md_start, md_done].forEach(btn => {
-      if (!btn) return;
-      try {
-        btn.style.display = 'none';
-        btn.disabled = true;
-        btn.setAttribute('aria-disabled','true');
-        // إلغاء أي مستمعات قد تكون مضافة سابقًا
-        btn.replaceWith(btn.cloneNode(true));
-      } catch(_) {}
-    });
-  } else {
-    // حالات غير Geliefert: تأكد من ظهور الأزرار بشكل طبيعي
-    if (md_nav)   { md_nav.style.display   = ''; md_nav.disabled   = false; md_nav.setAttribute('aria-disabled','false'); }
-    if (md_start) { md_start.style.display = ''; md_start.disabled = false; md_start.setAttribute('aria-disabled','false'); }
-    if (md_done)  { md_done.style.display  = ''; md_done.disabled  = false; md_done.setAttribute('aria-disabled','false'); }
+// ملاحظة مهمة: لا تستعمل replaceWith(...) حتى لا نخسر مراجع الأزرار
+
+if (__isDelivered) {
+  [md_nav, md_start, md_done].forEach(btn => {
+    if (!btn) return;
+    btn.style.display = 'none';
+    btn.disabled = true;
+    btn.setAttribute('aria-disabled', 'true');
+    // أوقف أي هاندلر سابق بدون استبدال العنصر
+    btn.onclick = null;
+  });
+
+  // أخفِ زر تعديل السعر فقط عندما يكون الطلب مُسلَّمًا
+  if (md_price_edit) {
+    md_price_edit.style.display = 'none';
+    md_price_edit.disabled = true;
+    md_price_edit.setAttribute('aria-disabled', 'true');
+    md_price_edit.onclick = null;
   }
-  // أخفِ زر التعديل فقط إذا كان الطلب مُسلّم
-if (__isDelivered && md_price_edit) {
-  md_price_edit.style.display = 'none';
-  md_price_edit.disabled = true;
-  md_price_edit.setAttribute('aria-disabled','true');
+
+} else {
+  // حالات غير Geliefert: أعد إظهار وتفعيل الأزرار + زر تعديل السعر
+  if (md_nav)   { md_nav.style.display   = ''; md_nav.disabled   = false; md_nav.setAttribute('aria-disabled','false'); }
+  if (md_start) { md_start.style.display = ''; md_start.disabled = false; md_start.setAttribute('aria-disabled','false'); }
+  if (md_done)  { md_done.style.display  = ''; md_done.disabled  = false; md_done.setAttribute('aria-disabled','false'); }
+
+  if (md_price_edit) {
+    md_price_edit.style.display = '';
+    md_price_edit.disabled = false;
+    md_price_edit.setAttribute('aria-disabled', 'false');
+  }
 }
+
 
 
   md.classList.add("show");
