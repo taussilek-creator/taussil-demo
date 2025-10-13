@@ -884,6 +884,48 @@ html, body { width:100%; max-width:100%; overflow-x:hidden; }
     flex-wrap: wrap !important;
   }
 }
+/* === [PIN-SERIAL-TOP-RIGHT] وضع الرقم التسلسلي أعلى يمين البطاقة (Single + Multi) === */
+/* نرفع الخصوصية بسياق .neo-driver ونستخدم !important لتجاوز أي تعارض على الموبايل/الديسكتوب */
+
+/* 0) اجعل البطاقة مرجعًا للتموضع المطلق */
+.neo-driver .card-order{
+  position: relative !important;
+}
+
+/* 1) الشارة التسلسلية (سواء plain أو hash) تُثبَّت أعلى يمين البطاقة */
+.neo-driver .card-order .tag-serial{
+  position: absolute !important;
+  top: 8px !important;
+  right: 10px !important;
+  z-index: 2 !important;
+  pointer-events: none !important; /* لا تعيق الأزرار في عمود الأفعال */
+  /* تحسينات بصرية طفيفة: (تعتمد على .tag لديك) */
+  line-height: 1.1 !important;
+  padding: 6px 12px !important;
+  border-radius: 999px !important;
+  white-space: nowrap !important;
+}
+
+/* 2) نُبقي منطق الإظهار كما اتفقنا سابقًا:
+      - نُظهر النسخة بدون # (serial-plain)
+      - نخفي النسخة ذات الـ# (serial-hash) */
+.neo-driver .card-order .serial-hash{  display: none !important; }
+.neo-driver .card-order .serial-plain{ display: inline-flex !important; }
+
+/* 3) دعم الشاشات الصغيرة: تأكيد عدم تغير سلوك أسطر العنوان/المزوّد */
+@media (max-width: 480px){
+  .neo-driver .card-order .title-line{
+    display: flex !important;
+    gap: 10px !important;
+    align-items: center !important;
+  }
+  .neo-driver .card-order .prov-line{
+    display: flex !important;
+    gap: 8px !important;
+    align-items: center !important;
+    flex-wrap: wrap !important;
+  }
+}
 
 
 </style>
