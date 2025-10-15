@@ -2332,66 +2332,20 @@ function attachStopsForOrder(orderId, orderData, cardEl){
   const cont = cardEl.querySelector('.multi-stops');
   if(!cont) return;
   const doneGeneral = cardEl.querySelector('button[data-act="delivered"]');
-// === [COD MAP HELPERS] — اشتقاق ستوب الكاش من order.payment ===
-function deriveCodMap(orderData, stopsDocs){
-  const p = orderData?.payment || {};
-  const out = { byId: new Map(), byProvider: new Set(), index1: null, singleVal: null };
-
-  // أشكال صريحة لو موجودة عندك مستقبلاً:
-  if (Array.isArray(p.codStops)) p.codStops.forEach(id => out.byId.set(String(id), null));
-  if (p.codByStop && typeof p.codByStop === 'object') {
-    Object.entries(p.codByStop).forEach(([id, val])=>{
-      out.byId.set(String(id), Number(val));
-    });
-  }
-  const prov1 = (p.codProvider || p.codPlatform || '').trim();
-  if (prov1) out.byProvider.add(prov1.toLowerCase());
-  if (Array.isArray(p.codProviders)) {
-    p.codProviders.forEach(pr => pr && out.byProvider.add(String(pr).toLowerCase()));
-  }
-  if (Number.isFinite(+p.codIndex) && +p.codIndex >= 1) out.index1 = +p.codIndex;
-  if (Number.isFinite(+p.codSum) && +p.codSum > 0) out.singleVal = +p.codSum;
-
-  // fallback: لو الطلب كله كاش وملتي فيه ستوب واحد فقط
-  const allCash = String(p.method||'').toLowerCase()==='cash' || p.cod === true;
-  if (!out.byId.size && !out.byProvider.size && !out.index1 && allCash && stopsDocs.length===1){
-    out.byId.set(String(stopsDocs[0]?.id), out.singleVal||0);
-  }
-
-  // [NEW:FALLBACK-COD-ANY-ONE] يدعم حالتك الحالية:
-  // payment = { codAny:true, codCount:1, codSum:n }
-  const hasExplicit = out.byId.size>0 || out.byProvider.size>0 || Number.isFinite(out.index1);
-  if (!hasExplicit && p.codAny === true && Number(p.codCount) === 1 && Number(p.codSum) > 0) {
-    out.singleVal = Number(p.codSum);
-    // اختر أول ستوب حسب nr (إن وجد) أو أول عنصر
-    const sorted = [...stopsDocs].sort((a,b)=>{
-      const na = Number(a?.s?.nr || 9999), nb = Number(b?.s?.nr || 9999);
-      return na - nb;
-    });
-    const first = sorted[0];
-    if (first?.id) out.byId.set(String(first.id), out.singleVal);
-  }
-
-  return out;
+// === [COD BY STOP] — القراءة مباشرة من وثيقة الستوب ===
+function stopIsCOD(s){
+  return !!(
+    s?.payment?.cod === true     // الشكل المفضل: payment.cod=true
+    || s?.cod === true           // دعم الشكل المسطح: cod=true
+    || String(s?.payment?.method||'').toLowerCase() === 'cash'
+  );
+}
+function stopCODAmount(s){
+  // إن وُجد مبلغ للكاش على مستوى الستوب نعرضه، وإلا نكتفي بكلمة "Bar"
+  const v = s?.payment?.amount ?? s?.cod_amount ?? s?.cash ?? s?.price;
+  return Number(v) || 0;
 }
 
-function pickStopCodAmount(stopRec, idx1, codMap){
-  const id = String(stopRec.id || '');
-  const plat = String(stopRec.s?.platform || '').toLowerCase();
-
-  if (codMap.byId.has(id)) {
-    const v = codMap.byId.get(id);
-    return Number.isFinite(v) && v>0 ? v
-      : (Number(stopRec.s?.cod_amount || stopRec.s?.cash || stopRec.s?.price || codMap.singleVal || 0) || 0);
-  }
-  if (plat && codMap.byProvider.has(plat)) {
-    return Number(stopRec.s?.cod_amount || stopRec.s?.cash || stopRec.s?.price || codMap.singleVal || 0) || 0;
-  }
-  if (Number.isFinite(codMap.index1) && codMap.index1 === idx1) {
-    return Number(stopRec.s?.cod_amount || stopRec.s?.cash || stopRec.s?.price || codMap.singleVal || 0) || 0;
-  }
-  return 0;
-}
 
   const subCol = collection(db, "orders", orderId, "stops");
   const unsub = onSnapshot(subCol, (snap)=>{
@@ -2415,8 +2369,7 @@ try{ cardEl.classList.add('has-stops'); cardEl.setAttribute('data-multi','1'); }
       if(na!==nb) return na-nb; return a.id.localeCompare(b.id);
     });
 
-    // --- خريطة الكاش من مستوى الطلب ---
-const codMap = deriveCodMap(orderData, docs);
+   
 
 cont.innerHTML = docs.map(({id,s},i)=>{
 // [HIDE-PARENT-COD-AMOUNT-FOR-MULTI] — أزل السعر الأحمر من البطاقة الأم عند وجود Stops
@@ -2440,9 +2393,10 @@ try{
     ? `<img src="${logoSrc}" alt="${plat}">`
     : `<span class="init">${initials}</span>`;
 
-  const idx1 = i + 1; // 1-based
-  const codAmt = pickStopCodAmount({id, s}, idx1, codMap);
-  const isCOD  = Number(codAmt) > 0;
+  const idx1  = i + 1; // 1-based
+const isCOD = stopIsCOD(s);
+const codAmt = stopCODAmount(s);
+
 
   const btn = del ? `<span class="btn-icon btn-done" title="Geliefert">✓</span>`
                   : `<button class="btn-icon btn-done" data-stop="${id}" title="Diesen Stop liefern">✓</button>`;
@@ -2456,7 +2410,8 @@ try{
           <span class="tag">Item #${idx1} · ${st}</span>
         </div>
         <div class="small">${plat || '—'}</div>
-        ${ isCOD ? `<div class="small stop-price">Bar: ${formatEUR(codAmt)}</div>` : `` }
+        ${ isCOD ? `<div class="small stop-price">Bar${codAmt>0 ? ': '+formatEUR(codAmt) : ''}</div>` : `` }
+
       </div>
       <div class="act">${btn}</div>
     </div>`;
