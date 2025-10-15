@@ -1595,45 +1595,48 @@ payment: {
 });
 
 
-    // === RESTORE: إنشاء stops كما في الملف القديم (سكيما قديمة 100%) ===
+    // === RESTORE: إنشاء stops كما في الملف القديم (سكيما قديمة 100%) + وسم الكاش ===
 if (qty > 1 && Array.isArray(platforms) && platforms.length) {
   try {
-    // تأكيد المسار الصريح للسب-كوليكشن
     const stopCol = collection(db, 'orders', id, 'stops');
 
     for (const plat of platforms) {
-      // بالضبط كما في الملف القديم: نعتمد providerPrices لكل مزوّد
-      const arr = providerPrices.get(plat) || [];
+      // نفس المصدر القديم للأسعار:
+      const arr  = providerPrices.get(plat) || [];
+      // موازيًا: أعلام الكاش لكل عنصر من نفس المزود (إن لم تكن موجودة فكلها false)
+      const cods = providerCOD.get(plat)    || [];
 
       for (let i = 0; i < arr.length; i++) {
         const stopId  = `${plat}_${i+1}`;
         const stopRef = doc(stopCol, stopId);
 
-        await setDoc(stopRef, {
-          nr,
-          platform: plat,
-          // نفس تقريب السعر القديم
-          price: Math.round(Number(arr[i] || 0) * 100) / 100,
-          qty: 1,
-          deliveryFee: 0,
-          status: "Bearbeitung",
-          address_text: addr,
+        const cods = providerCOD.get(plat) || [];
+const isCOD = !!cods[i];
 
-          // نفس الحقول كما كانت (بدون payment/restaurant/…)
-          name:  hiddenDefaults?.Restaurant_Name  ?? null,
-          phone: hiddenDefaults?.Telefon          ?? null,
-          fullName: null,
+await setDoc(stopRef, {
+  nr,
+  platform: plat,
+  price: Math.round(Number(arr[i] || 0) * 100) / 100,
+  qty: 1,
+  deliveryFee: 0,
+  status: "Bearbeitung",
+  address_text: addr,
+  name:  hiddenDefaults?.Restaurant_Name ?? null,
+  phone: hiddenDefaults?.Telefon ?? null,
+  fullName: null,
+  ...(isCOD ? { payment: { cod: true } } : {}),
+  createdAt: serverTimestamp(),
+  updatedAt: serverTimestamp()
+});
 
-          createdAt: serverTimestamp(),
-          updatedAt: serverTimestamp()
-        });
       }
     }
-  } catch(e){
+  } catch (e) {
     console.error("stops creation failed", e);
   }
 }
 // === END RESTORE ===
+
 
 
 
