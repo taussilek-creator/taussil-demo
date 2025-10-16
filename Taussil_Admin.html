@@ -707,6 +707,13 @@ html{ overflow-x: hidden; }
   :root{ --admin-maxw: 1400px; }
   .controls .small{ display:none; }  /* لإفساح المجال عند الضيق */
 }
+/* ===== [CASH-UI] highlight ===== */
+.cash-row{
+  border: 1px solid #ef4444 !important;   /* إطار أحمر */
+}
+.cash-price{
+  color:#b91c1c; font-weight:800;         /* سعر أحمر ثقيل */
+}
 
 </style>
 </head>
@@ -1067,6 +1074,14 @@ html{ overflow-x: hidden; }
           <option value="">All</option>
         </select>
       </div>
+	    <!-- [EXPORT] Driver filter -->
+  <div style="grid-column:1">
+    <div class="small">Driver</div>
+    <select id="export-driver" style="width:100%;height:38px;border:1px solid #e5e7eb;border-radius:10px">
+      <option value="">All</option>
+    </select>
+  </div>
+
       <div>
         <div class="small">Status</div>
         <select id="export-status" multiple size="6" style="width:100%;height:100%;border:1px solid #e5e7eb;border-radius:10px">
@@ -1087,6 +1102,13 @@ html{ overflow-x: hidden; }
         <input id="export-to" type="date" style="width:100%;height:38px;border:1px solid #e5e7eb;border-radius:10px">
       </div>
     </div>
+<!-- [CASH-EXPORT] خيار تصفية الكاش -->
+<div style="grid-column: 1 / -1">
+  <label class="small" style="display:flex;align-items:center;gap:6px">
+    <input type="checkbox" id="export-cash-only">
+    <span>Cash only</span>
+  </label>
+</div>
 
     <div style="margin-top:10px">
       <div class="small" style="margin-bottom:6px">Columns</div>
@@ -1979,7 +2001,8 @@ function renderDashboard(){
   const incWrap = $('#incoming-list');
   if(incWrap){
     incWrap.innerHTML = incoming.map(o=>`
-      <div class="tr">
+      <div class="tr ${isCashOrder(o)?'cash-row':''}">
+
         <!-- Restaurant -->
         <div class="flex">
           <img class="logo" src="${o.restaurant?.logoUrl||''}"/>
@@ -1996,9 +2019,10 @@ function renderDashboard(){
         <div class="order-qty mono">x${Number(o.qty||0)}</div>
 
         <!-- Price -->
-        <div class="order-price">
-          ${Number.isFinite(Number(o.price))? Number(o.price).toFixed(2)+' €':'—'}
-        </div>
+        <div class="order-price ${isCashOrder(o)?'cash-price':''}">
+  ${Number.isFinite(Number(o.price))? Number(o.price).toFixed(2)+' €':'—'}
+</div>
+
 
         <!-- Pickup -->
         <div class="order-pickup"><i data-lucide="clock"></i> ${o.pickupTime||'—'}</div>
@@ -2017,7 +2041,8 @@ function renderDashboard(){
   const aWrap = $('#active-list');
   if(aWrap){
     aWrap.innerHTML = active.map(o=>`
-      <div class="tr" data-mini-map="${o.id}">
+      <div class="tr ${isCashOrder(o)?'cash-row':''}" data-mini-map="${o.id}">
+
         <!-- Driver -->
         <div class="flex">
           ${o.driver?.avatarUrl? `<img class="avatar" src="${o.driver.avatarUrl}">`:`<div class="avatar"></div>`}
@@ -2173,7 +2198,8 @@ function renderDrivers(){
 function renderOrdersLog(){
   const wrap = $('#orders-log'); if(!wrap) return;
   wrap.innerHTML = orders.map(o=>`
-    <div class="tr">
+  <div class="tr ${isCashOrder(o)?'cash-row':''}">
+
       <div class="select"><input type="checkbox" class="order-select" data-id="${o.id}"></div>
 
       <div class="order-code mono">#${o.nr!=null? o.nr : (o.shortCode||'—')}</div>
@@ -2309,9 +2335,19 @@ async function openOrderModal(o){
       </div>
 
       <div>
-        <div class="small">${t('labels.price')}</div>
-        <div>${price.toFixed(2)} €</div>
-      </div>
+  <div class="small">${t('labels.price')}</div>
+  <div class="${isCashOrder(o)?'cash-price':''}">${price.toFixed(2)} €</div>
+</div>
+<!-- [CASH] Payment & Cash Due -->
+<div>
+  <div class="small">${t('labels.payment')||'Payment'}</div>
+  <div>${isCashOrder(o) ? (t('payment.cash')||'Cash') : (t('payment.online')||'Online')}</div>
+</div>
+<div>
+  <div class="small">${t('labels.cashDue')||'Cash to collect'}</div>
+  <div>${isCashOrder(o) ? (readCashDueEUR(o).toFixed(2)+' €') : '—'}</div>
+</div>
+
 
       <!-- Fees -->
       <div>
@@ -3435,6 +3471,47 @@ async function calcRouteDistanceKm(o){
     return Number.isFinite(meters) ? meters/1000 : null;
   }catch(_){ return null; }
 }
+/* ===== [CASH-HELPERS] Payment & Cash ===== */
+function paymentMethodRaw(o){
+  return String(
+    o?.payment?.method ??
+    o?.payment?.type ??
+    o?.paymentMethod ??
+    o?.payMethod ??
+    o?.paytype ??
+    o?.zahlung ??
+    o?.zahlungsmethode ??
+    ''
+  ).toLowerCase();
+}
+function isCashOrder(o){
+  const m = paymentMethodRaw(o);
+  if (m.includes('bar') || m.includes('cash') || m.includes('cod')) return true;
+  if (o?.cash === true || o?.isCash === true || o?.cod === true) return true;
+  return false;
+}
+function readOrderTotalEUR(o){
+  const v = o?.total ?? o?.totalPrice ?? o?.grandTotal ??
+            o?.amount ?? o?.priceTotal ?? o?.sum ?? o?.price;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : 0;
+}
+function readCashDueEUR(o){
+  // حاول استعمال حقل صريح إن وُجد
+  const explicit = o?.cashDue ?? o?.amountDue ?? o?.amount_cash ??
+                   o?.cash_amount ?? o?.amountToCollect ?? o?.toCollect;
+  const en = Number(explicit);
+  if (Number.isFinite(en)) return en;
+
+  // خلاف ذلك: إن وُجد total استخدمه؛ وإلا price + (serviceFee + distanceFee)
+  const total = readOrderTotalEUR(o);
+  if (total) return total;
+
+  const price = Number(o?.price) || 0;
+  const sFee  = Number(readServiceFee(o)) || 0;
+  const dFee  = Number(readDistanceFee(o)) || 0;
+  return price + sFee + dFee;
+}
 
 // [DISTANCE-HELPERS-END]
 
@@ -3453,24 +3530,43 @@ function getVisibleOrders(){
 }
 /* 4) CSV عام */
 function exportCsv(rows, filenameTag){
-  const headers = ['NrOrCode','OrderId','Restaurant','RestaurantPhone','Driver','DriverPhone','Platform','Qty','PriceEUR','DeliveryFeeEUR','Status','PickupTime','CreatedAt','UpdatedAt'];
+  const headers = [
+    'NrOrCode','OrderId','Restaurant','RestaurantPhone','Driver','DriverPhone',
+    'Platform','Qty','PriceEUR','DeliveryFeeEUR','Status','PickupTime','CreatedAt','UpdatedAt',
+    'Payment','CashDueEUR',
+    'DistanceKmBillable','DistanceKmTotal','DistanceFeeEUR','ServiceFeeEUR'
+  ];
+
   const esc = v => {
     if (v === null || v === undefined) return '';
     const s = String(v).replace(/"/g,'""');
     return /[",\n]/.test(s) ? `"${s}"` : s;
   };
-  const rec = o=>{
-    const nrOr = (o.nr!=null? `#${o.nr}` : (o.shortCode || (o.id || '')));
-    const plat = Array.isArray(o.platform)? o.platform.join(' / ') : (o.platform||'');
-    const price= fmtNum(o.price);
-    const fee  = fmtNum(readFee(o));
+  const toFixedOrEmpty = (n)=> Number.isFinite(n)? n.toFixed(2) : '';
+
+  const rec = (o) => {
+    const nrOr   = (o.nr!=null? `#${o.nr}` : (o.shortCode || (o.id || '')));
+    const plat   = Array.isArray(o.platform)? o.platform.join(' / ') : (o.platform||'');
+    const price  = Number.isFinite(Number(o.price)) ? Number(o.price).toFixed(2) : '';
+    const delFee = Number.isFinite(Number(readFee(o))) ? Number(readFee(o)).toFixed(2) : '';
+    const pay    = isCashOrder(o) ? 'cash' : (paymentMethodRaw(o)||'online');
+    const cash   = isCashOrder(o) ? Number(readCashDueEUR(o)).toFixed(2) : '';
+
+    const distBill  = toFixedOrEmpty(Number(readDistanceBillableKm(o)));
+    const distTotal = toFixedOrEmpty(Number(readDistanceTotalKm(o)));
+    const distFee   = toFixedOrEmpty(Number(readDistanceFee(o)));
+    const svcFee    = toFixedOrEmpty(Number(readServiceFee(o)));
+
     return [
       nrOr, o.id||'', o.restaurant?.name||'', o.restaurant?.phone||'',
       o.driver?.fullName||'', o.driver?.phone||'',
-      plat, Number(o.qty||0), price, fee, o.status||'',
-      o.pickupTime||'', fmtTsLatn(o.createdAt), fmtTsLatn(o.updatedAt)
+      plat, Number(o.qty||0), price, delFee, o.status||'',
+      o.pickupTime||'', fmtTsLatn(o.createdAt), fmtTsLatn(o.updatedAt),
+      pay, cash,
+      distBill, distTotal, distFee, svcFee
     ].map(esc).join(',');
   };
+
   const csv = [headers.join(','), ...rows.map(rec)].join('\n');
   const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
   const url  = URL.createObjectURL(blob);
@@ -3480,6 +3576,8 @@ function exportCsv(rows, filenameTag){
   document.body.appendChild(a); a.click(); a.remove();
   URL.revokeObjectURL(url);
 }
+
+
 /* 5) شريط الأزرار */
 function ensureExportBar(){
   const logWrap = document.getElementById('orders-log');
@@ -3493,6 +3591,247 @@ function ensureExportBar(){
     bar.innerHTML = `<button id="btn-export-open" class="btn">📦 Export…</button>`;
     logWrap.parentElement?.insertBefore(bar, logWrap);
   }
+/* ===== Export & Print – wiring (Cash filter + columns) ===== */
+const EXPORT_COLS_DEF = [
+  { id:'nr',        label:'NrOrCode',        get:o => (o.nr!=null? `#${o.nr}` : (o.shortCode || o.id || '')) },
+  { id:'orderId',   label:'OrderId',         get:o => o.id || '' },
+  { id:'rest',      label:'Restaurant',      get:o => o.restaurant?.name || '' },
+  { id:'restPhone', label:'RestaurantPhone', get:o => o.restaurant?.phone || '' },
+  { id:'driver',    label:'Driver',          get:o => o.driver?.fullName || '' },
+  { id:'driverTel', label:'DriverPhone',     get:o => o.driver?.phone || '' },
+  { id:'platform',  label:'Platform',        get:o => Array.isArray(o.platform)? o.platform.join(' / ') : (o.platform||'') },
+  { id:'qty',       label:'Qty',             get:o => Number(o.qty||0) },
+  { id:'price',     label:'PriceEUR',        get:o => Number.isFinite(Number(o.price)) ? Number(o.price).toFixed(2) : '' },
+
+  // لا نزيل "DeliveryFeeEUR" القديمة (تجميعية)، فقط نضيف حقول أدق أدناه
+  { id:'fee',       label:'DeliveryFeeEUR',  get:o => Number.isFinite(Number(readFee(o))) ? Number(readFee(o)).toFixed(2) : '' },
+
+  { id:'status',    label:'Status',          get:o => o.status || '' },
+  { id:'pickup',    label:'PickupTime',      get:o => o.pickupTime || '' },
+  { id:'created',   label:'CreatedAt',       get:o => fmtTsLatn(o.createdAt) },
+  { id:'updated',   label:'UpdatedAt',       get:o => fmtTsLatn(o.updatedAt) },
+
+  // الدفع والكاش
+  { id:'payment',   label:'Payment',         get:o => isCashOrder(o)? 'cash' : (paymentMethodRaw(o)||'online') },
+  { id:'cashdue',   label:'CashDueEUR',      get:o => isCashOrder(o)? Number(readCashDueEUR(o)).toFixed(2) : '' },
+
+  // ===== الحقول الجديدة المطلوبة =====
+  { id:'distBill',  label:'DistanceKmBillable', get:o => {
+      const n = Number(readDistanceBillableKm(o)); return Number.isFinite(n)? n.toFixed(2) : '';
+    }
+  },
+  { id:'distTotal', label:'DistanceKmTotal',    get:o => {
+      const n = Number(readDistanceTotalKm(o)); return Number.isFinite(n)? n.toFixed(2) : '';
+    }
+  },
+  { id:'distFee',   label:'DistanceFeeEUR',     get:o => {
+      const n = Number(readDistanceFee(o));     return Number.isFinite(n)? n.toFixed(2) : '';
+    }
+  },
+  { id:'svcFee',    label:'ServiceFeeEUR',      get:o => {
+      const n = Number(readServiceFee(o));      return Number.isFinite(n)? n.toFixed(2) : '';
+    }
+  },
+];
+
+
+function uniqueRestaurantsFromOrders(){
+  const set = new Set();
+  (orders||[]).forEach(o=>{
+    const nm = o?.restaurant?.name;
+    if(nm) set.add(nm);
+  });
+  return Array.from(set).sort((a,b)=>a.localeCompare(b));
+}
+// [EXPORT] جمع السائقين من الطلبات الظاهرة
+function uniqueDriversFromOrders(){
+  const map = new Map();
+  (orders||[]).forEach(o=>{
+    const d = o?.driver;
+    if(d?.id){
+      const name = d.fullName || d.name || d.email || d.id;
+      if(!map.has(d.id)) map.set(d.id, name);
+    }
+  });
+  return Array.from(map.entries())
+    .map(([id,name])=>({id,name}))
+    .sort((a,b)=> a.name.localeCompare(b.name));
+}
+
+function fillExportRestaurantSelect(){
+  const sel = document.getElementById('export-restaurant');
+  if(!sel) return;
+  const last = sel.value; // حاول الحفاظ على الاختيار
+  const names = uniqueRestaurantsFromOrders();
+  sel.innerHTML = `<option value="">All</option>` + names.map(n=>`<option>${n}</option>`).join('');
+  if(names.includes(last)) sel.value = last;
+}
+function collectExportFilters(){
+  const rest   = document.getElementById('export-restaurant')?.value || '';
+  const driver = document.getElementById('export-driver')?.value || '';
+  const cashOnly = !!document.getElementById('export-cash-only')?.checked;
+  const from = document.getElementById('export-from')?.value || '';
+  const to   = document.getElementById('export-to')?.value   || '';
+  const stSel = document.getElementById('export-status');
+  const statuses = stSel ? Array.from(stSel.selectedOptions).map(o=>o.value) : [];
+  return { rest, driver, cashOnly, from, to, statuses };
+}
+
+
+function fillExportDriverSelect(){
+  const sel = document.getElementById('export-driver');
+  if(!sel) return;
+  const last = sel.value;
+  const drivers = uniqueDriversFromOrders();
+  sel.innerHTML = `<option value="">All</option>` +
+    drivers.map(d=>`<option value="${d.id}">${d.name}</option>`).join('');
+  if(drivers.some(d=> d.id===last)) sel.value = last;
+}
+
+function fillExportColsUI(){
+  const host = document.getElementById('export-cols');
+  if(!host) return;
+  // افتراضيًا: كل الأعمدة مفعّلة
+  host.innerHTML = EXPORT_COLS_DEF.map(c => `
+    <label class="small" style="display:flex;align-items:center;gap:6px">
+      <input type="checkbox" data-col="${c.id}" checked> <span>${c.label}</span>
+    </label>
+  `).join('');
+}
+
+
+
+function tsFromDateStringInclusiveEnd(dateStr){
+  if(!dateStr) return null;
+  const d = new Date(dateStr + 'T23:59:59');
+  return d.getTime();
+}
+
+function orderMatchesFilters(o, f){
+  // مطعم
+  if(f.rest && (o?.restaurant?.name || '') !== f.rest) return false;
+    // سائق (القيمة = driver.id)
+  if(f.driver){
+    if((o?.driver?.id || '') !== f.driver) return false;
+  }
+
+  // كاش؟
+  if(f.cashOnly && !isCashOrder(o)) return false;
+  // حالة
+  if(f.statuses && f.statuses.length){
+    if(!f.statuses.includes(o?.status || '')) return false;
+  }
+  // تاريخ (على createdAt)
+  const createdMs = (()=> {
+    try{
+      const c = o?.createdAt;
+      if(c?.toDate) return c.toDate().getTime();
+      if(c instanceof Date) return c.getTime();
+      if(typeof c === 'number') return c;
+    }catch(_){}
+    return null;
+  })();
+  if(f.from){
+    const fromMs = new Date(f.from).getTime();
+    if(createdMs && createdMs < fromMs) return false;
+  }
+  if(f.to){
+    const toMs = tsFromDateStringInclusiveEnd(f.to);
+    if(createdMs && createdMs > toMs) return false;
+  }
+  return true;
+}
+
+function filterOrdersForExport(){
+  const f = collectExportFilters();
+  const all = Array.isArray(orders)? orders : [];
+  return all.filter(o => orderMatchesFilters(o, f));
+}
+
+function selectedExportColIds(){
+  const boxes = document.querySelectorAll('#export-cols input[type="checkbox"][data-col]');
+  const ids = Array.from(boxes).filter(b=>b.checked).map(b=>b.getAttribute('data-col'));
+  return ids.length ? ids : EXPORT_COLS_DEF.map(c=>c.id);
+}
+
+function buildPrintReport(rows, colIds){
+  ensurePrintStyles();
+  let host = document.getElementById('print-report');
+  if(!host){
+    host = document.createElement('div');
+    host.id = 'print-report';
+    document.body.appendChild(host);
+  }
+  const cols = EXPORT_COLS_DEF.filter(c => colIds.includes(c.id));
+  const thead = `<tr>${cols.map(c=>`<th>${c.label}</th>`).join('')}</tr>`;
+  const tbody = rows.map(o=>{
+    const numericIds = ['qty','price','fee','cashdue','distBill','distTotal','distFee','svcFee'];
+const tds = cols.map(c=>`<td class="${numericIds.includes(c.id)?'num':''}">${c.get(o)}</td>`).join('');
+
+    return `<tr>${tds}</tr>`;
+  }).join('');
+  host.innerHTML = `
+    <h1>Orders Report</h1>
+    <div class="meta">${rows.length} rows • ${new Date().toLocaleString()}</div>
+    <table><thead>${thead}</thead><tbody>${tbody}</tbody></table>
+  `;
+}
+
+let __exportHandlersBound = false;
+function openExportModal(){
+  fillExportRestaurantSelect();
+  fillExportDriverSelect();
+  fillExportColsUI();
+  document.getElementById('export-modal')?.classList.add('open');
+
+  if(!__exportHandlersBound){
+    __exportHandlersBound = true;
+
+    document.getElementById('export-close')?.addEventListener('click', ()=>{
+      document.getElementById('export-modal')?.classList.remove('open');
+    });
+
+    // CSV
+    document.getElementById('export-run-csv')?.addEventListener('click', ()=>{
+      const rows = filterOrdersForExport();
+      exportCsv(rows); // يستخدم الأعمدة الثابتة + يشمل Payment/CashDue
+      const msg = document.getElementById('export-msg');
+      if(msg) msg.textContent = `${rows.length} rows exported (CSV).`;
+    });
+
+    // PDF / Print
+    document.getElementById('export-run-pdf')?.addEventListener('click', ()=>{
+      const rows = filterOrdersForExport();
+      const colIds = selectedExportColIds();
+      buildPrintReport(rows, colIds);
+      window.print();
+    });
+
+    // Excel (حل بسيط: HTML-as-Excel، بدون مكتبات خارجية)
+    document.getElementById('export-run-xlsx')?.addEventListener('click', ()=>{
+      const rows = filterOrdersForExport();
+      const colIds = selectedExportColIds();
+      const cols = EXPORT_COLS_DEF.filter(c => colIds.includes(c.id));
+
+      // ابني HTML table كملف xls (يفتح في إكسل)
+      const thead = `<tr>${cols.map(c=>`<th>${c.label}</th>`).join('')}</tr>`;
+      const tbody = rows.map(o=>{
+        const tds = cols.map(c=>`<td>${c.get(o)}</td>`).join('');
+        return `<tr>${tds}</tr>`;
+      }).join('');
+      const html = `<table>${thead}${tbody}</table>`;
+      const blob = new Blob([html], {type:'application/vnd.ms-excel'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = `taussil-orders_${new Date().toISOString().slice(0,10)}.xls`;
+      document.body.appendChild(a); a.click(); a.remove();
+      URL.revokeObjectURL(url);
+
+      const msg = document.getElementById('export-msg');
+      if(msg) msg.textContent = `${rows.length} rows exported (Excel).`;
+    });
+  }
+}
 
   const btn = document.getElementById('btn-export-open');
   if(btn) btn.onclick = openExportModal;
