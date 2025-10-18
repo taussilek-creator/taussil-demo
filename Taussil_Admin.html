@@ -3548,7 +3548,16 @@ function exportCsv(rows, filenameTag){
     const nrOr   = (o.nr!=null? `#${o.nr}` : (o.shortCode || (o.id || '')));
     const plat   = Array.isArray(o.platform)? o.platform.join(' / ') : (o.platform||'');
     const price  = Number.isFinite(Number(o.price)) ? Number(o.price).toFixed(2) : '';
-    const delFee = Number.isFinite(Number(readFee(o))) ? Number(readFee(o)).toFixed(2) : '';
+    const _del = Number(
+  o?.deliveryFee ??
+  o?.delivery_fee ??
+  o?.liefergebuehr ?? o?.lieferGebuehr ??
+  o?.feeDelivery ??
+  o?.pricing?.deliveryFee ?? o?.meta?.deliveryFee ??
+  (o?.serviceFee == null ? o?.fee : null)
+);
+const delFee = Number.isFinite(_del) ? _del.toFixed(2) : '';
+
     const pay    = isCashOrder(o) ? 'cash' : (paymentMethodRaw(o)||'online');
     const cash   = isCashOrder(o) ? Number(readCashDueEUR(o)).toFixed(2) : '';
 
@@ -3604,7 +3613,18 @@ const EXPORT_COLS_DEF = [
   { id:'price',     label:'PriceEUR',        get:o => Number.isFinite(Number(o.price)) ? Number(o.price).toFixed(2) : '' },
 
   // لا نزيل "DeliveryFeeEUR" القديمة (تجميعية)، فقط نضيف حقول أدق أدناه
-  { id:'fee',       label:'DeliveryFeeEUR',  get:o => Number.isFinite(Number(readFee(o))) ? Number(readFee(o)).toFixed(2) : '' },
+  { id:'fee', label:'DeliveryFeeEUR',  get:o => {
+  const n = Number(
+    o?.deliveryFee ??
+    o?.delivery_fee ??
+    o?.liefergebuehr ?? o?.lieferGebuehr ??
+    o?.feeDelivery ??
+    o?.pricing?.deliveryFee ?? o?.meta?.deliveryFee ??
+    (o?.serviceFee == null ? o?.fee : null) // توافق قديم فقط إذا ما في serviceFee
+  );
+  return Number.isFinite(n) ? n.toFixed(2) : '';
+}},
+
 
   { id:'status',    label:'Status',          get:o => o.status || '' },
   { id:'pickup',    label:'PickupTime',      get:o => o.pickupTime || '' },
