@@ -1123,6 +1123,11 @@ rows = rows.filter(matchCat);
     const showCover = !!coverUrl && coverUrl !== logoUrl;
     const showLogo  = !!logoUrl;
     const deliveryMinutes = (typeof r.etaExtraMinutes === 'number' && r.etaExtraMinutes >= 0) ? r.etaExtraMinutes : null;
+	// قبول الطلبات أونلاين؟ عند false نعرض "Nur Abholung"
+const acceptsOnline = (r.acceptOrders !== false); // الافتراضي: يقبل، إلا إذا كانت false صراحة
+const pickupOnlyHtml = acceptsOnline ? '' :
+  `<span class="badge" style="background:rgba(59,130,246,.12);color:#1d4ed8;border-color:rgba(59,130,246,.25)">Nur Abholung</span>`;
+
 // Delivery fee & Min order (from restaurant doc; with backward-compat keys)
 const feeRaw = (r.deliveryFee ?? (r.delivery && r.delivery.fee) ?? null);
 const feeNum = (feeRaw==null ? null : Number(feeRaw));
@@ -1172,11 +1177,13 @@ card.dataset.rid = r.id;   // ← مهم: نحتاجه لاكتشاف المطع
   
     <span class="badge ${isOpenNow(r)?'open':'closed'}">${isOpenNow(r)?T('open'):T('closed')}</span>
   </div>
-  <div class="tile-meta-right">
-    ${deliveryMinutes!=null ? `<span class="meta-time">🕒 <strong>${deliveryMinutes}</strong> min</span>` : ``}
-    ${deliveryHtml}
-    ${minOrderHtml}
-  </div>
+    <div class="tile-meta-right">
+  ${acceptsOnline && deliveryMinutes!=null ? `<span class="meta-time">🕒 <strong>${deliveryMinutes}</strong> min</span>` : ``}
+  ${!acceptsOnline ? pickupOnlyHtml : ``}
+  ${acceptsOnline ? deliveryHtml : ``}
+  ${acceptsOnline ? minOrderHtml : ``}
+</div>
+
 </div>
 <div class="tile-actions">
   <button class="btn-cta" data-open="${r.id}">${T('viewMenu')}</button>
@@ -1848,11 +1855,16 @@ CART_INFO = {
   rid: r.id,
   rname: (r.name||''),
   delivery: Number(r.flatDelivery ?? r.deliveryFlat ?? r.deliveryFee ?? 0) || 0,
-  minOrder: Number(r.minOrder ?? r.minOrderValue ?? 0) || 0
+  minOrder: Number(r.minOrder ?? r.minOrderValue ?? 0) || 0,
+  // جديد: قفل الالتقاط إذا المطعم موقف الطلبات الأونلاين
+  pickupLocked: (r.acceptOrders === false)
 };
 
+// إذا مقفول، فعّل الالتقاط إجباريًا
+if (CART_INFO.pickupLocked) {
+  PICKUP = true;
+}
 
- 
 
   // اختر أفضل مصدر للصورة: images[0] ثم img ثم imageUrl (إن وُجد)
   const img =
@@ -1998,44 +2010,52 @@ summary.appendChild(feeLine);
   body.appendChild(summary);
 }
 // --- صف الالتقاط (Pickup / Abholung) ---
+const pickupLocked = !!(CART_INFO && CART_INFO.pickupLocked);
+
 const pickupRow = document.createElement('div');
 pickupRow.style.cssText = 'display:flex;align-items:center;gap:8px;padding:8px 0;border-top:1px solid #eee';
+
+// checkbox: مفعّل إجباريًا ومقفول إذا pickupLocked
 pickupRow.innerHTML = `
-  <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
-    <input id="pickupToggle" type="checkbox" ${PICKUP ? 'checked' : ''}>
+  <label style="display:flex;align-items:center;gap:8px;cursor:${pickupLocked ? 'not-allowed' : 'pointer'}">
+    <input id="pickupToggle" type="checkbox" ${PICKUP ? 'checked' : ''} ${pickupLocked ? 'disabled' : ''}>
     <span>${T('pickup')}</span>
+    ${pickupLocked ? `<span class="small" style="opacity:.8">(${LANG==='de'?'Nur Abholung':'Nur Abholung'})</span>` : ``}
   </label>
 `;
 body.appendChild(pickupRow);
 
-// ربط التغيير
-pickupRow.querySelector('#pickupToggle').addEventListener('change', (e)=>{
-  PICKUP = !!e.target.checked;
+// اربط التغيير فقط إذا غير مقفول
+if (!pickupLocked){
+  pickupRow.querySelector('#pickupToggle').addEventListener('change', (e)=>{
+    PICKUP = !!e.target.checked;
 
-  if (PICKUP){
-    // أزل تنبيه الحد الأدنى (إن وُجد) وفَعّل الدفع دائمًا
-    const minNotice = body.querySelector('#minOrderNotice');
-    if (minNotice) minNotice.remove();
-    const payBtn = document.getElementById('checkout');
-    if (payBtn){ payBtn.disabled = false; payBtn.title=''; }
+    if (PICKUP){
+      // أزل تنبيه الحد الأدنى (إن وُجد) وفَعّل الدفع
+      const minNotice = body.querySelector('#minOrderNotice');
+      if (minNotice) minNotice.remove();
+      const payBtn = document.getElementById('checkout');
+      if (payBtn){ payBtn.disabled = false; payBtn.title=''; }
 
-    // شطب رسوم التوصيل بصريًا وإظهار 0,00 €
-    const feeEl = document.getElementById('feeLine');
-    const r = (typeof getCartRestaurant==='function') ? getCartRestaurant() : null;
-    const origFee = r ? (Number(r.flatDelivery ?? r.deliveryFlat ?? r.deliveryFee ?? 0) || 0) : 0;
-    if (feeEl){
-      feeEl.innerHTML = (origFee > 0)
-        ? `${T('delivery')}: <s>${eur(origFee)}</s> <strong>0,00 €</strong> <span style="margin-inline-start:6px;color:#16a34a;font-weight:800">(${T('pickup')})</span>`
-        : `<span style="color:#16a34a;font-weight:800">${T('freeDelivery')}</span>`;
+      // شطب رسوم التوصيل بصريًا وإظهار 0,00 €
+      const feeEl = document.getElementById('feeLine');
+      const r = (typeof getCartRestaurant==='function') ? getCartRestaurant() : null;
+      const origFee = r ? (Number(r.flatDelivery ?? r.deliveryFlat ?? r.deliveryFee ?? 0) || 0) : 0;
+      if (feeEl){
+        feeEl.innerHTML = (origFee > 0)
+          ? `${T('delivery')}: <s>${eur(origFee)}</s> <strong>0,00 €</strong> <span style="margin-inline-start:6px;color:#16a34a;font-weight:800">(${T('pickup')})</span>`
+          : `<span style="color:#16a34a;font-weight:800">${T('freeDelivery')}</span>`;
+      }
+
+      updateTotal();
+    } else {
+      // إعادة بناء السلة لاسترجاع قواعد الحد الأدنى/التوصيل
+      openCart();
+      return;
     }
+  });
+}
 
-    updateTotal();   // إجمالي بدون توصيل
-  } else {
-    // أبسط استرجاع: أعد بناء السلة لتعود قواعد الحد الأدنى/التوصيل كما كانت
-    openCart();
-    return; // لأن openCart() سيستدعي updateTotal() بنفسه
-  }
-});
 
   updateTotal();
   dlg.showModal();
@@ -2305,8 +2325,17 @@ CART_INFO = {
   rid: r.id,
   rname: (r.name||''),
   delivery: Number(r.flatDelivery ?? r.deliveryFlat ?? r.deliveryFee ?? 0) || 0,
-  minOrder: Number(r.minOrder ?? r.minOrderValue ?? 0) || 0
+  minOrder: Number(r.minOrder ?? r.minOrderValue ?? 0) || 0,
+  // جديد: قفل الالتقاط إذا المطعم موقف الطلبات الأونلاين
+  pickupLocked: (r.acceptOrders === false)
 };
+
+// إذا مقفول، فعّل الالتقاط إجباريًا
+if (CART_INFO.pickupLocked) {
+  PICKUP = true;
+}
+
+
 
 
     // حساب سعر الوحدة بعد/قبل الخصم مع الإضافات لكل وحدة
