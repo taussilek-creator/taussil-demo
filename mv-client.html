@@ -1856,6 +1856,7 @@ CART_INFO = {
   rname: (r.name||''),
   delivery: Number(r.flatDelivery ?? r.deliveryFlat ?? r.deliveryFee ?? 0) || 0,
   minOrder: Number(r.minOrder ?? r.minOrderValue ?? 0) || 0,
+  isOpen: !!isOpenNow(r),
   // جديد: قفل الالتقاط إذا المطعم موقف الطلبات الأونلاين
   pickupLocked: (r.acceptOrders === false)
 };
@@ -1969,12 +1970,41 @@ if (!PICKUP && minRequired > 0) {
 
   // عطّل/فعّل زر الدفع
   const payBtn = document.getElementById('checkout');
-  if (payBtn) {
-    const belowMin = (!PICKUP && minRequired > 0 && missingAmt > 0);
+if (payBtn) {
+  const isClosed = (CART_INFO && CART_INFO.isOpen === false);
+  const belowMin = (!PICKUP && minRequired > 0 && missingAmt > 0);
 
-    payBtn.disabled = belowMin;
-    payBtn.title = belowMin ? T('belowMinWarn') : '';
+  // عطّل إذا مغلق أو تحت الحد الأدنى
+  payBtn.disabled = isClosed || belowMin;
+
+  // Tooltips بحسب الحالة
+  if ( isClosed ) {
+    payBtn.title = (LANG==='de') ? 'Dieses Restaurant ist derzeit geschlossen'
+                 : (LANG==='en') ? 'This restaurant is currently closed'
+                 : (LANG==='tr') ? 'Bu restoran şu anda kapalı'
+                 : 'المطعم مغلق حالياً';
+  } else if ( belowMin ) {
+    payBtn.title = T('belowMinWarn');
+  } else {
+    payBtn.title = '';
   }
+
+  // تنبيه بصري إذا المطعم مغلق
+  const oldClosed = body.querySelector('#closedNotice');
+  if (oldClosed) oldClosed.remove();
+  if (isClosed){
+    const notice = document.createElement('div');
+    notice.id = 'closedNotice';
+    notice.className = 'small';
+    notice.style.cssText = 'margin-top:8px;padding:10px 12px;background:#fff7ed;border:1px solid #fed7aa;border-radius:10px;color:#9a3412;font-weight:700';
+    notice.textContent = (LANG==='de') ? 'Dieses Restaurant ist geschlossen – Bestellung nicht möglich'
+                      : (LANG==='en') ? 'This restaurant is closed – ordering is disabled'
+                      : (LANG==='tr') ? 'Restoran kapalı – sipariş verilemiyor'
+                      : 'المطعم مغلق – لا يمكن إتمام الطلب';
+    body.appendChild(notice);
+  }
+}
+
 })();
 
   // --- ملخص الأسعار (أسفل عناصر السلة) ---
@@ -2035,7 +2065,17 @@ if (!pickupLocked){
       const minNotice = body.querySelector('#minOrderNotice');
       if (minNotice) minNotice.remove();
       const payBtn = document.getElementById('checkout');
-      if (payBtn){ payBtn.disabled = false; payBtn.title=''; }
+      const isClosed = (CART_INFO && CART_INFO.isOpen === false);
+if (payBtn){
+  payBtn.disabled = isClosed ? true : false;
+  payBtn.title = isClosed
+    ? ((LANG==='de') ? 'Dieses Restaurant ist derzeit geschlossen'
+      : (LANG==='en') ? 'This restaurant is currently closed'
+      : (LANG==='tr') ? 'Bu restoran şu anda kapalı'
+      : 'المطعم مغلق حالياً')
+    : '';
+}
+
 
       // شطب رسوم التوصيل بصريًا وإظهار 0,00 €
       const feeEl = document.getElementById('feeLine');
@@ -2326,6 +2366,7 @@ CART_INFO = {
   rname: (r.name||''),
   delivery: Number(r.flatDelivery ?? r.deliveryFlat ?? r.deliveryFee ?? 0) || 0,
   minOrder: Number(r.minOrder ?? r.minOrderValue ?? 0) || 0,
+  isOpen: !!isOpenNow(r),
   // جديد: قفل الالتقاط إذا المطعم موقف الطلبات الأونلاين
   pickupLocked: (r.acceptOrders === false)
 };
