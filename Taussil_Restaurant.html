@@ -764,24 +764,24 @@ input[type="number"]{-moz-appearance:textfield;text-align:center;font-variant-nu
     </div>
   </div>
 </div>
-<!-- ===== Customer Order (aus Costumers/*/orders) ===== -->
-<div id="custOrderModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.35);align-items:center;justify-content:center;z-index:9999">
-  <div class="box" style="width:min(600px,92vw);background:#fff;border-radius:14px;padding:16px;box-shadow:0 10px 30px rgba(0,0,0,.2);border:1px solid #e5e7eb">
-    <div style="display:flex;justify-content:space-between;align-items:center;gap:12px">
-      <strong style="font-size:18px">Neuer Kundenauftrag</strong>
-      <button id="custClose" class="btn-mini">Schließen</button>
+<!-- ===== Customer Order Incoming Modal (Costumers/*/orders) ===== -->
+<div id="custOrderModal" class="modal white" style="display:none">
+  <div class="box" role="dialog" aria-modal="true" aria-labelledby="custOMTitle">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
+      <strong id="custOMTitle">Neuer Kundenauftrag</strong>
+      <button id="custOMClose" class="btn-mini">✕</button>
     </div>
 
-    <div id="custOrderBody" style="margin-top:10px;max-height:50vh;overflow:auto"></div>
+    <div id="custOMBody" class="od-dl" style="margin-top:8px"></div>
 
-    <div style="display:flex;gap:10px;align-items:center;margin-top:12px">
-      <label class="small">Vorbereitungszeit (Minuten)</label>
-      <input id="custPrepMins" type="number" min="0" step="5" style="width:120px;padding:8px 10px;border:1px solid #ddd;border-radius:10px">
+    <div style="display:flex; gap:8px; align-items:center; justify-content:center; margin-top:10px">
+      <label class="small">Vorbereitungszeit (Min)</label>
+      <input id="custOMPrep" class="input center" type="number" min="0" step="5" value="15" style="width:120px">
     </div>
 
-    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:14px">
-      <button id="custReject" class="btn-mini" style="border:1px solid #ddd;background:#f5f5f5">Ablehnen</button>
-      <button id="custAccept" class="btn" style="padding:10px 14px;background:#111;color:#fff">Akzeptieren</button>
+    <div style="display:flex; gap:8px; justify-content:center; margin-top:10px">
+      <button id="custOMAccept" class="btn btn-cta" type="button">Annehmen</button>
+      <button id="custOMCancel" class="btn" type="button">Abbrechen</button>
     </div>
   </div>
 </div>
@@ -932,9 +932,7 @@ input[type="number"]{-moz-appearance:textfield;text-align:center;font-variant-nu
   <audio id="unterwegsSound" src="unterwegs.mp3"  preload="auto"></audio>
   <audio id="timer160Sound"  src="Ankunft.mp3"    preload="auto"></audio>
   <audio id="deliveredSound" src="Geliefert.mp3"  preload="auto"></audio>
-  <audio id="custOrderSound" src="neu1.mp3" preload="auto"></audio>
   <input id="soundPicker" type="file" accept="audio/mpeg" multiple style="display:none">
-
 
 <script type="module">
 /* ================= Firebase Core ================= */
@@ -950,12 +948,10 @@ const firebaseConfig = {
 
 import { initializeApp, getApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import {
-  initializeFirestore, collection, collectionGroup, doc, setDoc, getDoc, updateDoc, serverTimestamp,
-  onSnapshot, query, where, orderBy, limit, getDocs, startAfter, getCountFromServer
+  initializeFirestore, collection, doc, setDoc, getDoc, serverTimestamp,
+  onSnapshot, query, where, orderBy, limit, getDocs, startAfter,
+  getCountFromServer, collectionGroup, updateDoc
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-
-
-
 
 import { getDatabase, ref as rRef, get as rGet, onValue as rOn, off as rOff } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, setPersistence, browserLocalPersistence } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
@@ -1391,7 +1387,7 @@ onAuthStateChanged(auth, async (user)=>{
     showAuth(false);
     ensureRestaurantGeocoded();
     attachMyTotalsAndLast();
-	attachCustomerOrdersListener(RESTAURANT_ID);
+	    attachCustomerOrdersListener();   // <= NEW
 
   }catch(e){
     console.error('auth flow error', e);
@@ -3353,148 +3349,101 @@ const codBadge  = (!isSingle && codAny)
   });
 })();
 
-/* ===== Customer Orders (Costumers → orders subcollection) — modal + listener ===== */
-const custModal   = document.getElementById('custOrderModal');
-const custBody    = document.getElementById('custOrderBody');
-const custClose   = document.getElementById('custClose');
-const custPrep    = document.getElementById('custPrepMins');
-const custAccept  = document.getElementById('custAccept');
-const custReject  = document.getElementById('custReject');
-const custSound   = document.getElementById('custOrderSound');
+// ===== Customer Orders (Costumers/*/orders) — modal + listener =====
+let CUST_ORDERS_UNSUB = null;
+let CUST_WARMED = false;
+let CUST_LAST_DOC = null;
 
-let __custCurrentDoc = null;
+function showCustOrder(docSnap){
+  CUST_LAST_DOC = docSnap;
+  const o = docSnap.data() || {};
+  const id = docSnap.id;
 
-function custShow(){ if(custModal) custModal.style.display='flex'; }
-function custHide(){ if(custModal) custModal.style.display='none'; __custCurrentDoc = null; }
-custClose?.addEventListener('click', custHide);
+  // حقول متاحة من إنشاء الزبون (كما في قواعدك): restaurantId, restaurantName, type, status, pricing, items, createdAt
+  const type   = o.type || '—';
+  const status = o.status || '—';
+  const rname  = o.restaurantName || '—';
+  const total  = (o.pricing && (o.pricing.total || o.pricing.price)) || o.price || 0;
+  const itemsN = Array.isArray(o.items) ? o.items.length : 0;
+  const created= (o.createdAt && o.createdAt.toDate) ? o.createdAt.toDate().toLocaleString('de-DE') : '—';
 
-function renderCustOrder(o){
-  const items = Array.isArray(o.items) ? o.items : [];
-  const itemsHtml = items.map(it=>`
-    <div style="display:flex;gap:8px;justify-content:space-between;border-bottom:1px solid #eee;padding:4px 0">
-      <div>x${Number(it?.qty||0)}</div>
-      <div style="flex:1">${it?.name || '—'}</div>
-      <div class="mono">${money(Number(it?.price||0))}</div>
-    </div>
-  `).join('');
-  const addr = o.customer?.address_text || o.address_text || '';
-  const phone= o.customer?.phone || o.phone || '';
-  const cname= o.customer?.name || o.name || '';
-
-  custBody.innerHTML = `
-    <div class="grid" style="row-gap:8px">
-      <div><span class="small">Restaurant</span><div><b>${o.restaurantName||hiddenDefaults?.Restaurant_Name||'—'}</b></div></div>
-      <div><span class="small">Kunde</span><div>${cname || '—'} ${phone? '• '+phone:''}</div></div>
-      <div><span class="small">Typ</span><div>${o.type||'—'}</div></div>
-      <div><span class="small">Summe</span><div>
-        <b>${money(Number(o.pricing?.subtotal||0))}</b>
-        + Lieferung ${money(Number(o.pricing?.deliveryFee||0))}
-      </div></div>
-      ${addr ? `<div class="small" style="opacity:.8">${addr}</div>` : ''}
-      <div style="margin-top:6px"><span class="small">Artikel</span>${itemsHtml || '<div class="small">—</div>'}</div>
-    </div>
+  // بناء تفاصيل خفيفة
+  const body = document.getElementById('custOMBody');
+  body.innerHTML = `
+    <dl class="od-dl">
+      <dt>Order ID</dt><dd>${id}</dd>
+      <dt>Restaurant</dt><dd>${rname}</dd>
+      <dt>Typ</dt><dd>${type}</dd>
+      <dt>Status</dt><dd>${status}</dd>
+      <dt>Items</dt><dd>${itemsN}</dd>
+      <dt>Total</dt><dd>${(Number(total)||0).toLocaleString('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2})}€</dd>
+      <dt>Erstellt</dt><dd>${created}</dd>
+    </dl>
   `;
+
+  const modal = document.getElementById('custOrderModal');
+  if(modal) modal.style.display = 'flex';
 }
 
-async function createLogisticOrderFromCustomerOrder(custOrder, prepMinutes){
-  const rid = RESTAURANT_ID;
-  const rDoc = await getDoc(doc(db, 'restaurants', rid));
-  const rest = rDoc.exists() ? rDoc.data() : {};
-
-  const qty = (custOrder.items||[]).reduce((s,it)=> s + Number(it?.qty||0), 0);
-  const price       = Number(custOrder.pricing?.subtotal   || 0) || 0;
-  const deliveryFee = Number(custOrder.pricing?.deliveryFee|| 0) || 0;
-
-  const nr = await nextSerialForRestaurant(rid);
-  const orderRef = doc(collection(db, 'orders'));
-
-  await setDoc(orderRef, {
-    nr,
-    status: 'Bearbeitung',
-    platform: ['App'],
-    qty: Number(qty)||0,
-    price,
-    deliveryFee,
-    pickupTime: null,
-    restaurant: {
-      id: rid,
-      name: rest.name || hiddenDefaults?.Restaurant_Name || '',
-      phone: rest.phone || hiddenDefaults?.Telefon || '',
-      address_text: rest.address_text || hiddenDefaults?.Restaurant_Adresse || ''
-    },
-    customer: {
-      id: custOrder.customer?.id || null,
-      name: custOrder.customer?.name || custOrder.name || null,
-      phone: custOrder.customer?.phone || custOrder.phone || null,
-      address_text: custOrder.customer?.address_text || custOrder.address_text || null
-    },
-    items: custOrder.items || [],
-    createdAt: serverTimestamp(),
-    updatedAt: serverTimestamp()
-  });
-
-  return orderRef.id;
+function hideCustOrder(){
+  const modal = document.getElementById('custOrderModal');
+  if(modal) modal.style.display = 'none';
+  CUST_LAST_DOC = null;
 }
 
-function openCustModal(docSnap){
-  const data = docSnap.data();
-  __custCurrentDoc = docSnap;
-
-  try { custSound.currentTime = 0; custSound.play().catch(()=>{}); } catch(_){}
-
-  renderCustOrder(data);
-  custPrep.value = '';
-
-  custAccept.onclick = async ()=>{
-    custAccept.disabled = true; custReject.disabled = true;
-    try{
-      const mins = Number(custPrep.value||0);
-      const logisticId = await createLogisticOrderFromCustomerOrder(data, mins);
-      await updateDoc(docSnap.ref, {
-        status: 'accepted',
-        prepMinutes: mins,
-        logisticOrderId: logisticId,
-        updatedAt: serverTimestamp()
-      });
-      custHide();
-    }catch(e){
-      console.error(e);
-      alert('Akzeptieren fehlgeschlagen.');
-    }finally{
-      custAccept.disabled = false; custReject.disabled = false;
-    }
-  };
-
-  custReject.onclick = async ()=>{
-    custAccept.disabled = true; custReject.disabled = true;
-    try{
-      await updateDoc(docSnap.ref, { status:'rejected', updatedAt: serverTimestamp() });
-      custHide();
-    }catch(e){
-      console.error(e);
-      alert('Ablehnen fehlgeschlagen.');
-    }finally{
-      custAccept.disabled = false; custReject.disabled = false;
-    }
-  };
-
-  custShow();
-}
-
-function attachCustomerOrdersListener(rid){
-  if(!rid) return;
-  // Costumers/{uid}/orders (collectionGroup)
-  const qy = query(
-    collectionGroup(db, 'orders'),
-    where('restaurantId', '==', rid),
-    where('status', '==', 'pending'),
-    orderBy('createdAt', 'desc'),
-    limit(20)
-  );
-  onSnapshot(qy, (snap)=>{
-    snap.docChanges().forEach(ch=>{
-      if(ch.type === 'added'){ openCustModal(ch.doc); }
+// أزرار المنبثق
+document.getElementById('custOMClose')?.addEventListener('click', hideCustOrder);
+document.getElementById('custOMCancel')?.addEventListener('click', async ()=>{
+  try{
+    if(!CUST_LAST_DOC) return;
+    await updateDoc(CUST_LAST_DOC.ref, {
+      status: 'Abgebrochen',
+      updatedAt: serverTimestamp()
     });
+  }catch(e){ console.error(e); }
+  hideCustOrder();
+});
+document.getElementById('custOMAccept')?.addEventListener('click', async ()=>{
+  try{
+    if(!CUST_LAST_DOC) return;
+    const mins = Math.max(0, parseInt(document.getElementById('custOMPrep')?.value || '0', 10) || 0);
+    await updateDoc(CUST_LAST_DOC.ref, {
+      status: 'Angenommen',
+      prepMinutes: mins,
+      acceptedAt: serverTimestamp(),
+      updatedAt: serverTimestamp()
+    });
+  }catch(e){ console.error(e); }
+  hideCustOrder();
+});
+
+// مستمع collectionGroup لكل أوامر الزبائن التي تخص هذا المطعم
+function attachCustomerOrdersListener(){
+  if(CUST_ORDERS_UNSUB){ CUST_ORDERS_UNSUB(); CUST_ORDERS_UNSUB = null; }
+  if(!RESTAURANT_ID) return;
+
+  // بدون orderBy لتفادي بناء فهارس إضافية الآن
+  const q = query(collectionGroup(db, 'orders'), where('restaurantId','==', RESTAURANT_ID));
+
+  CUST_WARMED = false;
+  CUST_ORDERS_UNSUB = onSnapshot(q, (snap)=>{
+    if(!CUST_WARMED){
+      // تجاهل اللقطة الأولى (موجودات قديمة) — نريد المنبثق فقط على الطلبات المُضافة لاحقًا
+      CUST_WARMED = true;
+      return;
+    }
+    snap.docChanges().forEach(ch=>{
+      if(ch.type === 'added'){
+        const o = ch.doc.data() || {};
+        const st = String(o.status || '');
+        // نفتح المنبثق فقط عندما يكون الطلب في حالته الابتدائية (قيد المعالجة/إنشاء)
+        if(st === 'Bearbeitung' || st === 'pending' || st === 'Neu' || st === ''){
+          showCustOrder(ch.doc);
+        }
+      }
+    });
+  }, (err)=>{
+    console.error('Customer orders listener error:', err);
   });
 }
 
