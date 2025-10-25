@@ -198,13 +198,7 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
 /* Cart (مختصر) */
 .cart{ padding:12px; background:#fff; max-height:60vh; overflow:auto }
 /* صورة + تفاصيل + كمية + المجموع */
-.cart-row{
-  display:grid;
-  grid-template-columns: 64px 1fr auto auto;
-  gap:8px;
-  border-bottom:1px solid #eee;
-  padding:8px 0;
-}
+
 
 /* مصغّر المنتج داخل السلة */
 .cart-thumb{
@@ -500,12 +494,85 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
   #top-rest-products .rail-nav,
   #hot-rest-products .rail-nav{ display: none; }
 }
+/* Auth dialog */
+.auth-dlg.dlg{ width:min(560px,96%) }
+.tabs{ display:flex; gap:6px; padding:8px; background:#f6f8fc; border-bottom:1px solid #e5e7eb }
+.tab{ flex:1; padding:10px; border-radius:10px; border:1px solid #e5e7eb; background:#fff; font-weight:800; text-align:center; cursor:pointer }
+.tab.active{ background:#e6f7fb; border-color:#aee7f5 }
+.auth-body{ padding:12px; background:#fff; display:flex; flex-direction:column; gap:10px }
+.field{ display:flex; flex-direction:column; gap:4px }
+.field label{ font-size:12px; color:#555 }
+.field input{ height:40px; border:1px solid #e5e7eb; border-radius:10px; padding:0 10px }
+/* === User side panel === */
+.backdrop{
+  position:fixed; inset:0; background:rgba(0,0,0,.45);
+  opacity:0; pointer-events:none; transition:.2s; z-index:50;
+}
+.backdrop.show{ opacity:1; pointer-events:auto }
+
+.sidepanel{
+  position:fixed; top:0; right:-360px; width:min(360px,92vw); height:100%;
+  background:#fff; border-left:1px solid rgba(0,0,0,.1);
+  box-shadow:-12px 0 28px rgba(0,0,0,.18);
+  transition:right .25s ease; z-index:60; display:flex; flex-direction:column;
+}
+.sidepanel.open{ right:0 }
+.sidepanel-head{
+  display:flex; align-items:center; justify-content:space-between;
+  padding:12px; background:var(--bar); color:#fff
+}
+.sidepanel-body{ padding:12px; display:flex; flex-direction:column; gap:10px }
+.user-row{ display:flex; align-items:center; gap:10px }
+.user-ava{
+  width:40px; height:40px; border-radius:999px; background:#e5e7eb;
+  display:inline-flex; align-items:center; justify-content:center; font-weight:800
+}
+.user-meta{ display:flex; flex-direction:column; line-height:1.2 }
+/* User panel tabs */
+.user-tabs{display:flex; gap:6px; padding:8px; background:#f6f8fc; border-bottom:1px solid #e5e7eb}
+.user-tab{flex:1; padding:10px; border-radius:10px; border:1px solid #e5e7eb; background:#fff; font-weight:800; text-align:center; cursor:pointer}
+.user-tab.active{background:#e6f7fb; border-color:#aee7f5}
+#userTabBody{
+  padding:12px;
+  background:#fff;
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+
+  /* جديد: يخليه ياخذ الفراغ العمودي ويصير قابل للتمرير */
+  flex: 1 1 auto;
+  overflow: auto;
+
+  /* إخفاء شريط التمرير (Firefox/Edge/IE/WebKit) */
+  scrollbar-width: none;           /* Firefox */
+  -ms-overflow-style: none;        /* IE/Edge */
+  -webkit-overflow-scrolling: touch; /* سلاسة على iOS */
+}
+#userTabBody::-webkit-scrollbar{   /* Chrome/Safari */
+  width: 0;
+  height: 0;
+}
+/* Orders list */
+.order-card{border:1px solid #e5e7eb; border-radius:10px; padding:10px; display:flex; align-items:center; justify-content:space-between; gap:10px; background:#fff}
+.order-meta{display:flex; flex-direction:column; gap:4px}
+.order-title{font-weight:800}
+.order-sub{font-size:12px; color:#666}
+.badge-st{font-size:12px; padding:2px 8px; border-radius:999px; border:1px solid #e5e7eb; background:#f9fafb}
+/* Profile form */
+.prof-field{display:flex; flex-direction:column; gap:4px}
+.prof-field label{font-size:12px; color:#555}
+.prof-field input{height:40px; border:1px solid #e5e7eb; border-radius:10px; padding:0 10px}
+.prof-grid{display:grid; grid-template-columns:1fr 1fr; gap:10px}
+@media (max-width:720px){ .prof-grid{grid-template-columns:1fr} }
 
 </style>
 
 <!-- Firebase Compat -->
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-functions-compat.js"></script>
+
 <script>
   const firebaseConfig = {
     apiKey: "AIzaSyD0g9T3amjuPodsLS6ZQkHYWrzV1UrX_QI",
@@ -516,9 +583,44 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
     appId: "1:583536892937:web:5d5ff133de4d8b3b28ecd8",
     databaseURL: "https://taussil-lieferservice-8bbe9-default-rtdb.europe-west1.firebasedatabase.app"
   };
-  try{ firebase.initializeApp(firebaseConfig); }catch(e){}
+
+  try { firebase.initializeApp(firebaseConfig); } catch(e) {}
+
+  // ثبّت الذاكرة محلياً حتى لا تضيع جلسة الضيف/المستخدم
+  firebase.auth()
+    .setPersistence(firebase.auth.Auth.Persistence.LOCAL)
+    .catch(()=>{ /* تجاهل */ });
 </script>
 </head>
+<div id="backdrop" class="backdrop"></div>
+
+<aside id="userPanel" class="sidepanel" aria-hidden="true">
+  <div class="sidepanel-head">
+    <div class="dlg-title">Profil</div>
+    <button id="userClose" class="btn">✕</button>
+  </div>
+  <div class="user-tabs">
+  <button class="user-tab active" data-ut="orders">Bestellungen</button>
+  <button class="user-tab" data-ut="profile">Profil Bearbeiten</button>
+</div>
+<div id="userTabBody"><!-- يملأه الجافاسكربت --></div>
+
+  <div class="sidepanel-body">
+    <div class="user-row">
+      <div id="userAva" class="user-ava">👤</div>
+      <div class="user-meta">
+        <strong id="userName">—</strong>
+        <small id="userEmail" class="small" style="color:#666">—</small>
+      </div>
+    </div>
+
+    <hr style="border:none;border-top:1px solid #eee">
+
+    <!-- زر تسجيل الخروج -->
+    <button id="btnLogout" class="btn" style="width:100%">Abmelden</button>
+  </div>
+</aside>
+
 <body>
 <div class="app">
   <!-- Topbar -->
@@ -534,6 +636,12 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
         <option value="ar">العربية</option>
         <option value="tr">Türkçe</option>
       </select>
+	  <button id="userBtn" class="btn" title="Profil">
+  <!-- أيقونة مستخدم بسيطة (SVG) -->
+  <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
+    <path d="M12 12a5 5 0 1 0-5-5 5 5 0 0 0 5 5zm0 2c-5.33 0-8 2.67-8 6v1h16v-1c0-3.33-2.67-6-8-6z"/>
+  </svg>
+</button>
       <button id="viewCart" class="btn-cta">Warenkorb (0)</button>
     </div>
   </div>
@@ -663,6 +771,19 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
     <button id="checkout" class="btn-cta">Bestellung bestätigen</button>
   </div>
 </dialog>
+<!-- Order details dialog -->
+<dialog id="orderDialog" class="dlg">
+  <div class="dlg-head">
+    <div class="dlg-title" id="ordDlgTitle">Details</div>
+    <button id="ordDlgClose" class="btn">✕</button>
+  </div>
+  <div id="ordDlgBody" style="padding:12px;background:#fff;max-height:60vh;overflow:auto"></div>
+  <div class="cart-foot">
+    <div id="ordDlgTotal" class="total">—</div>
+    <button id="ordDlgReorder" class="btn-cta">Nochmal Bestellen</button>
+  </div>
+</dialog>
+
 <!-- Configurator dialog -->
 <dialog id="cfgDialog" class="cfg">
   <div class="cfg-head">
@@ -680,6 +801,52 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
       </div>
       <button id="cfgDone" class="btn-cta" disabled>OK</button>
     </div>
+  </div>
+</dialog>
+<!-- Auth dialog -->
+<dialog id="authDialog" class="dlg auth-dlg">
+  <div class="dlg-head">
+    <div class="dlg-title">Anmeldung</div>
+    <button id="authClose" class="btn">✕</button>
+  </div>
+
+  <div class="tabs">
+    <button class="tab active" data-tab="login">Anmelden</button>
+    <button class="tab" data-tab="register">Registrieren</button>
+    <button class="tab" data-tab="guest">Als Gast bestellen</button>
+  </div>
+
+  <div class="auth-body">
+    <!-- login -->
+    <form id="frmLogin" data-panel="login">
+      <div class="field"><label>Email</label><input type="email" id="loginEmail" required></div>
+      <div class="field"><label>Password</label><input type="password" id="loginPass" required></div>
+      <button class="btn-cta" type="submit">Anmelden</button>
+    </form>
+
+    <!-- register -->
+    <form id="frmRegister" data-panel="register" style="display:none">
+  <div class="field"><label>Vorname</label><input type="text" id="regFirst" required></div>
+  <div class="field"><label>Nachname</label><input type="text" id="regLast" required></div>
+  <div class="field"><label>Email</label><input type="email" id="regEmail" required></div>
+  <div class="field"><label>Rufnummer</label><input type="tel" id="regPhone" required></div>
+  <div class="field"><label>Straße und Hausnummer</label><input type="text" id="regStreet" required></div>
+  <div class="field"><label>PLZ</label><input type="text" id="regZip" required></div>
+  <div class="field"><label>Password</label><input type="password" id="regPass" required minlength="6"></div>
+  <button class="btn-cta" type="submit">Regestrieren</button>
+</form>
+
+
+    <!-- guest -->
+    <form id="frmGuest" data-panel="guest" style="display:none">
+  <div class="field"><label>Vorname</label><input type="text" id="gstFirst" required></div>
+  <div class="field"><label>Nachname</label><input type="text" id="gstLast" required></div>
+  <div class="field"><label>Rufnummer</label><input type="tel" id="gstPhone" required></div>
+  <div class="field"><label>Straße und Hausnummer</label><input type="text" id="gstStreet" required></div>
+  <div class="field"><label>PLZ</label><input type="text" id="gstZip" required></div>
+  <button class="btn-cta" type="submit">Als Gast fortfahren</button>
+</form>
+
   </div>
 </dialog>
 
@@ -814,6 +981,10 @@ const eur = n=> new Intl.NumberFormat(LANG==='tr'?'tr-TR':LANG==='ar'?'ar-EG':LA
 const esc = s=> String(s||'').replace(/[&<>"']/g, m=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[m]));
 const lastPart = t=> (String(t||'').split(',').map(s=>s.trim()).pop()||'');
 const isOpenNow = r=> typeof r.isOpen==='boolean'?r.isOpen:(r.status==='active');
+function getCartRestaurant(){ 
+  return CART_INFO || null; 
+}
+
 // --- discounts (restaurant vs product) ---
 function getRestaurantDiscount(r){
   const raw = (r.discountPercent ?? r.discount ?? r?.promo?.discountPercent ?? null);
@@ -851,6 +1022,182 @@ function getProductDiscount(p){
     return Number.isFinite(n) ? n : 0;
   }
   return 0;
+}
+// ===== تفاصيل الطلب =====
+
+async function fillOrderDialogUI(o, docId){
+  const title = document.getElementById('ordDlgTitle');
+  const body  = document.getElementById('ordDlgBody');
+  const total = document.getElementById('ordDlgTotal');
+
+  const when = fmtDate(o.createdAt);
+  const rname = o.restaurantName || o.restaurantId || '—';
+  const type  = (o.type==='pickup') ? T('pickup') : T('delivery');
+  const status= o.status || '—';
+  const items = Array.isArray(o.items) ? o.items : [];
+
+  title.textContent = `#${docId.slice(0,6)} – ${rname}`;
+  total.textContent = T('sum')(
+    eur( (o.pricing && Number.isFinite(+o.pricing.total)) ? Number(o.pricing.total) : 0 )
+  );
+
+  const frag = document.createDocumentFragment();
+
+  const meta = document.createElement('div');
+  meta.className = 'small';
+  meta.style.cssText = 'margin-bottom:10px; color:#555';
+  meta.innerHTML = `
+    <div><strong>Status:</strong> ${esc(status)}</div>
+    <div><strong>Methode:</strong> ${esc(type)}</div>
+    <div><strong>Datum:</strong> ${esc(when)}</div>
+  `;
+  frag.appendChild(meta);
+
+  // ابنِ كل عنصر مع صورته
+  for (const it of items){
+    const row = document.createElement('div');
+    row.className = 'cart-row';
+    row.style.borderBottom = '1px dashed #eee';
+
+    const lineTotal = Number(it.unit||0) * Number(it.qty||0);
+
+    // حمّل الصورة (قد ترجع فارغة إذا المنتج محذوف/قديم)
+    let imgUrl = '';
+    if (o.restaurantId && (it.productId || it.pid)){
+      imgUrl = await getProductImage(o.restaurantId, it.productId || it.pid);
+    }
+    const imgHtml = imgUrl
+      ? `<img class="cart-thumb" src="${esc(imgUrl)}" alt="">`
+      : `<div class="cart-thumb" style="display:flex;align-items:center;justify-content:center;font-size:12px;color:#888">🍽️</div>`;
+
+    // ملخص الخيارات
+    let optsHtml = '';
+    if (Array.isArray(it.options) && it.options.length){
+      const lines = [];
+      it.options.forEach(g=>{
+        const parts = (g.items||[]).map(m => `${m.name} ×${m.qty||1}`).join(', ');
+        if (parts) lines.push(`${g.group||''}: ${parts}`);
+      });
+      if (lines.length){
+        optsHtml = `<div class="small" style="color:#666">${esc(lines.join(' • '))}</div>`;
+      }
+    }
+
+    row.innerHTML = `
+      ${imgHtml}
+      <div>
+        <strong class="line-1">${esc(it.name||'(—)')}</strong>
+        ${optsHtml}
+      </div>
+      <div class="cart-right">
+        <div><strong>${eur(lineTotal)}</strong></div>
+        <div class="q"><span>x ${Number(it.qty||0)}</span></div>
+      </div>
+    `;
+    frag.appendChild(row);
+  }
+
+  // الصندوق السفلي (المجموع/التوصيل)
+  const sumBox = document.createElement('div');
+  sumBox.className = 'small';
+  sumBox.style.cssText = 'margin-top:8px;padding:10px 12px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;display:flex;flex-direction:column;gap:6px';
+  const sub = (o.pricing && Number.isFinite(+o.pricing.itemsSubtotal)) ? Number(o.pricing.itemsSubtotal) : items.reduce((s,x)=>s + (Number(x.unit||0)*Number(x.qty||0)),0);
+  const fee = (o.pricing && Number.isFinite(+o.pricing.deliveryFee)) ? Number(o.pricing.deliveryFee) : 0;
+  sumBox.innerHTML = `
+    <div>${T('subtotal')(eur(sub))}</div>
+    ${o.type==='pickup' ? `<div style="color:#16a34a;font-weight:800">${T('pickup')}</div>` : `<div>${T('delivery')}: <strong>${eur(fee)}</strong></div>`}
+  `;
+  frag.appendChild(sumBox);
+
+  body.innerHTML = '';
+  body.appendChild(frag);
+}
+
+
+async function openOrderDialog(oid){
+  try{
+    const u = firebase.auth().currentUser;
+    if (!u) { openAuthDialog(); return; }
+    const ref = fs.collection('Costumers').doc(u.uid).collection('orders').doc(oid);
+    const snap = await ref.get();
+    if (!snap.exists){ alert('الطلب غير موجود'); return; }
+    const o = snap.data() || {};
+    fillOrderDialogUI(o, oid);
+
+    // ربط الأزرار
+    const dlg = document.getElementById('orderDialog');
+    document.getElementById('ordDlgClose').onclick = ()=> dlg.close();
+    document.getElementById('ordDlgReorder').onclick = ()=> reorderFromOrder(o);
+    dlg.showModal();
+  }catch(e){
+    alert(e?.message || String(e));
+  }
+}
+
+// ===== إعادة الطلب =====
+// سنُعيد بناء السلة من نفس العناصر المخزّنة بالطلب (بأسعارها المخزنة)
+// ثم نفتح سلة الشراء ليتأكد المستخدم ويُكمل.
+async function reorderFromOrder(o){
+  try{
+    // مسح السلة الحالية
+    CART = [];
+    CART_INFO = null;
+    PICKUP = (o.type === 'pickup');
+
+    // حاول جلب رسوم المطعم الحالية، وإلا استخدم المخزّن في الطلب
+    let rid = o.restaurantId || '';
+    let rname = o.restaurantName || '';
+    let deliveryFee = (o.pricing && Number.isFinite(+o.pricing.deliveryFee)) ? Number(o.pricing.deliveryFee) : 0;
+    let isOpen = true;
+    let pickupLocked = false;
+
+    if (rid){
+      try{
+        const rDoc = await fs.collection('restaurants').doc(rid).get();
+        if (rDoc.exists){
+          const r = rDoc.data()||{};
+          rname = r.name || rname;
+          deliveryFee = Number(r.flatDelivery ?? r.deliveryFlat ?? r.deliveryFee ?? deliveryFee) || 0;
+          isOpen = !!isOpenNow(r);
+          pickupLocked = (r.acceptOrders === false);
+          if (pickupLocked) PICKUP = true; // لو المطعم لا يقبل أونلاين
+        }
+      }catch(_){}
+    }
+
+    CART_INFO = {
+      rid, rname,
+      delivery: deliveryFee,
+      minOrder: 0, // لا نفرض حد أدنى عند إعادة الطلب (يمكنك جلبه إن أحببت)
+      isOpen,
+      pickupLocked
+    };
+
+    // بناء العناصر
+    const items = Array.isArray(o.items) ? o.items : [];
+    items.forEach(it=>{
+      const key = `${rid||'__'}::${it.productId||it.name||Math.random().toString(36).slice(2)}`;
+      CART.push({
+        key,
+        rid: rid||'__',
+        rname: rname||'',
+        pid: it.productId || '',
+        title: it.name || '',
+        price: Number(it.unit||0),   // نستخدم سعر الوحدة المخزّن
+        unitOld: null,
+        discPct: 0,
+        qty: Number(it.qty||0),
+        img: '',
+        // نعيد تمرير الخيارات كنص فقط (التسعير محسوب في unit)
+        opts: Array.isArray(it.options) ? it.options : []
+      });
+    });
+
+    updateCartBadge();
+    openCart();
+  }catch(e){
+    alert(e?.message || String(e));
+  }
 }
 
 // price builder (old+new) — supports "from" label
@@ -1354,49 +1701,40 @@ function renderProductDealsGrid(list){
 
 // تحميل منتجات عليها حسومات (عبر كل المطاعم المحمّلة)
 async function loadProductDeals(){
-  if(!Array.isArray(RESTAURANTS) || !RESTAURANTS.length){ renderProductDealsRail([]); return; }
-
-  const deals = [];
-
-  // اجلب من كل مطعم منتجاته، التقط المخفَّض فقط، ثم قصّ إلى عدد معقول
-  for (const r of RESTAURANTS){
-    try{
-      const snap = await fs.collection('restaurants').doc(r.id).collection('products').get();
-      snap.forEach(d=>{
-        const p = { id:d.id, ...d.data() };
-        // احسب الخصم الفعّال لهذا المنتج
-       const prodPct = getProductDiscount(p);
-const restPct = getRestaurantDiscount(r);
-
-        const eff = prodPct > 0 ? prodPct : restPct;
-        if (eff > 0){
-          deals.push({ r, p, eff });
-        }
-      });
-    }catch(_){}
-    // حد أعلى للحِمل
-    if (deals.length >= 48) break;
+  if(!Array.isArray(RESTAURANTS) || !RESTAURANTS.length){
+    renderProductDealsGrid([]);
+    return;
   }
 
-  // رتب حسب أعلى خصم وخذ أفضل 24
+  const MAX = 48;       // أقصى ما نجمع قبل الفرز
+  const BATCH = 6;      // توازي آمن
+
+  const deals = [];
+  for (let i=0; i<RESTAURANTS.length; i+=BATCH){
+    const chunk = RESTAURANTS.slice(i, i+BATCH);
+    const results = await Promise.all(chunk.map(r =>
+      fs.collection('restaurants').doc(r.id).collection('products').get()
+        .then(s => ({ r, s }))
+        .catch(() => null)
+    ));
+
+    for (const res of results){
+      if (!res) continue;
+      const { r, s } = res;
+      s.forEach(d => {
+        const p = { id: d.id, ...d.data() };
+        const eff = Math.max(getProductDiscount(p), getRestaurantDiscount(r));
+        if (eff > 0) deals.push({ r, p, eff });
+      });
+      if (deals.length >= MAX) break;
+    }
+    if (deals.length >= MAX) break;
+  }
+
   deals.sort((a,b)=> b.eff - a.eff);
-renderProductDealsGrid(deals.slice(0,24));  // ← بدل renderProductDealsRail(...)
-
-// احذف/لا تضف أي منطق لأسهم التنقل - لم نعد بحاجة لها
-
-
-  // فعل أسهم التنقل لهذه السكة (مرة واحدة كفاية)
-  document.querySelectorAll('.rail-nav[data-nav="pdeal"]').forEach(btn=>{
-    if(btn.dataset.bound) return;
-    btn.dataset.bound = '1';
-    btn.addEventListener('click', ()=>{
-      const el = document.getElementById('railProdDeals');
-      if(!el) return;
-      const dir = btn.classList.contains('next') ? 1 : -1;
-      el.scrollBy({ left: dir * (el.clientWidth * 0.9), behavior:'smooth' });
-    });
-  });
+  renderProductDealsGrid(deals.slice(0,24));
 }
+
 
 // === Helper: جلب منتجات المطعم (مع كاش)
 async function getRestaurantProductsCached(rid){
@@ -1413,6 +1751,45 @@ async function getRestaurantProductsCached(rid){
 PROD_CACHE.set(rid, { ...old, prods });
 
   return prods;
+}
+// كاش صور المنتجات
+const PRODUCT_IMAGE_CACHE = new Map(); // key = `${rid}::${pid}` => url
+
+// انتزاع رابط صورة من وثيقة منتج
+function pickProductImage(p){
+  return (Array.isArray(p?.images) && p.images[0]) ? p.images[0]
+       : (typeof p?.img === 'string' && p.img) ? p.img
+       : (typeof p?.imageUrl === 'string' && p.imageUrl) ? p.imageUrl
+       : '';
+}
+
+// جلب صورة منتج (مع كاش) من مطعم معيّن
+async function getProductImage(rid, pid){
+  const key = `${rid}::${pid}`;
+  if (PRODUCT_IMAGE_CACHE.has(key)) return PRODUCT_IMAGE_CACHE.get(key);
+
+  // جرّب أولًا الكاش العام للمنتجات
+  try{
+    const cached = PROD_CACHE.get(rid);
+    if (cached?.prods?.length){
+      const p = cached.prods.find(x => x.id === pid);
+      const url = pickProductImage(p||{});
+      PRODUCT_IMAGE_CACHE.set(key, url);
+      return url;
+    }
+  }catch(_){}
+
+  // لو مش موجودة، حمّل المنتجات لهذا المطعم مرّة واحدة ثم ابحث
+  try{
+    const prods = await getRestaurantProductsCached(rid);
+    const p = prods.find(x => x.id === pid);
+    const url = pickProductImage(p||{});
+    PRODUCT_IMAGE_CACHE.set(key, url);
+    return url;
+  }catch(_){
+    PRODUCT_IMAGE_CACHE.set(key, '');
+    return '';
+  }
 }
 
 // === Helper: بناء بطاقة منتج صغيرة لسكة المنتجات
@@ -1507,19 +1884,16 @@ async function showHotRestaurantProductsById(rid){
 function initHotProdArrows(){
   const rail = document.getElementById('hotRestProd');
   if(!rail) return;
+
   const btnPrev = document.querySelector('[data-nav="hotprod-prev"]');
   const btnNext = document.querySelector('[data-nav="hotprod-next"]');
-  if(!btnPrev || !btnNext) return;
+  if(!btnPrev || !btnNext || btnPrev.dataset.bound === '1') return;
 
-  const scrollStep = 320; // px per click
-
-  btnPrev.addEventListener('click', ()=>{
-    rail.scrollBy({ left: -scrollStep, behavior: 'smooth' });
-  });
-  btnNext.addEventListener('click', ()=>{
-    rail.scrollBy({ left: scrollStep, behavior: 'smooth' });
-  });
+  btnPrev.dataset.bound = '1';
+  btnNext.dataset.bound = '1';
+  // ... (أكمل كما هو عندك)
 }
+
 
 // === احسب المطعم الواقع في منتصف سكة HOT
 function getCenteredHotRid(){
@@ -1541,7 +1915,10 @@ function getCenteredHotRid(){
 // === استمع لتمرير سكة HOT وحدّث السكشن
 function initHotCenterTracking(){
   const rail = document.getElementById('railHot');
-  if(!rail) return;
+  if(!rail || rail.dataset.bound === '1') return;
+  rail.dataset.bound = '1';
+  // ... (أكمل كما هو عندك)
+
 
   // حدّث dataset.rid على بطاقات HOT (يُستدعى بعد رسمها)
   // (لو كانت محددة مسبقًا نتجاهل)
@@ -1613,41 +1990,6 @@ PROD_CACHE.set(rid, { ...existing, cats, prods });
 renderMenu(r, cats, prods);
 
 }
-// إعادة بناء عرض القائمة عند تغيير الحجم (لو الديالوج مفتوح)
-(function(){
-    let lastW = window.innerWidth;
-  window.addEventListener('resize', ()=>{
-    if (!dlg || !dlg.open || !ridOpen) return;
-
-    // على الجوال تغيّر الارتفاع شائع؛ لا نعيد الرسم إن لم يتغير العرض فعلياً
-    const w = window.innerWidth;
-    if (Math.abs(w - lastW) < 40) return;  // تجاهل اختلافات بسيطة
-    lastW = w;
-
-    // لو العرض حاليًا جوال، لا تعيد الرسم (تجنب رست الفئة)
-    if (window.matchMedia('(max-width: 900px)').matches) return;
-
-    clearTimeout(t);
-    t = setTimeout(async ()=>{
-      try{
-        const rDoc = await fs.collection('restaurants').doc(ridOpen).get();
-        if(!rDoc.exists) return;
-        const r = { id: ridOpen, ...rDoc.data() };
-
-        let cats = [], prods = [];
-        const cs = await fs.collection('restaurants').doc(ridOpen).collection('categories').get();
-        cs.forEach(d=> cats.push({id:d.id, ...d.data()}));
-        const ps = await fs.collection('restaurants').doc(ridOpen).collection('products').get();
-        ps.forEach(d=> prods.push({id:d.id, ...d.data()}));
-        prods = prods.filter(p=> p.isAvailable !== false);
-
-        // إعادة الرسم بحفاظ على الفئة (renderMenu صار يتكفّل بها للجوال)
-        renderMenu(r, cats.sort((a,b)=>(a.sort??0)-(b.sort??0)), prods);
-      }catch(_){}
-    }, 200);
-  });
-
-})();
 
 function renderMenu(r, cats, prods){
   const body = document.getElementById('menuBody');
@@ -2118,11 +2460,282 @@ function updateTotal(){
 }
 
 
-function checkout(){
+async function checkout(){
   if(!CART.length){ toast(T('emptyCart')); return; }
-  const payload={ createdAt:new Date().toISOString(), lang:LANG, items:CART.map(x=>({restaurantId:x.rid,productId:x.pid,title:x.title,qty:x.qty,price:x.price})), total:CART.reduce((s,x)=>s+x.qty*x.price,0) };
-  console.log('ORDER_DRAFT', payload); alert('Order draft prepared (Console). Connect backend to place the order.');
+
+  // لو لا يوجد مستخدم، أو الجلسة Anonymous (ضيف) بلا بيانات هذه الجلسة → افتح المنبثق
+  if (!firebase.auth().currentUser || firebase.auth().currentUser.isAnonymous){
+    openAuthDialog();
+    return;
+  }
+
+  const user = firebase.auth().currentUser;
+  // ضَمَّن معلومات السلة الحالية
+  const type = PICKUP ? 'pickup' : 'delivery';
+
+  // بناء عناصر الطلب من CART (لا تغيّر تسعير العميل — حفظًا للسجل)
+  // بناء عناصر الطلب من CART (مع حراسة قوية على البُنى)
+const items = CART.map(x => ({
+  productId: x.pid,
+  name: x.title,
+  qty: Number(x.qty || 0),
+  unit: Number(x.price || 0),
+  // نخزّن الخيارات بشكل "مسطّح" كما كنت تعمل، لكن نحرس على g.items
+  options: Array.isArray(x.opts)
+    ? x.opts.flatMap(g =>
+        Array.isArray(g.items)
+          ? g.items.map(it => ({
+              group: g.group || '',
+              name: it.name || '',
+              qty: Number(it.qty || 1),
+              price: Number(it.price || 0)
+            }))
+          : []
+      )
+    : []
+}));
+
+
+  const pricing = {
+    itemsSubtotal: Number(CART.reduce((s,x)=>s+x.qty*x.price,0).toFixed(2)),
+    deliveryFee: (type==='delivery' ? (Number(CART_INFO?.delivery||0)) : 0),
+    total: 0, currency:'EUR'
+  };
+  pricing.total = Number((pricing.itemsSubtotal + (type==='pickup'?0:pricing.deliveryFee)).toFixed(2));
+
+  // أنشئ/حدّث وثيقة Costumer ثم أضِف الطلب في السب-كولكشن
+  const costumerRef = fs.collection('Costumers').doc(user.uid);
+  await upsertCostumerProfile({
+    uid: user.uid,
+    name: user.displayName||'',
+    phone: user.phoneNumber||'',
+    email: user.email||'',
+    isGuest: user.isAnonymous===true
+  });
+
+  const orderDoc = {
+    restaurantId: CART_INFO?.rid || '',
+    restaurantName: CART_INFO?.rname || '',
+    type, status: 'placed',
+    pricing,
+    items,
+    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+  };
+
+  const ref = await costumerRef.collection('orders').add(orderDoc);
+
+  // نظّف السلة وأغلق المنبثق
+  CART = []; CART_INFO = null; updateCartBadge();
+  document.getElementById('cartDialog').close();
+  alert(`تم إرسال الطلب. رقم الطلب: ${ref.id}`);
+  // ❷ لو كان المستخدم ضيفًا: احذفه أو سجّل خروجه كي يُطلب إدخال البيانات في كل مرة
+  try{
+    const u = firebase.auth().currentUser;
+    if (u && u.isAnonymous) {
+      // حذف حساب الضيف (أنظف من signOut للـ anonymous)
+      await u.delete().catch(async ()=>{ await firebase.auth().signOut(); });
+    }
+  }catch(_){}
 }
+// === Helpers مشتركة ===
+const fmtDate = (ts) => {
+  try{
+    if (!ts) return '—';
+    const d = ts.toDate ? ts.toDate() : (ts.seconds ? new Date(ts.seconds*1000) : new Date(ts));
+    return new Intl.DateTimeFormat(LANG==='tr'?'tr-TR':LANG==='ar'?'ar-EG':LANG==='en'?'en-GB':'de-DE', {
+      dateStyle:'medium', timeStyle:'short'
+    }).format(d);
+  }catch(_){ return '—'; }
+};
+
+// === تبويب: طلباتي ===
+async function renderMyOrdersTab(user){
+  const cont = document.getElementById('userTabBody');
+  cont.innerHTML = `<div class="small">... Loading</div>`;
+
+  try{
+    const ref = fs.collection('Costumers').doc(user.uid).collection('orders')
+                   .orderBy('createdAt','desc').limit(20);
+    const snap = await ref.get();
+    if (snap.empty) {
+      cont.innerHTML = `<div class="small">Keine Bestellungen.</div>`;
+      return;
+    }
+    const frag = document.createDocumentFragment();
+    snap.forEach(doc=>{
+      const o = doc.data()||{};
+      const total = (o.pricing && o.pricing.total!=null) ? Number(o.pricing.total) : 0;
+      const rid   = o.restaurantName || o.restaurantId || '';
+      const st    = o.status || '—';
+      const card  = document.createElement('div');
+	  // داخل renderMyOrdersTab، بعد إنشاء card:
+card.setAttribute('data-oid', doc.id);
+card.style.cursor = 'pointer';
+card.addEventListener('click', () => openOrderDialog(doc.id));
+
+      card.className = 'order-card';
+      card.innerHTML = `
+        <div class="order-meta">
+          <div class="order-title">#${doc.id.slice(0,6)} – ${rid ? `<span>${esc(rid)}</span>` : '—'}</div>
+          <div class="order-sub">${fmtDate(o.createdAt)}</div>
+        </div>
+        <div style="display:flex; align-items:center; gap:10px">
+          <span class="badge-st">${esc(st)}</span>
+          <strong>${eur(total)}</strong>
+        </div>
+      `;
+      frag.appendChild(card);
+    });
+    cont.innerHTML = '';
+    cont.appendChild(frag);
+  }catch(e){
+    cont.innerHTML = `<div class="small" style="color:#b91c1c">${esc(e?.message||String(e))}</div>`;
+  }
+}
+
+// === تبويب: تعديل الملف الشخصي ===
+async function renderProfileTab(user){
+  const cont = document.getElementById('userTabBody');
+  cont.innerHTML = `<div class="small">... Loading</div>`;
+
+  // جلب الملف الحالي
+  let d = {};
+  try{
+    const snap = await fs.collection('Costumers').doc(user.uid).get();
+    d = snap.exists ? (snap.data()||{}) : {};
+  }catch(_){}
+
+  // تفكيك الحقول (نحاول استخراج الشارع/البيت من address_text إن وُجد)
+  const firstName = d.firstName || (d.name ? String(d.name).split(' ')[0] : '');
+  const lastName  = d.lastName  || (d.name ? String(d.name).split(' ').slice(1).join(' ') : '');
+  const phone     = d.phone || user.phoneNumber || '';
+  const email     = d.email || user.email || '';
+  let street      = d.street || '';
+  let zip         = d.zip || '';
+  if (!street && d.address_text){
+    // محاولة بسيطة: "شارع 10, 12345 مدينة"
+    const parts = String(d.address_text).split(',');
+    street = parts[0]?.trim() || '';
+    const tail = parts[1] || '';
+    const z = String(tail).match(/\b\d{4,6}\b/);
+    if (z) zip = z[0];
+  }
+
+  cont.innerHTML = `
+    <form id="frmProfile" class="prof-form" novalidate>
+      <div class="prof-grid">
+        <div class="prof-field">
+          <label>Vorname *</label>
+          <input type="text" id="pfFirst" required value="${esc(firstName)}">
+        </div>
+        <div class="prof-field">
+          <label>Nachname *</label>
+          <input type="text" id="pfLast" required value="${esc(lastName)}">
+        </div>
+      </div>
+
+      <div class="prof-grid">
+        <div class="prof-field">
+          <label>Rufnummer *</label>
+          <input type="tel" id="pfPhone" required value="${esc(phone)}">
+        </div>
+        <div class="prof-field">
+          <label>E-Mail</label>
+          <input type="email" id="pfEmail" value="${esc(email)}" placeholder="Optional">
+        </div>
+      </div>
+
+      <div class="prof-field">
+        <label>Straße und Hausnummer *</label>
+        <input type="text" id="pfStreet" required value="${esc(street)}" placeholder="Z.B: Musterstraße 10">
+      </div>
+
+      <div class="prof-field">
+        <label>PLZ *</label>
+        <input type="text" id="pfZip" required value="${esc(zip)}" inputmode="numeric" pattern="\\d{4,6}">
+      </div>
+
+      <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:6px">
+        <button type="submit" class="btn-cta">Speichern</button>
+      </div>
+    </form>
+  `;
+
+  // حفظ
+  const form = document.getElementById('frmProfile');
+  form.addEventListener('submit', async (e)=>{
+    e.preventDefault();
+    const v = {
+      firstName: document.getElementById('pfFirst').value.trim(),
+      lastName:  document.getElementById('pfLast').value.trim(),
+      phone:     document.getElementById('pfPhone').value.trim(),
+      email:     document.getElementById('pfEmail').value.trim(),
+      street:    document.getElementById('pfStreet').value.trim(),
+      zip:       document.getElementById('pfZip').value.trim(),
+    };
+    // تحقق بسيط
+    if (!v.firstName || !v.lastName || !v.phone || !v.street || !v.zip){
+      alert('الرجاء تعبئة جميع الحقول الإلزامية'); return;
+    }
+    // build address_text (للتوافق مع واجهتك)
+    const address_text = `${v.street}, ${v.zip}`.trim();
+
+    try{
+      await fs.collection('Costumers').doc(user.uid).set({
+        firstName: v.firstName,
+        lastName:  v.lastName,
+        phone:     v.phone,
+        email:     v.email,
+        street:    v.street,
+        zip:       v.zip,
+        address_text,
+        updatedAt: new Date().toISOString()
+      }, { merge:true });
+
+      // حدّث الهيدر (الاسم العلوي والأفاتار)
+      const full = `${v.firstName} ${v.lastName}`.trim();
+      document.getElementById('userName').textContent = full || 'Benutzer';
+      document.getElementById('userAva').textContent  = initialsFromName(full);
+
+      toast('تم حفظ الملف الشخصي');
+    }catch(e){
+      alert(e?.message || String(e));
+    }
+  });
+}
+
+// === مُبدّل التبويبات ===
+function bindUserTabs(){
+  const tabs = document.querySelectorAll('.user-tab');
+  tabs.forEach(t=>{
+    t.addEventListener('click', async ()=>{
+      tabs.forEach(x=>x.classList.remove('active'));
+      t.classList.add('active');
+      const key = t.dataset.ut;
+      const u = firebase.auth().currentUser;
+      if (!u) { openAuthDialog(); return; }
+      if (key === 'orders') await renderMyOrdersTab(u);
+      else await renderProfileTab(u);
+    });
+  });
+}
+
+// عند فتح اللوحة لأول مرة: فعّل التبويب الافتراضي (طلباتي)
+async function openUserPanelWithDefaultTab(){
+  const u = firebase.auth().currentUser;
+  if (!u) { openAuthDialog(); return; }
+  refreshUserUI(u);
+  await hydrateNameFromProfile?.(u); // لو كنت أضفتها سابقًا
+  openUserPanel();
+  // افتراضي: "طلباتي"
+  const first = document.querySelector('.user-tab[data-ut="orders"]');
+  if (first){
+    document.querySelectorAll('.user-tab').forEach(x=>x.classList.remove('active'));
+    first.classList.add('active');
+    await renderMyOrdersTab(u);
+  }
+}
+
 async function fetchOptionGroups(rid, ids){
   if(!Array.isArray(ids) || !ids.length) return [];
   const col = fs.collection('restaurants').doc(rid).collection('option_groups');
@@ -2410,6 +3023,241 @@ if (CART_INFO.pickupLocked) {
 }
 
 /* ===== Bindings ===== */
+// helper: أنشئ/حدّث وثيقة Costumer عند أول دخول/تسجيل/طلب
+async function upsertCostumerProfile({
+  uid,
+  firstName='',
+  lastName='',
+  phone='',
+  email='',
+  address_text='',
+  isGuest=false
+}){
+  const ref = fs.collection('Costumers').doc(uid);
+  const snap = await ref.get();
+  const now  = new Date().toISOString();
+
+  const base = {
+    firstName,
+    lastName,
+    phone,
+    email,
+    address_text,
+    isGuest: !!isGuest, // لن تُكتب إن لم تكن بالقاعدة، لكنها لا تكسرها لو تجاهلها السيرفر
+    updatedAt: now
+  };
+
+  if (snap.exists){
+    await ref.set(base, { merge: true });
+  } else {
+    await ref.set({ ...base, createdAt: now });
+  }
+}
+
+function openAuthDialog(){
+  const dlg = document.getElementById('authDialog');
+  dlg.showModal();
+}
+(function bindAuthTabs(){
+  const dlg = document.getElementById('authDialog');
+  if (!dlg) return;
+
+  // تبويبات
+  dlg.querySelectorAll('.tab').forEach(tab=>{
+    tab.addEventListener('click', ()=>{
+      dlg.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+      tab.classList.add('active');
+      const key = tab.dataset.tab;
+      dlg.querySelectorAll('[data-panel]').forEach(p=> p.style.display = (p.getAttribute('data-panel')===key?'block':'none'));
+    });
+  });
+
+  // إغلاق
+  document.getElementById('authClose').addEventListener('click', ()=> dlg.close());
+
+  // تسجيل الدخول
+  document.getElementById('frmLogin').addEventListener('submit', async (e)=>{
+    e.preventDefault();
+    const email = document.getElementById('loginEmail').value.trim();
+    const pass  = document.getElementById('loginPass').value;
+    try{
+      const { user } = await firebase.auth().signInWithEmailAndPassword(email, pass);
+      await upsertCostumerProfile({ uid:user.uid, email:user.email||email, name:user.displayName||'', phone:user.phoneNumber||'', isGuest:false });
+      dlg.close(); toast('تم تسجيل الدخول');
+    }catch(err){ alert(err.message||String(err)); }
+  });
+
+  // إنشاء حساب
+  document.getElementById('frmRegister').addEventListener('submit', async (e)=>{
+  e.preventDefault();
+
+  const firstName = document.getElementById('regFirst').value.trim();
+  const lastName  = document.getElementById('regLast').value.trim();
+  const email     = document.getElementById('regEmail').value.trim();
+  const phone     = document.getElementById('regPhone').value.trim();
+  const street    = document.getElementById('regStreet').value.trim();
+  const zip       = document.getElementById('regZip').value.trim();
+  const pass      = document.getElementById('regPass').value;
+
+  const address_text = `${street}, ${zip}`;
+
+  try{
+    const { user } = await firebase.auth().createUserWithEmailAndPassword(email, pass);
+    await user.updateProfile({ displayName: `${firstName} ${lastName}` }).catch(()=>{});
+
+    await upsertCostumerProfile({
+      uid: user.uid,
+      firstName, lastName, phone, email, address_text,
+      isGuest: false
+    });
+
+    document.getElementById('authDialog').close();
+    toast('تم إنشاء الحساب وتسجيل الدخول');
+  }catch(err){
+    alert(err.message || String(err));
+  }
+});
+
+
+  // ضيف
+  document.getElementById('frmGuest').addEventListener('submit', async (e)=>{
+  e.preventDefault();
+
+  const firstName = document.getElementById('gstFirst').value.trim();
+  const lastName  = document.getElementById('gstLast').value.trim();
+  const phone     = document.getElementById('gstPhone').value.trim();
+  const street    = document.getElementById('gstStreet').value.trim();
+  const zip       = document.getElementById('gstZip').value.trim();
+
+  const address_text = `${street}, ${zip}`;
+
+  try{
+    // لا تحفظ جلسة الضيف
+    await firebase.auth().setPersistence(firebase.auth.Auth.Persistence.NONE);
+
+    if(!firebase.auth().currentUser){
+      await firebase.auth().signInAnonymously();
+    }
+    const uid = firebase.auth().currentUser.uid;
+
+    await upsertCostumerProfile({
+      uid,
+      firstName, lastName, phone, email:'', address_text,
+      isGuest:true
+    });
+
+    document.getElementById('authDialog').close();
+    toast('متابعة كضيف');
+
+    // لا تكمل الطلب تلقائيًا — يجب أن يضغط المستخدم "اتمام الطلب" يدويًا
+  }catch(err){
+    alert(err.message||String(err));
+  }
+});
+
+})();
+// === User panel helpers ===
+function openUserPanel(){
+  document.getElementById('backdrop').classList.add('show');
+  const p = document.getElementById('userPanel');
+  p.classList.add('open');
+  p.setAttribute('aria-hidden', 'false');
+}
+function closeUserPanel(){
+  document.getElementById('backdrop').classList.remove('show');
+  const p = document.getElementById('userPanel');
+  p.classList.remove('open');
+  p.setAttribute('aria-hidden', 'true');
+}
+function initialsFromName(name=''){
+  const parts = String(name).trim().split(/\s+/).filter(Boolean);
+  if (!parts.length) return '👤';
+  const ini = (parts[0][0]||'') + (parts[1]?.[0]||'');
+  return ini.toUpperCase();
+}
+function refreshUserUI(user){
+  const nameEl  = document.getElementById('userName');
+  const emailEl = document.getElementById('userEmail');
+  const avaEl   = document.getElementById('userAva');
+
+  if (user){
+    const name  = user.displayName || (user.isAnonymous ? 'Gast' : (user.email || 'Benutzer'));
+    const email = user.email || (user.phoneNumber || '');
+    nameEl.textContent  = name;
+    emailEl.textContent = email || '—';
+    avaEl.textContent   = initialsFromName(name);
+  }else{
+    nameEl.textContent  = 'Nicht angemeldet';
+    emailEl.textContent = '—';
+    avaEl.textContent   = '👤';
+  }
+}
+// يجلب الاسم المعروض من وثيقة Costumers/{uid}
+async function getCostumerDisplayName(uid){
+  try{
+    const snap = await fs.collection('Costumers').doc(uid).get();
+    if (!snap.exists) return null;
+    const d = snap.data() || {};
+    const fn = (d.firstName || '').trim();
+    const ln = (d.lastName  || '').trim();
+    const full = `${fn} ${ln}`.trim();
+    if (full) return full;
+    if (d.name && d.name.trim()) return d.name.trim();
+    return null;
+  }catch(_){ return null; }
+}
+
+// يحقن الاسم الحقيقي بعد عرض الواجهة الأولي
+async function hydrateNameFromProfile(user){
+  if (!user) return;
+  const profName = await getCostumerDisplayName(user.uid);
+  if (!profName) return;
+  const nameEl = document.getElementById('userName');
+  const avaEl  = document.getElementById('userAva');
+  nameEl.textContent = profName;
+  avaEl.textContent  = initialsFromName(profName);
+}
+
+// === Bind on load ===
+window.addEventListener('DOMContentLoaded', () => {
+  const userBtn   = document.getElementById('userBtn');
+  const userClose = document.getElementById('userClose');
+  const backdrop  = document.getElementById('backdrop');
+  const btnLogout = document.getElementById('btnLogout');
+
+  userBtn?.addEventListener('click', async () => {
+  const u = firebase.auth().currentUser;
+  if (!u) { openAuthDialog(); return; }
+
+  // عرض فوري بالمتاح من Firebase Auth (displayName/…)
+  refreshUserUI(u);
+
+  // ثم استبدل الاسم من ملف العميل في Firestore إن وجد
+  await hydrateNameFromProfile(u);
+
+  openUserPanel();
+});
+
+
+  userClose?.addEventListener('click', closeUserPanel);
+  backdrop?.addEventListener('click', closeUserPanel);
+
+  btnLogout?.addEventListener('click', async () => {
+    try{
+      await firebase.auth().signOut();
+      closeUserPanel();
+      toast('تم تسجيل الخروج');
+    }catch(e){
+      alert(e?.message || String(e));
+    }
+  });
+
+  // راقب تغيّر حالة المستخدم لتحديث العرض
+  firebase.auth().onAuthStateChanged(u => {
+    refreshUserUI(u);
+  });
+});
+
 window.addEventListener('DOMContentLoaded', ()=>{
   const sel=document.getElementById('lang'); sel.value=LANG; applyLang(); // Make cart button icon-only
 const vc = document.getElementById('viewCart');
@@ -2421,7 +3269,13 @@ if (vc) vc.innerHTML = `<span class="cart-ico"></span><span id="cartCount" class
   });
 buildCatRail();
   bindRailNav(); // ربط أسهم السكك مرة واحدة
+bindUserTabs();
 
+  // زر المستخدم
+  const userBtn = document.getElementById('userBtn');
+  userBtn?.addEventListener('click', async () => {
+    await openUserPanelWithDefaultTab();
+  });
   document.querySelector('.chip[data-chip="open"]').addEventListener('click',e=>{ e.currentTarget.classList.toggle('active'); renderCatalog(); });
   document.getElementById('sort').addEventListener('change',renderCatalog);
   document.getElementById('city').addEventListener('change',renderCatalog);
