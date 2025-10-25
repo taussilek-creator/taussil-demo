@@ -764,27 +764,6 @@ input[type="number"]{-moz-appearance:textfield;text-align:center;font-variant-nu
     </div>
   </div>
 </div>
-<!-- ===== Customer Order Incoming Modal (Costumers/*/orders) ===== -->
-<div id="custOrderModal" class="modal white" style="display:none">
-  <div class="box" role="dialog" aria-modal="true" aria-labelledby="custOMTitle">
-    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
-      <strong id="custOMTitle">Neuer Kundenauftrag</strong>
-      <button id="custOMClose" class="btn-mini">✕</button>
-    </div>
-
-    <div id="custOMBody" class="od-dl" style="margin-top:8px"></div>
-
-    <div style="display:flex; gap:8px; align-items:center; justify-content:center; margin-top:10px">
-      <label class="small">Vorbereitungszeit (Min)</label>
-      <input id="custOMPrep" class="input center" type="number" min="0" step="5" value="15" style="width:120px">
-    </div>
-
-    <div style="display:flex; gap:8px; justify-content:center; margin-top:10px">
-      <button id="custOMAccept" class="btn btn-cta" type="button">Annehmen</button>
-      <button id="custOMCancel" class="btn" type="button">Abbrechen</button>
-    </div>
-  </div>
-</div>
 
 <body>
   <!-- Auth Modal (Restaurant) -->
@@ -950,8 +929,10 @@ import { initializeApp, getApp } from "https://www.gstatic.com/firebasejs/10.12.
 import {
   initializeFirestore, collection, doc, setDoc, getDoc, serverTimestamp,
   onSnapshot, query, where, orderBy, limit, getDocs, startAfter,
-  getCountFromServer, collectionGroup, updateDoc
+  getCountFromServer
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+
 
 import { getDatabase, ref as rRef, get as rGet, onValue as rOn, off as rOff } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, setPersistence, browserLocalPersistence } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
@@ -1387,8 +1368,6 @@ onAuthStateChanged(auth, async (user)=>{
     showAuth(false);
     ensureRestaurantGeocoded();
     attachMyTotalsAndLast();
-	    attachCustomerOrdersListener();   // <= NEW
-
   }catch(e){
     console.error('auth flow error', e);
     showAuth(true);
@@ -3349,103 +3328,6 @@ const codBadge  = (!isSingle && codAny)
   });
 })();
 
-// ===== Customer Orders (Costumers/*/orders) — modal + listener =====
-let CUST_ORDERS_UNSUB = null;
-let CUST_WARMED = false;
-let CUST_LAST_DOC = null;
-
-function showCustOrder(docSnap){
-  CUST_LAST_DOC = docSnap;
-  const o = docSnap.data() || {};
-  const id = docSnap.id;
-
-  // حقول متاحة من إنشاء الزبون (كما في قواعدك): restaurantId, restaurantName, type, status, pricing, items, createdAt
-  const type   = o.type || '—';
-  const status = o.status || '—';
-  const rname  = o.restaurantName || '—';
-  const total  = (o.pricing && (o.pricing.total || o.pricing.price)) || o.price || 0;
-  const itemsN = Array.isArray(o.items) ? o.items.length : 0;
-  const created= (o.createdAt && o.createdAt.toDate) ? o.createdAt.toDate().toLocaleString('de-DE') : '—';
-
-  // بناء تفاصيل خفيفة
-  const body = document.getElementById('custOMBody');
-  body.innerHTML = `
-    <dl class="od-dl">
-      <dt>Order ID</dt><dd>${id}</dd>
-      <dt>Restaurant</dt><dd>${rname}</dd>
-      <dt>Typ</dt><dd>${type}</dd>
-      <dt>Status</dt><dd>${status}</dd>
-      <dt>Items</dt><dd>${itemsN}</dd>
-      <dt>Total</dt><dd>${(Number(total)||0).toLocaleString('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2})}€</dd>
-      <dt>Erstellt</dt><dd>${created}</dd>
-    </dl>
-  `;
-
-  const modal = document.getElementById('custOrderModal');
-  if(modal) modal.style.display = 'flex';
-}
-
-function hideCustOrder(){
-  const modal = document.getElementById('custOrderModal');
-  if(modal) modal.style.display = 'none';
-  CUST_LAST_DOC = null;
-}
-
-// أزرار المنبثق
-document.getElementById('custOMClose')?.addEventListener('click', hideCustOrder);
-document.getElementById('custOMCancel')?.addEventListener('click', async ()=>{
-  try{
-    if(!CUST_LAST_DOC) return;
-    await updateDoc(CUST_LAST_DOC.ref, {
-      status: 'Abgebrochen',
-      updatedAt: serverTimestamp()
-    });
-  }catch(e){ console.error(e); }
-  hideCustOrder();
-});
-document.getElementById('custOMAccept')?.addEventListener('click', async ()=>{
-  try{
-    if(!CUST_LAST_DOC) return;
-    const mins = Math.max(0, parseInt(document.getElementById('custOMPrep')?.value || '0', 10) || 0);
-    await updateDoc(CUST_LAST_DOC.ref, {
-      status: 'Angenommen',
-      prepMinutes: mins,
-      acceptedAt: serverTimestamp(),
-      updatedAt: serverTimestamp()
-    });
-  }catch(e){ console.error(e); }
-  hideCustOrder();
-});
-
-// مستمع collectionGroup لكل أوامر الزبائن التي تخص هذا المطعم
-function attachCustomerOrdersListener(){
-  if(CUST_ORDERS_UNSUB){ CUST_ORDERS_UNSUB(); CUST_ORDERS_UNSUB = null; }
-  if(!RESTAURANT_ID) return;
-
-  // بدون orderBy لتفادي بناء فهارس إضافية الآن
-  const q = query(collectionGroup(db, 'orders'), where('restaurantId','==', RESTAURANT_ID));
-
-  CUST_WARMED = false;
-  CUST_ORDERS_UNSUB = onSnapshot(q, (snap)=>{
-    if(!CUST_WARMED){
-      // تجاهل اللقطة الأولى (موجودات قديمة) — نريد المنبثق فقط على الطلبات المُضافة لاحقًا
-      CUST_WARMED = true;
-      return;
-    }
-    snap.docChanges().forEach(ch=>{
-      if(ch.type === 'added'){
-        const o = ch.doc.data() || {};
-        const st = String(o.status || '');
-        // نفتح المنبثق فقط عندما يكون الطلب في حالته الابتدائية (قيد المعالجة/إنشاء)
-        if(st === 'Bearbeitung' || st === 'pending' || st === 'Neu' || st === ''){
-          showCustOrder(ch.doc);
-        }
-      }
-    });
-  }, (err)=>{
-    console.error('Customer orders listener error:', err);
-  });
-}
 
 </script>
 </body>
