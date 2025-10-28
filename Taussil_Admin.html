@@ -2706,7 +2706,7 @@ async function openFleetDriversModal(fleetId){
 
   let rows = [];
   try{
-    const qy = query(collection(db,'users'), where('role','==','driver'), where('fleetId','==', fleetId), limit(200));
+    const qy = query(collection(db,'users'), where('role','==','driver'), where('fleetId','==', fleetId), limit(10000));
     const snap = await getDocs(qy);
     rows = snap.docs.map(d=>({id:d.id, ...d.data()}));
   }catch(e){
@@ -3154,7 +3154,7 @@ async function bindRealtimeOnce(){
   if (unsubOrders || unsubRestaurants || unsubDrivers) return;
 
   unsubOrders = onSnapshot(
-    query(collection(db,'orders'), orderBy('updatedAt','desc'), limit(200)),
+    query(collection(db,'orders'), orderBy('updatedAt','desc'), limit(10000)),
     (snap)=>{
       snap.docChanges().forEach(ch=>{
         const id=ch.doc.id; const data=ch.doc.data()||{}; const prev=ordersMap.get(id);
@@ -3187,7 +3187,7 @@ async function bindRealtimeOnce(){
   if(!unsubRestaurantUsersApproved){
     unsubRestaurantUsersApproved = onSnapshot(
       // شرط role فقط، ونفلتر approved على الواجهة لتجنّب فهرس مركّب
-      query(collection(db,'users'), where('role','==','restaurant'), limit(200)),
+      query(collection(db,'users'), where('role','==','restaurant'), limit(10000)),
       (snap)=>{
         const rows = snap.docs.map(d => {
           const u = d.data() || {};
@@ -3209,7 +3209,7 @@ async function bindRealtimeOnce(){
   /* [TAUSSIL-REST-APPROVED-LISTENER-END] */
 
   unsubDrivers = onSnapshot(
-  query(collection(db,'users'), where('role','==','driver'), where('approved','==', true), limit(200)),
+  query(collection(db,'users'), where('role','==','driver'), where('approved','==', true), limit(10000)),
   (snap)=>{
     drivers = snap.docs.map(d=>{
       const u=d.data()||{};
@@ -4809,7 +4809,7 @@ async function bindPendingRealtime(){
   if(!unsubPendingDrv){
   unsubPendingDrv = onSnapshot(
     // لا نقيّد approved == false — نجلب كل السائقين ثم نرشّح محلياً
-    query(collection(db,'users'), where('role','==','driver'), limit(200)),
+    query(collection(db,'users'), where('role','==','driver'), limit(10000)),
     (snap)=>{
       const all = snap.docs.map(d=>({id:d.id, ...d.data()}));
       // pending = كل من ليس approved === true (واستبعاد المرفوضين)
@@ -4837,7 +4837,7 @@ async function bindPendingRealtime(){
 
   if(!unsubPendingRestUsers){
     unsubPendingRestUsers = onSnapshot(
-      query(collection(db,'users'), where('role','==','restaurant'), where('approved','==', false), limit(200)),
+      query(collection(db,'users'), where('role','==','restaurant'), where('approved','==', false), limit(10000)),
       (snap)=>{
         /* ===== [TAUSSIL-APPROVAL-FILTER-PENDING-RESTUSERS-START] ===== */
         pendingRestaurantUsers = snap.docs
@@ -4852,7 +4852,7 @@ async function bindPendingRealtime(){
   if(!unsubPendingRestDocs){
     try{
       unsubPendingRestDocs = onSnapshot(
-        query(collection(db,'restaurants'), where('approved','==', false), limit(200)),
+        query(collection(db,'restaurants'), where('approved','==', false), limit(10000)),
         (snap)=>{
           /* ===== [TAUSSIL-APPROVAL-FILTER-PENDING-RESTDOCS-START] ===== */
           pendingRestaurantDocs = snap.docs
