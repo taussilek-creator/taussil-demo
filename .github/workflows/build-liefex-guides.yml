@@ -20,40 +20,47 @@ jobs:
 
       - name: Install system dependencies
         run: |
-          sudo apt-get update
-          sudo apt-get install -y libreoffice-writer fonts-dejavu-core curl
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq libreoffice-writer fonts-dejavu-core curl >/dev/null
           sudo mkdir -p /usr/local/share/fonts
-          sudo curl -L "https://github.com/google/fonts/raw/main/ofl/almarai/Almarai-Regular.ttf" -o /usr/local/share/fonts/Almarai-Regular.ttf
-          sudo curl -L "https://github.com/google/fonts/raw/main/ofl/almarai/Almarai-Bold.ttf" -o /usr/local/share/fonts/Almarai-Bold.ttf
-          sudo fc-cache -f -v
+          sudo curl -sSL "https://github.com/google/fonts/raw/main/ofl/almarai/Almarai-Regular.ttf" -o /usr/local/share/fonts/Almarai-Regular.ttf
+          sudo curl -sSL "https://github.com/google/fonts/raw/main/ofl/almarai/Almarai-Bold.ttf" -o /usr/local/share/fonts/Almarai-Bold.ttf
+          sudo fc-cache -f >/dev/null
 
       - name: Install Python dependencies
         run: |
-          python -m pip install --upgrade pip
-          pip install python-docx pillow lxml arabic-reshaper python-bidi
+          python -m pip install -q --upgrade pip
+          pip install -q python-docx pillow lxml arabic-reshaper python-bidi
 
       - name: Build DOCX guides
+        shell: bash
         run: |
-          python liefex_training_guides/build_docs.py
+          set -o pipefail
+          python liefex_training_guides/build_docs.py 2>&1 | tee build.log
 
       - name: Convert DOCX to PDF
+        if: success()
         run: |
           mkdir -p liefex_training_guides/output/pdf
           libreoffice --headless --convert-to pdf --outdir liefex_training_guides/output/pdf liefex_training_guides/output/*.docx
 
       - name: Package output
+        if: success()
         run: |
           cp liefex_training_guides/output/pdf/*.pdf liefex_training_guides/output/
           cd liefex_training_guides/output
-          zip -r LiefeX_Professional_RTL_Training_Guides.zip *.docx *.pdf assets
+          zip -q -r LiefeX_Professional_RTL_Training_Guides.zip *.docx *.pdf assets
 
-      - name: Upload guides
+      - name: Upload guides and diagnostics
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: liefex-professional-rtl-guides
           path: |
+            build.log
             liefex_training_guides/output/*.docx
             liefex_training_guides/output/*.pdf
             liefex_training_guides/output/*.zip
             liefex_training_guides/output/assets/*.png
+          if-no-files-found: warn
           retention-days: 7
